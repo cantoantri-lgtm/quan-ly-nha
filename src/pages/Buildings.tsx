@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ClipboardEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { KIND_LABEL, type Building } from "../lib/labels";
 import { Empty, Sheet, TopBar } from "../components/ui";
+import { currentPosition, googlePlace, parseLatLng, round6 } from "../lib/geo";
 
 export default function Buildings() {
   const { buildings, reloadBase, toast } = useSession();
@@ -38,7 +39,7 @@ export default function Buildings() {
                 <span className="tag" style={{ fontSize: 13 }}>{b.code}</span>
                 <div className="grow">
                   <div className="name">{b.name}</div>
-                  <div className="sub">{KIND_LABEL[b.kind]}{b.address ? ` · ${b.address}` : ""}</div>
+                  <div className="sub">{b.lat == null ? <span style={{ color: "var(--today)" }}>Chưa có vị trí · </span> : null}{KIND_LABEL[b.kind]}{b.address ? ` · ${b.address}` : ""}</div>
                 </div>
                 <span className="muted small num" style={{ textAlign: "right" }}>{roomCounts[b.id] ?? 0} phòng<br />{counts[b.id] ?? 0} người</span>
               </div>
@@ -63,6 +64,9 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
   const [address, setAddress] = useState(value.address ?? "");
   const [kind, setKind] = useState(value.kind ?? "hon_hop");
   const [floors, setFloors] = useState(value.total_floors?.toString() ?? "");
+  const [lat, setLat] = useState(value.lat != null ? String(value.lat) : "");
+  const [lng, setLng] = useState(value.lng != null ? String(value.lng) : "");
+  const [locating, setLocating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [delOpen, setDelOpen] = useState(false);
@@ -77,10 +81,40 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
     onDeleted?.(`Đã xoá toà ${r.code} và ${r.rooms} phòng.${r.tasks_unlinked ? ` ${r.tasks_unlinked} việc đã giao được giữ lại, bỏ gắn toà.` : ""}`);
   }
 
+  // Toạ độ: nhận cả dấu phẩy thập phân (10,7769)
+  const num = (v: string) => (v.trim() ? Number(v.trim().replace(",", ".")) : NaN);
+  const latN = num(lat), lngN = num(lng);
+  const hasBoth = Number.isFinite(latN) && Number.isFinite(lngN);
+  const outsideVN = hasBoth && (latN < 8 || latN > 24 || lngN < 102 || lngN > 110);
+
+  // Dán "10.7769, 106.7009" hoặc link Google Maps vào ô nào cũng được → tự tách
+  function onPastePos(e: ClipboardEvent<HTMLInputElement>) {
+    const text = e.clipboardData.getData("text");
+    if (!/https?:|[,;\s]\s*-?\d+[.,]\d/.test(text.trim())) return;
+    const r = parseLatLng(text);
+    if (r && !("error" in r)) { e.preventDefault(); setLat(String(r.lat)); setLng(String(r.lng)); setErr(null); }
+    else if (r && /https?:/.test(text)) { e.preventDefault(); setErr(r.error); }
+  }
+
+  async function locateMe() {
+    setErr(null); setLocating(true);
+    try { const p = await currentPosition(); setLat(String(p.lat)); setLng(String(p.lng)); }
+    catch (e) { setErr((e as Error).message); }
+    setLocating(false);
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
-    setErr(null); setBusy(true);
-    const row = { code: code.trim().toUpperCase(), name: name.trim(), address: address.trim() || null, kind, total_floors: floors ? Number(floors) : null };
+    setErr(null);
+    if (lat.trim() || lng.trim()) {
+      if (!hasBoth) { setErr("Nhập đủ cả Vĩ độ và Kinh độ (dạng số, VD 10.7769 và 106.7009), hoặc để trống cả hai."); return; }
+      if (Math.abs(latN) > 90 || Math.abs(lngN) > 180) { setErr("Toạ độ không hợp lệ: Vĩ độ từ -90 đến 90, Kinh độ từ -180 đến 180."); return; }
+    }
+    setBusy(true);
+    const row = {
+      code: code.trim().toUpperCase(), name: name.trim(), address: address.trim() || null, kind, total_floors: floors ? Number(floors) : null,
+      lat: hasBoth ? round6(latN) : null, lng: hasBoth ? round6(lngN) : null,
+    };
     const { error } = value.id
       ? await supabase.from("buildings").update(row).eq("id", value.id)
       : await supabase.from("buildings").insert(row);
@@ -102,6 +136,24 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
           <input id="b-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Toà 89 Cách Mạng Tháng 8" required /></label>
         <label className="field"><span>Địa chỉ</span>
           <input id="b-addr" className="input" value={address} onChange={(e) => setAddress(e.target.value)} /></label>
+        <div className="field">
+          <span>Vị trí trên bản đồ</span>
+          <div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}>
+            <label className="field" style={{ flex: "1 1 0", minWidth: 0 }}><span className="small">Vĩ độ (Lat)</span>
+              <input id="b-lat" className="input num" inputMode="decimal" value={lat} placeholder="10.7769"
+                onChange={(e) => setLat(e.target.value)} onPaste={onPastePos} /></label>
+            <label className="field" style={{ flex: "1 1 0", minWidth: 0 }}><span className="small">Kinh độ (Long)</span>
+              <input id="b-lng" className="input num" inputMode="decimal" value={lng} placeholder="106.7009"
+                onChange={(e) => setLng(e.target.value)} onPaste={onPastePos} /></label>
+          </div>
+          <small className="muted">Dán dãy toạ độ hoặc link Google Maps vào một ô, app tự tách. Mẹo: trên Google Maps, chạm giữ vào toà rồi copy dãy số hiện ra.</small>
+          {outsideVN ? <small style={{ color: "var(--today)" }}>Toạ độ này nằm ngoài Việt Nam — kiểm tra lại có nhập ngược Vĩ độ và Kinh độ không.</small> : null}
+          <div className="row">
+            <button type="button" className="btn ghost sm" onClick={locateMe} disabled={locating}>{locating ? "Đang lấy vị trí…" : "Vị trí của tôi"}</button>
+            {hasBoth ? <a className="btn ghost sm" href={googlePlace({ lat: latN, lng: lngN })} target="_blank" rel="noopener">Xem trên Google Maps</a> : null}
+            {lat || lng ? <button type="button" className="btn ghost sm" style={{ color: "var(--danger)" }} onClick={() => { setLat(""); setLng(""); }}>Xoá toạ độ</button> : null}
+          </div>
+        </div>
         <label className="field"><span>Loại hình</span>
           <select id="b-kind" className="input" value={kind} onChange={(e) => setKind(e.target.value)}>
             {Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
