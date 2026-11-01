@@ -1,30 +1,63 @@
+/// <reference types="google.maps" />
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import "../map.css";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { KIND_LABEL } from "../lib/labels";
 import { naturalCompare } from "../lib/money";
 import { DEFAULT_CENTER, currentPosition, fmtLatLng, googleDirections, parseLatLng, round6, type LatLng } from "../lib/geo";
+import { GOOGLE_MAPS_KEY, loadGoogleMaps, onMapsAuthFailure } from "../lib/gmaps";
 import { Empty, TopBar } from "../components/ui";
 
 type Spot = {
   id: string; code: string; name: string; address: string | null; kind: string;
   lat: number | null; lng: number | null; total_rooms: number; vacant_rooms: number; can_open: boolean;
 };
+type Located = Spot & { lat: number; lng: number };
 type Placing = { spot: Spot; pos: LatLng | null };
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-const hasPos = (s: Spot): s is Spot & { lat: number; lng: number } => s.lat != null && s.lng != null;
+/** Ghim HTML vẽ trên Google Maps (giữ kiểu ghim có số phòng trống của app) */
+type HtmlPin = google.maps.OverlayView & { setPos(p: LatLng): void; el: HTMLDivElement };
+type PinCtor = new (pos: LatLng, html: string, label: string, onClick: (() => void) | null) => HtmlPin;
 
-const pinIcon = (s: Spot) => L.divIcon({
-  className: "pin-wrap",
-  html: `<div class="pin ${s.vacant_rooms > 0 ? "ok" : "zero"}"><b>${s.vacant_rooms}</b></div><span class="pin-code">${esc(s.code)}</span>`,
-  iconSize: [44, 44], iconAnchor: [22, 44], popupAnchor: [0, -40],
-});
-const draftIcon = L.divIcon({ className: "pin-wrap", html: `<div class="pin draft"><b>+</b></div>`, iconSize: [44, 44], iconAnchor: [22, 44] });
+function makePinClass(g: typeof google.maps): PinCtor {
+  return class Pin extends g.OverlayView {
+    el: HTMLDivElement;
+    pos: LatLng;
+    constructor(pos: LatLng, html: string, label: string, onClick: (() => void) | null) {
+      super();
+      this.pos = pos;
+      this.el = document.createElement("div");
+      this.el.className = "pin-wrap";
+      this.el.innerHTML = html;
+      this.el.setAttribute("aria-label", label);
+      this.el.title = label;
+      if (onClick) {
+        this.el.setAttribute("role", "button");
+        this.el.tabIndex = 0;
+        this.el.addEventListener("click", onClick);
+        this.el.addEventListener("keydown", (e) => { if (e.key === "Enter") onClick(); });
+      }
+    }
+    onAdd() {
+      g.OverlayView.preventMapHitsAndGesturesFrom(this.el); // bấm ghim không tính là bấm bản đồ
+      this.getPanes()?.overlayMouseTarget.appendChild(this.el);
+    }
+    draw() {
+      const p = this.getProjection()?.fromLatLngToDivPixel(new g.LatLng(this.pos.lat, this.pos.lng));
+      if (p) { this.el.style.left = `${p.x}px`; this.el.style.top = `${p.y}px`; }
+    }
+    onRemove() { this.el.remove(); }
+    setPos(p: LatLng) { this.pos = p; this.draw(); }
+  };
+}
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+const hasPos = (s: Spot): s is Located => s.lat != null && s.lng != null;
+const pinHtml = (s: Spot) =>
+  `<div class="pin ${s.vacant_rooms > 0 ? "ok" : "zero"}"><b>${s.vacant_rooms}</b></div><span class="pin-code">${esc(s.code)}</span>`;
+const DRAFT_HTML = `<div class="pin draft"><b>+</b></div>`;
 
 export default function MapPage() {
   const { isManager, reloadBase, toast } = useSession();
@@ -34,6 +67,8 @@ export default function MapPage() {
   const [spots, setSpots] = useState<Spot[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [mapErr, setMapErr] = useState<string | null>(GOOGLE_MAPS_KEY ? null : "Chưa cấu hình khoá Google Maps cho app.");
+  const [mapReady, setMapReady] = useState(false);
   const [onlyVacant, setOnlyVacant] = useState(false);
   const [placing, setPlacing] = useState<Placing | null>(null);
   const [paste, setPaste] = useState("");
@@ -41,10 +76,12 @@ export default function MapPage() {
   const [busy, setBusy] = useState(false);
 
   const box = useRef<HTMLDivElement>(null);
-  const map = useRef<L.Map | null>(null);
-  const layer = useRef<L.LayerGroup | null>(null);
-  const markers = useRef<Record<string, L.Marker>>({});
-  const draft = useRef<L.Marker | null>(null);
+  const gref = useRef<typeof google.maps | null>(null);
+  const Pin = useRef<PinCtor | null>(null);
+  const map = useRef<google.maps.Map | null>(null);
+  const info = useRef<google.maps.InfoWindow | null>(null);
+  const pins = useRef<Record<string, HtmlPin>>({});
+  const draft = useRef<HtmlPin | null>(null);
   const fitted = useRef(false);
   const placingRef = useRef<Placing | null>(null);
   placingRef.current = placing;
@@ -57,26 +94,30 @@ export default function MapPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  // Tạo bản đồ một lần
+  // Tải Google Maps và tạo bản đồ một lần
   useEffect(() => {
-    const el = box.current;
-    if (!el || map.current) return;
-    const m = L.map(el, { center: [DEFAULT_CENTER.lat, DEFAULT_CENTER.lng], zoom: 12, zoomControl: false });
-    L.control.zoom({ position: "bottomright", zoomInTitle: "Phóng to", zoomOutTitle: "Thu nhỏ" }).addTo(m);
-    m.attributionControl.setPrefix(false);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
-    }).addTo(m);
-    layer.current = L.layerGroup().addTo(m);
-    m.on("click", (e: L.LeafletMouseEvent) => {
-      const cur = placingRef.current;
-      if (cur) setPlacing({ ...cur, pos: { lat: round6(e.latlng.lat), lng: round6(e.latlng.lng) } });
-    });
-    map.current = m;
-    const ro = new ResizeObserver(() => m.invalidateSize());
-    ro.observe(el);
-    return () => { ro.disconnect(); m.remove(); map.current = null; layer.current = null; draft.current = null; };
+    if (!GOOGLE_MAPS_KEY) return;
+    let alive = true;
+    const off = onMapsAuthFailure(() => alive && setMapErr(
+      "Google Maps từ chối khoá: khoá sai, chưa bật Maps JavaScript API, chưa gắn thanh toán, hoặc địa chỉ trang này chưa được thêm vào danh sách Websites của khoá."));
+    loadGoogleMaps().then((g) => {
+      if (!alive || !box.current) return;
+      gref.current = g;
+      Pin.current = makePinClass(g);
+      const m = new g.Map(box.current, {
+        center: DEFAULT_CENTER, zoom: 12,
+        mapTypeControl: false, streetViewControl: false, fullscreenControl: true,
+        clickableIcons: false, gestureHandling: "greedy",
+      });
+      info.current = new g.InfoWindow({ pixelOffset: new g.Size(0, -44), maxWidth: 280 });
+      m.addListener("click", (e: google.maps.MapMouseEvent) => {
+        const cur = placingRef.current;
+        if (cur && e.latLng) setPlacing({ ...cur, pos: { lat: round6(e.latLng.lat()), lng: round6(e.latLng.lng()) } });
+      });
+      map.current = m;
+      setMapReady(true);
+    }).catch((e: Error) => alive && setMapErr(e.message));
+    return () => { alive = false; off(); };
   }, []);
 
   const located = useMemo(() => spots.filter(hasPos), [spots]);
@@ -84,12 +125,12 @@ export default function MapPage() {
   const startPlacing = useCallback((s: Spot) => {
     setPlaceErr(null); setPaste("");
     setPlacing({ spot: s, pos: hasPos(s) ? { lat: s.lat, lng: s.lng } : null });
-    map.current?.closePopup();
-    if (hasPos(s)) map.current?.setView([s.lat, s.lng], 17);
+    info.current?.close();
+    if (hasPos(s) && map.current) { map.current.setCenter(s); map.current.setZoom(18); }
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
-  const popupEl = useCallback((s: Spot & { lat: number; lng: number }) => {
+  const popupEl = useCallback((s: Located) => {
     const el = document.createElement("div");
     el.className = "map-pop";
     el.innerHTML =
@@ -117,49 +158,54 @@ export default function MapPage() {
     return el;
   }, [isManager, nav, startPlacing]);
 
+  const openInfo = useCallback((s: Located) => {
+    if (!map.current || !info.current) return;
+    info.current.setContent(popupEl(s));
+    info.current.setPosition(s);
+    info.current.open({ map: map.current });
+  }, [popupEl]);
+
   // Vẽ ghim các toà
   useEffect(() => {
-    const m = map.current, g = layer.current;
-    if (!m || !g) return;
-    g.clearLayers();
-    markers.current = {};
+    const m = map.current, P = Pin.current, g = gref.current;
+    if (!mapReady || !m || !P || !g) return;
+    Object.values(pins.current).forEach((p) => p.setMap(null));
+    pins.current = {};
     located.filter((s) => !onlyVacant || s.vacant_rooms > 0).forEach((s) => {
-      const mk = L.marker([s.lat, s.lng], { icon: pinIcon(s), title: `${s.name}: ${s.vacant_rooms} phòng trống`, riseOnHover: true });
-      mk.bindPopup(() => popupEl(s), { autoPanPadding: [16, 16], maxWidth: 280 });
-      mk.addTo(g);
-      markers.current[s.id] = mk;
+      const p = new P(s, pinHtml(s), `${s.name}: ${s.vacant_rooms} phòng trống`, () => openInfo(s));
+      p.setMap(m);
+      pins.current[s.id] = p;
     });
     if (!fitted.current && !loading) {
       fitted.current = true;
       const f = focusId ? located.find((s) => s.id === focusId) : undefined;
-      if (f) { m.setView([f.lat, f.lng], 16); markers.current[f.id]?.openPopup(); }
-      else if (located.length === 1) m.setView([located[0].lat, located[0].lng], 15);
-      else if (located.length > 1) m.fitBounds(L.latLngBounds(located.map((s) => [s.lat, s.lng] as [number, number])), { padding: [40, 40], maxZoom: 15 });
+      if (f) { m.setCenter(f); m.setZoom(16); openInfo(f); }
+      else if (located.length === 1) { m.setCenter(located[0]); m.setZoom(15); }
+      else if (located.length > 1) {
+        const b = new g.LatLngBounds();
+        located.forEach((s) => b.extend(s));
+        m.fitBounds(b, 48);
+        g.event.addListenerOnce(m, "idle", () => { if ((m.getZoom() ?? 0) > 16) m.setZoom(16); });
+      }
       // Mở từ trang toà chưa có vị trí → Quản lý đặt vị trí luôn
       const unplaced = focusId && !f ? spots.find((s) => s.id === focusId) : undefined;
       if (unplaced && isManager) startPlacing(unplaced);
     }
-  }, [located, onlyVacant, popupEl, loading, focusId, spots, isManager, startPlacing]);
+  }, [mapReady, located, onlyVacant, openInfo, loading, focusId, spots, isManager, startPlacing]);
 
-  // Ghim tạm khi Quản lý đang đặt vị trí
+  // Ghim đỏ tạm khi Quản lý đang đặt vị trí
   useEffect(() => {
-    const m = map.current;
-    if (!m) return;
+    const m = map.current, P = Pin.current;
+    if (!mapReady || !m || !P) return;
     const pos = placing?.pos;
-    if (!pos) { draft.current?.remove(); draft.current = null; return; }
-    if (!draft.current) {
-      const d = L.marker([pos.lat, pos.lng], { icon: draftIcon, draggable: true, zIndexOffset: 1000 }).addTo(m);
-      d.on("dragend", () => {
-        const p = d.getLatLng();
-        setPlacing((cur) => (cur ? { ...cur, pos: { lat: round6(p.lat), lng: round6(p.lng) } } : cur));
-      });
-      draft.current = d;
-    } else draft.current.setLatLng([pos.lat, pos.lng]);
-  }, [placing?.pos]);
+    if (!pos) { draft.current?.setMap(null); draft.current = null; return; }
+    if (!draft.current) { draft.current = new P(pos, DRAFT_HTML, "Vị trí đang chọn", null); draft.current.setMap(m); }
+    else draft.current.setPos(pos);
+  }, [mapReady, placing?.pos]);
 
   function setPosAndShow(p: LatLng) {
     setPlacing((cur) => (cur ? { ...cur, pos: p } : cur));
-    map.current?.setView([p.lat, p.lng], 17);
+    if (map.current) { map.current.setCenter(p); map.current.setZoom(18); }
   }
 
   function applyPasted() {
@@ -191,10 +237,11 @@ export default function MapPage() {
   function focus(s: Spot) {
     if (hasPos(s) && map.current) {
       if (onlyVacant && s.vacant_rooms === 0) setOnlyVacant(false);
-      map.current.setView([s.lat, s.lng], 16);
+      map.current.setCenter(s);
+      map.current.setZoom(16);
       window.scrollTo({ top: 0, behavior: "smooth" });
-      setTimeout(() => markers.current[s.id]?.openPopup(), 50);
-    } else if (isManager) startPlacing(s);
+      openInfo(s);
+    } else if (isManager && !mapErr) startPlacing(s);
     else if (s.can_open) nav(`/toa/${s.id}`);
   }
 
@@ -214,12 +261,21 @@ export default function MapPage() {
           <button className="chip" aria-pressed={onlyVacant} onClick={() => setOnlyVacant(!onlyVacant)}>Chỉ toà còn trống</button>
         </div>
 
-        <div className={`map-box${placing ? " placing" : ""}`} ref={box} role="region" aria-label="Bản đồ các toà nhà" />
+        <div className={`map-box${placing ? " placing" : ""}${mapErr ? " failed" : ""}`}>
+          <div ref={box} className="map-canvas" role="region" aria-label="Bản đồ các toà nhà" />
+          {mapErr ? (
+            <div className="map-msg" role="alert">
+              <b>Không mở được Google Maps</b>
+              <span>{mapErr}</span>
+              <span className="muted">Danh sách toà và nút Chỉ đường bên dưới vẫn dùng được.</span>
+            </div>
+          ) : !mapReady ? <div className="map-msg"><span className="muted">Đang tải Google Maps…</span></div> : null}
+        </div>
 
         {err ? <div className="error-box" role="alert">{err}</div> : null}
         {!loading && spots.length > 0 && located.length === 0 ? (
           <p className="muted small" style={{ margin: 0 }}>
-            Chưa toà nào có vị trí. {isManager ? "Bấm vào từng toà bên dưới để đặt vị trí." : "Quản lý sẽ đặt vị trí cho các toà."}
+            Chưa toà nào có vị trí. {isManager ? "Bấm vào từng toà bên dưới để đặt vị trí, hoặc nhập Lat/Long trong Quản trị → Toà nhà." : "Quản lý sẽ đặt vị trí cho các toà."}
           </p>
         ) : null}
 
@@ -235,6 +291,9 @@ export default function MapPage() {
                   <div className="sub">
                     {hasPos(s) ? (s.address || KIND_LABEL[s.kind]) : <span style={{ color: "var(--today)" }}>Chưa có vị trí{isManager ? " · bấm để đặt" : ""}</span>}
                   </div>
+                  {hasPos(s) && mapErr ? (
+                    <a className="small" href={googleDirections(s)} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()}>Chỉ đường</a>
+                  ) : null}
                 </div>
                 <span className="small num" style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                   <b style={{ color: s.vacant_rooms > 0 ? "var(--s-done)" : "var(--muted)", fontSize: 16 }}>{s.vacant_rooms}</b> trống
@@ -257,7 +316,7 @@ export default function MapPage() {
             <div>
               <b>Vị trí toà {placing.spot.code}</b>
               <div className="small muted">
-                {placing.pos ? <>Ghim đỏ: <span className="num">{fmtLatLng(placing.pos)}</span> · kéo ghim để chỉnh</> : "Chạm vào bản đồ đúng chỗ toà nhà, hoặc dán toạ độ bên dưới."}
+                {placing.pos ? <>Ghim đỏ: <span className="num">{fmtLatLng(placing.pos)}</span> · chạm chỗ khác để chỉnh</> : "Chạm vào bản đồ đúng chỗ toà nhà, hoặc dán toạ độ bên dưới."}
               </div>
             </div>
             <div className="row" style={{ flexWrap: "nowrap" }}>

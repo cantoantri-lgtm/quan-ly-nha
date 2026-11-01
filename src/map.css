@@ -1,20 +1,22 @@
-/* Bản đồ toà nhà (Leaflet + OpenStreetMap) */
+/* Bản đồ toà nhà (Google Maps) */
 .map-box {
   position: relative; z-index: 0; isolation: isolate; /* giữ lớp bản đồ dưới thanh trên/dưới và sheet */
   height: min(58vh, 480px); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line);
+  background: var(--surface-2);
 }
+.map-canvas { position: absolute; inset: 0; }
 .map-box.placing { outline: 3px solid var(--danger); outline-offset: -3px; }
-.map-box.placing .leaflet-container { cursor: crosshair; }
-.map-box .leaflet-container { height: 100%; font: inherit; background: var(--surface-2); }
-.map-box .leaflet-bar a { background: var(--surface); color: var(--ink); border-color: var(--line); }
-.map-box .leaflet-control-attribution { background: var(--surface); color: var(--muted); opacity: .85; font-size: 10px; }
-.map-box .leaflet-control-attribution a { color: var(--brand); }
-@media (prefers-color-scheme: dark) {
-  .map-box .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+.map-box.placing .map-canvas { cursor: crosshair; }
+.map-box.failed { height: auto; }
+.map-box.failed .map-msg { position: static; }
+.map-msg {
+  position: absolute; inset: 0; display: grid; place-content: center; gap: 6px; padding: 24px;
+  text-align: center; font-size: 14px; background: var(--surface-2); color: var(--ink);
 }
 
-/* Ghim: số phòng trống + mã toà */
-.pin-wrap { background: none; border: 0; }
+/* Ghim: số phòng trống + mã toà. Mũi ghim nằm đúng toạ độ. */
+.pin-wrap { position: absolute; width: 44px; height: 44px; transform: translate(-22px, -44px); cursor: pointer; }
+.pin-wrap:focus-visible { outline: 2px solid var(--brand); border-radius: 8px; }
 .pin {
   width: 36px; height: 36px; margin: 0 4px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
   display: grid; place-items: center; border: 2px solid var(--surface); box-shadow: var(--shadow);
@@ -26,15 +28,17 @@
 .pin-code {
   position: absolute; top: 46px; left: 50%; transform: translateX(-50%); white-space: nowrap;
   font-size: 11px; font-weight: 700; line-height: 1.5; padding: 0 5px; border-radius: 6px;
-  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); font-family: var(--font);
 }
 
-/* Khung thông tin khi bấm ghim */
-.map-box .leaflet-popup-content-wrapper, .map-box .leaflet-popup-tip { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
-.map-box .leaflet-popup-content { margin: 12px 14px; font-size: 14px; line-height: 1.4; }
-.map-box .leaflet-container a.leaflet-popup-close-button { color: var(--muted); }
-.map-pop { display: grid; gap: 4px; min-width: 200px; }
-.mp-name { font-size: 15px; padding-right: 14px; }
+/* Khung thông tin khi bấm ghim (InfoWindow của Google) theo màu của app, kể cả chế độ tối */
+.map-box .gm-style .gm-style-iw-c { background: var(--surface); color: var(--ink); padding: 0; box-shadow: var(--shadow); }
+.map-box .gm-style .gm-style-iw-d { overflow: auto !important; }
+.map-box .gm-style .gm-style-iw-tc::after { background: var(--surface); }
+.map-box .gm-style .gm-style-iw-chr { position: absolute; top: 0; right: 0; }
+.map-box .gm-style .gm-ui-hover-effect > span { background-color: var(--muted) !important; }
+.map-pop { display: grid; gap: 4px; min-width: 200px; padding: 12px 14px; font: 14px/1.4 var(--font); color: var(--ink); }
+.mp-name { font-size: 15px; padding-right: 30px; }
 .mp-sub { font-size: 12.5px; color: var(--muted); }
 .mp-vacant { font-size: 14px; margin-top: 2px; }
 .mp-vacant b { font-size: 18px; }
@@ -43,6 +47,7 @@
 .mp-of { color: var(--muted); font-size: 13px; }
 .mp-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .map-box .mp-actions a.btn { color: var(--brand-ink); }
+.map-box .mp-actions .btn { font-family: var(--font); }
 
 /* Thanh đặt vị trí (Quản lý) */
 .savebar .in.place-bar { display: grid; gap: 8px; justify-content: stretch; align-items: stretch; }

@@ -11,6 +11,7 @@ Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện �
 | Mục | Nội dung |
 |---|---|
 | Công việc | Quản lý / Giám sát giao việc cho cấp dưới, chia bước, cập nhật tiến độ, nhắc việc 7h sáng, báo trễ hạn. Nhân viên chỉ nhận việc, đổi trạng thái, thêm bước vào việc của mình. |
+| Bản đồ toà nhà | Google Maps: mỗi toà một ghim ghi số phòng trống, bấm xem tên toà, chỉ đường. Mọi người xem được tất cả toà (chỉ tên, vị trí, số phòng trống); Quản lý đặt vị trí (chạm bản đồ, dán toạ độ / link Google Maps, hoặc nhập Lat/Long trong Sửa toà). |
 | Giao việc bằng giọng nói | Ghi âm hoặc dán tin nhắn Zalo → AI (Google Gemini) tách thành danh sách việc → kiểm tra rồi giao. Chỉ Quản lý / Giám sát. |
 | Toà nhà & phòng | Lưới phòng theo tầng, giá thuê, trạng thái phòng, tạo nhanh nhiều phòng, dán từ Excel, xoá toà / xoá phòng. |
 | Văn phòng | Xin nghỉ phép (phép năm / không lương, cả ngày / nửa ngày, không tính Chủ nhật), làm việc bên ngoài, đi công tác (duyệt trước, nhập thực tế sau), đề nghị thanh toán, tạm ứng. Chỉ Quản lý duyệt. |
@@ -25,6 +26,7 @@ Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện �
 - Dữ liệu: Supabase (Postgres, Auth, Realtime, Edge Functions, pg_cron, Vault)
 - Hosting: Vercel (build tĩnh, `vercel.json` chuyển mọi đường dẫn về `index.html`)
 - AI: Google Gemini API (gọi từ Edge Function, khoá không bao giờ xuống trình duyệt)
+- Bản đồ: Google Maps JavaScript API, khoá trình duyệt `VITE_GOOGLE_MAPS_KEY` (xem mục Google Maps bên dưới)
 
 ## Nơi đặt hệ thống
 
@@ -50,6 +52,8 @@ supabase/
   002_lich_tu_dong.sql       lịch pg_cron: nhắc việc 7h sáng, tạo hoá đơn ngày 1
   003_van_phong.sql          module Văn phòng (bảng requests, duyệt, thông báo)
   004_phep_nam_chu_nhat.sql  phép năm do Quản lý nhập, nghỉ phép không tính Chủ nhật
+  005_vi_tri_toa.sql         toạ độ toà (lat/lng), hàm building_map() cho màn hình Bản đồ
+  thu_nghiem/                seed.sql / cleanup.sql: tài khoản + toà thử nghiệm (không phải migration)
   functions/quan-ly-tai-khoan    cấp / khoá tài khoản, đổi SĐT, cấp lại mật khẩu (dùng service role)
   functions/phan-tich-giao-viec  ghi âm / tin nhắn → danh sách việc (Gemini)
 ```
@@ -73,7 +77,7 @@ npm run build        # kiểm tra kiểu + build ra dist/
 ```
 
 Biến môi trường (không bắt buộc — đã có giá trị mặc định trỏ tới project thật), xem `.env.example`:
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` (khoá publishable, an toàn để công khai).
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY` (khoá publishable, an toàn để công khai), `VITE_GOOGLE_MAPS_KEY` (khoá Google Maps, bắt buộc để màn hình Bản đồ hiện bản đồ).
 
 > Lưu ý: chạy trên máy vẫn ghi vào dữ liệu thật. Muốn thử nghiệm an toàn, tạo một Supabase project riêng, chạy lần lượt các file SQL bên dưới rồi trỏ `.env.local` sang project đó.
 
@@ -91,6 +95,23 @@ Dựng một project mới từ đầu:
    where id = (select id from auth.users where email = '<sđt>@neonestly.app');
    ```
    Các tài khoản sau đó cấp ngay trong app (Quản trị → Nhân sự).
+
+## Google Maps
+
+Màn hình Bản đồ dùng Google Maps JavaScript API. Khoá nằm ở biến `VITE_GOOGLE_MAPS_KEY`:
+trên Vercel (Settings → Environment Variables, cho Production và Preview), trên máy thì trong `.env.local`.
+
+Khoá này là **khoá trình duyệt** (khác khoá Gemini), được phép nằm trong code giao diện vì đã giới hạn trong Google Cloud:
+- *Application restrictions* → Websites: `https://neo-nestly.vercel.app/*`, `https://neo-nestly-thu-nghiem.vercel.app/*` (thêm `http://localhost:5173/*` nếu chạy trên máy)
+- *API restrictions*: chỉ Maps JavaScript API
+- Nên đặt quota *Map loads per day* (VD 300) để không vượt mức miễn phí
+
+Đổi khoá: sửa biến trên Vercel rồi deploy lại. Thiếu khoá hoặc khoá bị từ chối thì màn hình Bản đồ báo lỗi, danh sách toà và nút Chỉ đường vẫn dùng được.
+
+## Môi trường thử nghiệm
+
+Bản thử có địa chỉ cố định https://neo-nestly-thu-nghiem.vercel.app (alias trên Vercel, trỏ vào bản preview mới nhất cần thử).
+Dữ liệu dùng chung CSDL thật; tài khoản/toà thử tạo bằng `supabase/thu_nghiem/seed.sql`, xoá bằng `cleanup.sql`.
 
 ## Edge Functions
 
