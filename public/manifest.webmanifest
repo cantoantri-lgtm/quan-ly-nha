@@ -1,0 +1,9 @@
+{
+  "name": "Neo Nestly",
+  "short_name": "Neo Nestly",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F3F5F4",
+  "theme_color": "#1F5C4F",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
