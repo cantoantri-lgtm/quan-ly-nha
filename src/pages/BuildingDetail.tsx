@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { KIND_LABEL, type Building } from "../lib/labels";
 import { naturalCompare, parseMoney, vnd, vndShort } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
+import { googleDirections } from "../lib/geo";
 import { BuildingSheet } from "./Buildings";
 import "../rooms.css";
 
@@ -98,6 +99,14 @@ export default function BuildingDetail() {
           <div>
             <h2>{building.name}</h2>
             <p className="muted small">{KIND_LABEL[building.kind]}{building.address ? ` · ${building.address}` : ""}{building.total_floors ? ` · ${building.total_floors} tầng` : ""}</p>
+            {building.lat != null && building.lng != null ? (
+              <p className="small" style={{ marginTop: 6 }}>
+                <Link to={`/ban-do?toa=${building.id}`}>Xem trên bản đồ</Link>
+                {" · "}<a href={googleDirections({ lat: building.lat, lng: building.lng })} target="_blank" rel="noopener">Chỉ đường</a>
+              </p>
+            ) : isManager ? (
+              <p className="small" style={{ marginTop: 6 }}><Link to={`/ban-do?toa=${building.id}`}>Đặt vị trí trên bản đồ</Link></p>
+            ) : null}
           </div>
           {isManager ? <button className="btn ghost sm" onClick={() => setEditBuilding(true)}>Sửa toà</button> : null}
         </section>

@@ -47,6 +47,8 @@ export type Building = {
   kind: string;
   total_floors: number | null;
   note: string | null;
+  lat?: number | null;
+  lng?: number | null;
 };
 
 export type Task = {

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useSession } from "./lib/session";
 import { supabase } from "./lib/supabase";
@@ -17,6 +18,9 @@ import BuildingDetail from "./pages/BuildingDetail";
 import Office from "./pages/Office";
 import RequestForm from "./pages/RequestForm";
 import RequestDetail from "./pages/RequestDetail";
+
+// Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
+const MapPage = lazy(() => import("./pages/MapPage"));
 
 function Shell() {
   return (
@@ -68,6 +72,7 @@ export default function App() {
         </Route>
         <Route path="viec/:id" element={<TaskDetail />} />
         <Route path="toa/:id" element={<BuildingDetail />} />
+        <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
         <Route path="van-phong" element={<Office />} />
         <Route path="van-phong/moi/:kind" element={<RequestForm />} />
         <Route path="van-phong/:id" element={<RequestDetail />} />

@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/session";
+import "../nav.css";
 
 export const Icon = {
   tasks: (
@@ -21,6 +22,11 @@ export const Icon = {
   office: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18M11 13v2h2v-2" />
+    </svg>
+  ),
+  map: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" />
     </svg>
   ),
   user: (
@@ -66,6 +72,7 @@ export function BottomNav() {
           {Icon.office}<span>Văn phòng</span>
           {isManager && pendingApprovals > 0 ? <span className="badge num">{pendingApprovals > 99 ? "99+" : pendingApprovals}</span> : null}
         </NavLink>
+        <NavLink to="/ban-do">{Icon.map}<span>Bản đồ</span></NavLink>
         <NavLink to="/thong-bao">
           {Icon.bell}<span>Thông báo</span>
           {unread > 0 ? <span className="badge num">{unread > 99 ? "99+" : unread}</span> : null}

@@ -1,0 +1,2 @@
+/* Thanh dưới: Quản lý có 6 mục nên chữ nhỏ lại một chút */
+.bottomnav .inner:has(> a:nth-child(6)) a { font-size: 11px; letter-spacing: -.01em; }
