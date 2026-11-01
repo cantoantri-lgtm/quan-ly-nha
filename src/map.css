@@ -1,24 +1,59 @@
-/* Bản đồ toà nhà: nhúng Google Maps miễn phí (mỗi lần 1 toà) */
-.map-frame {
-  position: relative; height: min(52vh, 440px); border-radius: var(--radius); overflow: hidden;
-  border: 1px solid var(--line); background: var(--surface-2);
+/* Bản đồ toà nhà: MapLibre + nền OpenFreeMap (miễn phí, không cần khoá) */
+.map-box {
+  position: relative; z-index: 0; isolation: isolate; /* giữ lớp bản đồ dưới thanh trên/dưới và sheet */
+  height: min(58vh, 480px); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line);
+  background: var(--surface-2);
 }
-.map-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.map-frame.placing { outline: 3px solid var(--danger); outline-offset: -3px; }
+.map-canvas { position: absolute; inset: 0; }
+.map-box.placing { outline: 3px solid var(--danger); outline-offset: -3px; }
+.map-box.placing .maplibregl-canvas { cursor: crosshair; }
+.map-box.failed { height: auto; }
+.map-box.failed .map-msg { position: static; }
 .map-msg {
   position: absolute; inset: 0; display: grid; place-content: center; gap: 6px; padding: 24px;
-  text-align: center; font-size: 14px; color: var(--ink);
+  text-align: center; font-size: 14px; background: var(--surface-2); color: var(--ink);
+}
+.map-box .maplibregl-ctrl-group { background: var(--surface); }
+.map-box .maplibregl-ctrl-attrib { font-size: 10px; }
+@media (prefers-color-scheme: dark) { .map-box .maplibregl-ctrl-group .maplibregl-ctrl-icon { filter: invert(1); } }
+
+/* Ghim: số phòng trống + mã toà; mũi ghim nằm đúng toạ độ (anchor bottom) */
+.pin-wrap { position: relative; width: 44px; height: 44px; cursor: pointer; }
+.pin {
+  width: 36px; height: 36px; margin: 0 4px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  display: grid; place-items: center; border: 2px solid var(--surface); box-shadow: var(--shadow);
+}
+.pin b { transform: rotate(45deg); color: var(--surface); font: 700 14px/1 var(--font); font-variant-numeric: tabular-nums; }
+.pin.ok { background: var(--s-done); }
+.pin.zero { background: var(--s-todo); }
+.pin.draft { background: var(--danger); }
+.pin-code {
+  position: absolute; top: 46px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font: 700 11px/1.5 var(--font); padding: 0 5px; border-radius: 6px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
 }
 
-/* Thẻ thông tin toà đang xem */
-.map-info { padding: 12px 14px; display: grid; gap: 10px; }
-.map-info .mi-head { display: flex; gap: 12px; align-items: flex-start; }
-.map-info .grow { display: grid; gap: 2px; min-width: 0; flex: 1; }
-.map-info .mi-name { font-size: 16px; }
-.map-info .mi-vacant { display: grid; justify-items: end; line-height: 1.1; white-space: nowrap; }
-.map-info .mi-vacant b { font-size: 26px; }
-.map-info.placing-info { gap: 4px; border-color: var(--danger); }
-.list-row.selected { background: var(--brand-soft); }
+/* Khung thông tin khi bấm ghim, theo màu app (kể cả chế độ tối) */
+.map-box .maplibregl-popup-content { background: var(--surface); color: var(--ink); border-radius: 12px; box-shadow: var(--shadow); padding: 12px 14px; }
+.map-box .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.map-box .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.map-box .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--surface); }
+.map-box .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.map-box .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.map-box .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--surface); }
+.map-box .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--surface); }
+.map-box .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--surface); }
+.map-box .maplibregl-popup-close-button { color: var(--muted); font-size: 20px; width: 28px; height: 28px; }
+.map-pop { display: grid; gap: 4px; min-width: 200px; font: 14px/1.4 var(--font); }
+.mp-name { font-size: 15px; padding-right: 22px; }
+.mp-sub { font-size: 12.5px; color: var(--muted); }
+.mp-vacant { margin-top: 2px; }
+.mp-vacant b { font-size: 18px; }
+.mp-vacant.ok b { color: var(--s-done); }
+.mp-vacant.zero b { color: var(--muted); }
+.mp-of { color: var(--muted); font-size: 13px; }
+.mp-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.map-box .mp-actions a.btn:not(.ghost) { color: var(--brand-ink); }
 
 /* Thanh đặt vị trí (Quản lý) */
 .savebar .in.place-bar { display: grid; gap: 8px; justify-content: stretch; align-items: stretch; }

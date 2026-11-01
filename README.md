@@ -11,7 +11,7 @@ Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện �
 | Mục | Nội dung |
 |---|---|
 | Công việc | Quản lý / Giám sát giao việc cho cấp dưới, chia bước, cập nhật tiến độ, nhắc việc 7h sáng, báo trễ hạn. Nhân viên chỉ nhận việc, đổi trạng thái, thêm bước vào việc của mình. |
-| Bản đồ toà nhà | Nhúng Google Maps miễn phí (không cần khoá): chọn toà trong danh sách để xem vị trí trên Google Maps kèm tên toà, số phòng trống, chỉ đường. Mọi người xem được tất cả toà (chỉ tên, vị trí, số phòng trống); Quản lý đặt vị trí (dán toạ độ / link Google Maps, vị trí hiện tại, hoặc nhập Lat/Long trong Sửa toà). |
+| Bản đồ toà nhà | Một bản đồ hiện tất cả toà, mỗi toà một ghim ghi số phòng trống; bấm ghim xem tên toà, chỉ đường bằng Google Maps. Mọi người xem được tất cả toà (chỉ tên, vị trí, số phòng trống); Quản lý đặt vị trí (chạm/kéo ghim trên bản đồ, dán toạ độ / link Google Maps, vị trí hiện tại, hoặc nhập Lat/Long trong Sửa toà). |
 | Giao việc bằng giọng nói | Ghi âm hoặc dán tin nhắn Zalo → AI (Google Gemini) tách thành danh sách việc → kiểm tra rồi giao. Chỉ Quản lý / Giám sát. |
 | Toà nhà & phòng | Lưới phòng theo tầng, giá thuê, trạng thái phòng, tạo nhanh nhiều phòng, dán từ Excel, xoá toà / xoá phòng. |
 | Văn phòng | Xin nghỉ phép (phép năm / không lương, cả ngày / nửa ngày, không tính Chủ nhật), làm việc bên ngoài, đi công tác (duyệt trước, nhập thực tế sau), đề nghị thanh toán, tạm ứng. Chỉ Quản lý duyệt. |
@@ -26,7 +26,7 @@ Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện �
 - Dữ liệu: Supabase (Postgres, Auth, Realtime, Edge Functions, pg_cron, Vault)
 - Hosting: Vercel (build tĩnh, `vercel.json` chuyển mọi đường dẫn về `index.html`)
 - AI: Google Gemini API (gọi từ Edge Function, khoá không bao giờ xuống trình duyệt)
-- Bản đồ: nhúng Google Maps (iframe `maps.google.com/maps?q=lat,lng&output=embed`), không cần khoá API
+- Bản đồ: MapLibre GL JS + nền OpenFreeMap (miễn phí, không cần khoá, được dùng cho doanh nghiệp); nút Chỉ đường mở Google Maps
 
 ## Nơi đặt hệ thống
 
@@ -96,13 +96,18 @@ Dựng một project mới từ đầu:
    ```
    Các tài khoản sau đó cấp ngay trong app (Quản trị → Nhân sự).
 
-## Bản đồ (Google Maps nhúng)
+## Bản đồ
 
-Màn hình Bản đồ nhúng Google Maps miễn phí, không cần khoá API, mỗi lần hiện 1 toà (ghim đỏ của Google).
-Tên toà, số phòng trống, nút Chỉ đường nằm ở thẻ phía trên bản đồ. Toạ độ lấy từ cột `lat`, `lng` của bảng `buildings`.
+Màn hình Bản đồ dùng MapLibre GL JS (thư viện mã nguồn mở) với nền bản đồ OpenFreeMap (`tiles.openfreemap.org`):
+miễn phí, không cần đăng ký hay khoá, cho phép dùng cho doanh nghiệp, phải giữ dòng ghi công OpenStreetMap ở góc bản đồ.
+Kiểu `liberty` cho giao diện sáng, `dark` cho chế độ tối; nhãn ưu tiên tên tiếng Việt (`name:vi`).
+Toạ độ lấy từ cột `lat`, `lng` của bảng `buildings` qua hàm `building_map()`.
 
-Ghi chú: không dùng nền OpenStreetMap vì mạng công ty không tải được ảnh bản đồ từ tile.openstreetmap.org.
-Muốn xem nhiều toà trên cùng một bản đồ (nhiều ghim có số phòng trống) thì phải dùng Google Maps JavaScript API — cần khoá và tài khoản thanh toán Google Cloud.
+Lưu ý:
+- Không dùng `tile.openstreetmap.org` vì mạng công ty không kết nối được máy chủ đó.
+- MapLibre 6 chạy phần xử lý trong web worker riêng: `MapPage.tsx` gọi `setWorkerUrl()` với file worker do Vite xuất ra (`?url`).
+- Thư viện bản đồ khá nặng (~300 KB nén) nên trang Bản đồ được tải riêng khi mở.
+- Muốn đổi sang Google Maps nhiều ghim thì phải dùng Google Maps JavaScript API (cần khoá + thanh toán Google Cloud).
 
 ## Môi trường thử nghiệm
 
