@@ -1,53 +1,24 @@
-/* Bản đồ toà nhà (Google Maps) */
-.map-box {
-  position: relative; z-index: 0; isolation: isolate; /* giữ lớp bản đồ dưới thanh trên/dưới và sheet */
-  height: min(58vh, 480px); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line);
-  background: var(--surface-2);
+/* Bản đồ toà nhà: nhúng Google Maps miễn phí (mỗi lần 1 toà) */
+.map-frame {
+  position: relative; height: min(52vh, 440px); border-radius: var(--radius); overflow: hidden;
+  border: 1px solid var(--line); background: var(--surface-2);
 }
-.map-canvas { position: absolute; inset: 0; }
-.map-box.placing { outline: 3px solid var(--danger); outline-offset: -3px; }
-.map-box.placing .map-canvas { cursor: crosshair; }
-.map-box.failed { height: auto; }
-.map-box.failed .map-msg { position: static; }
+.map-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.map-frame.placing { outline: 3px solid var(--danger); outline-offset: -3px; }
 .map-msg {
   position: absolute; inset: 0; display: grid; place-content: center; gap: 6px; padding: 24px;
-  text-align: center; font-size: 14px; background: var(--surface-2); color: var(--ink);
+  text-align: center; font-size: 14px; color: var(--ink);
 }
 
-/* Ghim: số phòng trống + mã toà. Mũi ghim nằm đúng toạ độ. */
-.pin-wrap { position: absolute; width: 44px; height: 44px; transform: translate(-22px, -44px); cursor: pointer; }
-.pin-wrap:focus-visible { outline: 2px solid var(--brand); border-radius: 8px; }
-.pin {
-  width: 36px; height: 36px; margin: 0 4px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
-  display: grid; place-items: center; border: 2px solid var(--surface); box-shadow: var(--shadow);
-}
-.pin b { transform: rotate(45deg); color: var(--surface); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.pin.ok { background: var(--s-done); }
-.pin.zero { background: var(--s-todo); }
-.pin.draft { background: var(--danger); }
-.pin-code {
-  position: absolute; top: 46px; left: 50%; transform: translateX(-50%); white-space: nowrap;
-  font-size: 11px; font-weight: 700; line-height: 1.5; padding: 0 5px; border-radius: 6px;
-  background: var(--surface); color: var(--ink); border: 1px solid var(--line); font-family: var(--font);
-}
-
-/* Khung thông tin khi bấm ghim (InfoWindow của Google) theo màu của app, kể cả chế độ tối */
-.map-box .gm-style .gm-style-iw-c { background: var(--surface); color: var(--ink); padding: 0; box-shadow: var(--shadow); }
-.map-box .gm-style .gm-style-iw-d { overflow: auto !important; }
-.map-box .gm-style .gm-style-iw-tc::after { background: var(--surface); }
-.map-box .gm-style .gm-style-iw-chr { position: absolute; top: 0; right: 0; }
-.map-box .gm-style .gm-ui-hover-effect > span { background-color: var(--muted) !important; }
-.map-pop { display: grid; gap: 4px; min-width: 200px; padding: 12px 14px; font: 14px/1.4 var(--font); color: var(--ink); }
-.mp-name { font-size: 15px; padding-right: 30px; }
-.mp-sub { font-size: 12.5px; color: var(--muted); }
-.mp-vacant { font-size: 14px; margin-top: 2px; }
-.mp-vacant b { font-size: 18px; }
-.mp-vacant.ok b { color: var(--s-done); }
-.mp-vacant.zero b { color: var(--muted); }
-.mp-of { color: var(--muted); font-size: 13px; }
-.mp-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.map-box .mp-actions a.btn { color: var(--brand-ink); }
-.map-box .mp-actions .btn { font-family: var(--font); }
+/* Thẻ thông tin toà đang xem */
+.map-info { padding: 12px 14px; display: grid; gap: 10px; }
+.map-info .mi-head { display: flex; gap: 12px; align-items: flex-start; }
+.map-info .grow { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.map-info .mi-name { font-size: 16px; }
+.map-info .mi-vacant { display: grid; justify-items: end; line-height: 1.1; white-space: nowrap; }
+.map-info .mi-vacant b { font-size: 26px; }
+.map-info.placing-info { gap: 4px; border-color: var(--danger); }
+.list-row.selected { background: var(--brand-soft); }
 
 /* Thanh đặt vị trí (Quản lý) */
 .savebar .in.place-bar { display: grid; gap: 8px; justify-content: stretch; align-items: stretch; }
