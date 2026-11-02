@@ -112,7 +112,7 @@ export default function RequestForm() {
       : await supabase.from("requests").insert(row).select("id").single();
     setBusy(false);
     if (res.error) { setErr(friendlyError(res.error)); return; }
-    toast(editing ? "Đã lưu thay đổi." : isMoney ? "Đã gửi đề nghị. Thêm ảnh hoá đơn, chứng từ ngay bên dưới." : "Đã gửi đề nghị, chờ quản lý duyệt.");
+    toast(editing ? "Đã lưu thay đổi." : "Đã gửi đề nghị, chờ quản lý duyệt.");
     nav(`/van-phong/${res.data.id}`, { replace: true });
   }
 
