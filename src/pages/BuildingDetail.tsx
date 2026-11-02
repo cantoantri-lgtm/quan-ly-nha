@@ -7,6 +7,7 @@ import { naturalCompare, parseMoney, vnd, vndShort } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import { googleDirections } from "../lib/geo";
 import { BuildingSheet } from "./Buildings";
+import FileGallery from "../components/FileGallery";
 import "../rooms.css";
 
 export type RoomStatus = "trong" | "dang_o" | "dang_sua" | "giu_cho";
@@ -123,6 +124,12 @@ export default function BuildingDetail() {
             {stats.nightCount ? ` · ${stats.nightCount} phòng thuê theo đêm` : ""}.
           </p>
         ) : null}
+
+        <div className="row">
+          <Link className="btn secondary sm" to={`/toa/${building.id}/khach`}>Khách thuê</Link>
+          <Link className="btn secondary sm" to={`/toa/${building.id}/hop-dong`}>Hợp đồng</Link>
+          <Link className="btn secondary sm" to={`/toa/${building.id}/hoa-don`}>Thu tiền phòng</Link>
+        </div>
 
         {canManage ? (
           <div className="row">
@@ -288,6 +295,10 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
         ) : (
           <p className="muted small" style={{ margin: 0 }}>{room.room_type ? `${room.room_type} · ` : ""}{MODE[room.rent_mode ?? "thang"]} · {vnd(room.list_price)}</p>
         )}
+        {!isNew ? (
+          <FileGallery owner={{ kind: "anh_phong", buildingId: building.id, roomId: room.id! }} title="Ảnh phòng" pdf={false} cover
+            hint={'Ảnh có nhãn "Đại diện" dùng làm ảnh chính của phòng.'} canUpload canDelete={canManage} />
+        ) : null}
         <div className="field"><span>Trạng thái</span>
           <div className="seg seg-room" role="group">
             {(Object.keys(ROOM_STATUS) as RoomStatus[]).map((s) => (

@@ -8,6 +8,12 @@ begin
   select id into b from public.buildings where code = 'TEST';
 
   if b is not null then
+    delete from storage.objects where bucket_id = 'kho-tai-lieu' and name like '%/' || b || '/%';   -- ảnh CCCD, hợp đồng, ảnh phòng của toà thử
+    delete from public.bank_transactions where invoice_id in (select id from public.invoices where building_id = b);
+    delete from public.invoices where building_id = b;
+    delete from public.contracts where building_id = b;   -- người ở, tệp xoá theo cascade
+    delete from public.tenants where building_id = b;
+    delete from public.nightly_revenues where building_id = b;
     delete from public.tasks where building_id = b;   -- bước con, cập nhật xoá theo cascade
     delete from public.buildings where id = b;        -- phòng, thành viên xoá theo cascade
   end if;

@@ -6,6 +6,7 @@ import { clock, daysBetween, todayVN } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
 import { LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, fmtDays, fullDate, hhmm, kindLabel, statusLabel, summary, type Req } from "../lib/office";
 import { Empty, Sheet, TopBar } from "../components/ui";
+import FileGallery from "../components/FileGallery";
 import { KIND_ICON, LeaveBalance } from "./Office";
 import "../office.css";
 
@@ -155,6 +156,13 @@ export default function RequestDetail() {
 
         {isManager && r.kind === "nghi_phep" && r.sub_type === "phep_nam" && requester ? (
           <LeaveBalance userId={requester.id} quota={requester.annual_leave_days == null ? null : Number(requester.annual_leave_days)} compact />
+        ) : null}
+
+        {isMoney ? (
+          <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} title="Chứng từ đính kèm"
+            hint="Hoá đơn, báo giá, ảnh chuyển khoản… (ảnh hoặc PDF, tối đa 10 MB mỗi tệp)."
+            canUpload={isManager || (mine && (r.status === "cho_duyet" || r.status === "da_duyet"))}
+            canDelete={isManager || (mine && r.status === "cho_duyet")} />
         ) : null}
 
         <div className="section-title">Lịch sử</div>

@@ -18,6 +18,11 @@ import BuildingDetail from "./pages/BuildingDetail";
 import Office from "./pages/Office";
 import RequestForm from "./pages/RequestForm";
 import RequestDetail from "./pages/RequestDetail";
+import Tenants, { TenantDetail } from "./pages/Tenants";
+import Contracts from "./pages/Contracts";
+import Invoices from "./pages/Invoices";
+import PayPage from "./pages/PayPage";
+import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
 const MapPage = lazy(() => import("./pages/MapPage"));
@@ -46,6 +51,8 @@ function ManagerOnly() {
 export default function App() {
   const { session, profile, loading } = useSession();
 
+  // Trang thanh toán cho khách thuê: công khai, không cần đăng nhập
+  if (window.location.pathname.startsWith("/thanh-toan/")) return <Routes><Route path="/thanh-toan/:code" element={<PayPage />} /></Routes>;
   if (loading) return <div className="loading">Đang mở Neo Nestly…</div>;
   if (!session) return <Login />;
   if (!profile || !profile.is_active) {
@@ -72,6 +79,10 @@ export default function App() {
         </Route>
         <Route path="viec/:id" element={<TaskDetail />} />
         <Route path="toa/:id" element={<BuildingDetail />} />
+        <Route path="toa/:id/khach" element={<Tenants />} />
+        <Route path="toa/:id/hop-dong" element={<Contracts />} />
+        <Route path="toa/:id/hoa-don" element={<Invoices />} />
+        <Route path="khach/:id" element={<TenantDetail />} />
         <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
         <Route path="van-phong" element={<Office />} />
         <Route path="van-phong/moi/:kind" element={<RequestForm />} />
@@ -83,6 +94,7 @@ export default function App() {
           <Route index element={<AdminHome />} />
           <Route path="nhan-su" element={<Staff />} />
           <Route path="toa-nha" element={<Buildings />} />
+          <Route path="thu-tien" element={<PaymentSettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

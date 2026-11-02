@@ -42,6 +42,9 @@ export default function AdminHome() {
           <Link className="list-row" to="/quan-tri/toa-nha" style={{ color: "inherit" }}>
             <div className="grow"><div className="name">Toà nhà</div><div className="sub">{buildings.length} toà</div></div>›
           </Link>
+          <Link className="list-row" to="/quan-tri/thu-tien" style={{ color: "inherit" }}>
+            <div className="grow"><div className="name">Thu tiền chuyển khoản</div><div className="sub">Tài khoản nhận tiền, mã QR, nối SePay</div></div>›
+          </Link>
         </section>
 
         <div className="section-title">Việc đang mở theo người</div>
