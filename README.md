@@ -15,6 +15,10 @@ Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện �
 | Giao việc bằng giọng nói | Ghi âm hoặc dán tin nhắn Zalo → AI (Google Gemini) tách thành danh sách việc → kiểm tra rồi giao. Chỉ Quản lý / Giám sát. |
 | Toà nhà & phòng | Lưới phòng theo tầng, giá thuê, trạng thái phòng, tạo nhanh nhiều phòng, dán từ Excel, xoá toà / xoá phòng. |
 | Văn phòng | Xin nghỉ phép (phép năm / không lương, cả ngày / nửa ngày, không tính Chủ nhật), làm việc bên ngoài, đi công tác (duyệt trước, nhập thực tế sau), đề nghị thanh toán, tạm ứng. Chỉ Quản lý duyệt. |
+| Khách thuê | Hồ sơ khách theo toà, đánh dấu (Khách quen / Cần lưu ý), ảnh CCCD hai mặt (chỉ Quản lý và Giám sát của toà xem; phải ghi nhận khách đồng ý trước khi tải). |
+| Hợp đồng | Lập hợp đồng gắn phòng và khách (phòng tự chuyển "Đang ở"), cách ký giấy hay điện tử, tải ảnh/PDF hợp đồng đã ký, thu và hoàn cọc, kết thúc hợp đồng. |
+| Thu tiền phòng | Hoá đơn tháng theo toà, mã QR chuyển khoản (VietQR) đúng số tiền và nội dung, link thanh toán gửi khách `/thanh-toan/<mã>`, tự đánh dấu "Đã thu" khi tiền về qua SePay, hoặc đánh dấu tay. |
+| Kho ảnh | Bucket riêng tư `kho-tai-lieu`: CCCD, hợp đồng, ảnh phòng, chứng từ đính kèm đề nghị thanh toán. Ảnh được thu nhỏ trước khi tải; xem bằng link tạm 10 phút. |
 | Quản trị | Cấp tài khoản, cấp lại mật khẩu, khoá tài khoản, gán toà, nhập số ngày phép năm. |
 | Thông báo | Trong app, thời gian thực. |
 
@@ -53,9 +57,12 @@ supabase/
   003_van_phong.sql          module Văn phòng (bảng requests, duyệt, thông báo)
   004_phep_nam_chu_nhat.sql  phép năm do Quản lý nhập, nghỉ phép không tính Chủ nhật
   005_vi_tri_toa.sql         toạ độ toà (lat/lng), hàm building_map() cho màn hình Bản đồ
+  006_kho_anh_thanh_toan.sql kho tệp riêng tư + bảng files, đánh dấu khách, đồng ý lưu CCCD, tài khoản nhận tiền, mã chuyển khoản, đối soát SePay
+  007_an_so_cccd.sql         ẩn cột số CCCD với nhân viên; Quản lý/Giám sát đọc qua tenant_private()
   thu_nghiem/                seed.sql / cleanup.sql: tài khoản + toà thử nghiệm (không phải migration)
   functions/quan-ly-tai-khoan    cấp / khoá tài khoản, đổi SĐT, cấp lại mật khẩu (dùng service role)
   functions/phan-tich-giao-viec  ghi âm / tin nhắn → danh sách việc (Gemini)
+  functions/sepay-webhook        nhận "tiền vào tài khoản" từ SePay, tự đánh dấu hoá đơn đã thu (không dùng JWT, tự kiểm khoá)
 ```
 
 ## Phân quyền (kiểm soát ở cơ sở dữ liệu, không chỉ ở giao diện)
@@ -114,6 +121,15 @@ Lưu ý:
 Bản thử có địa chỉ cố định https://neo-nestly-thu-nghiem.vercel.app (alias trên Vercel, trỏ vào bản preview mới nhất cần thử).
 Dữ liệu dùng chung CSDL thật; tài khoản/toà thử tạo bằng `supabase/thu_nghiem/seed.sql`, xoá bằng `cleanup.sql`.
 
+## Thu tiền chuyển khoản (SePay)
+
+1. Quản lý vào Quản trị → Thu tiền chuyển khoản, nhập ngân hàng và số tài khoản nhận tiền.
+2. Đăng ký SePay (sepay.vn), liên kết đúng tài khoản đó. Thêm webhook trỏ tới `https://<project>.supabase.co/functions/v1/sepay-webhook`, kiểu chứng thực API Key.
+3. Đặt cùng chuỗi API Key vào Supabase → Edge Functions → Secrets với tên `SEPAY_WEBHOOK_KEY`.
+4. Mỗi hoá đơn có mã `NN` + 10 ký tự (cột `invoices.pay_code`) đặt làm nội dung chuyển khoản. Tiền về, hàm `apply_bank_transfer()` khớp mã và số tiền: đủ tiền thì đánh dấu đã thu, thiếu thì chỉ báo cho Quản lý/Giám sát. Mọi giao dịch được ghi ở `bank_transactions`.
+
+Mã QR sinh ngay trên máy (chuẩn VietQR/NAPAS, `src/lib/vietqr.ts`), không gọi dịch vụ ngoài.
+
 ## Edge Functions
 
 Dùng Supabase CLI (`npm i -g supabase`, rồi `supabase login`):
@@ -146,4 +162,5 @@ Thứ tự khi một thay đổi đụng cả dữ liệu lẫn giao diện: **c
 - Đổi khoá Gemini (khoá hiện tại từng được dán qua chat).
 - Bật "Leaked password protection" trong Supabase → Authentication → Policies.
 - Xoá Edge Function tạm `do-toc-do-ai` (Supabase → Edge Functions) — đã vô hiệu, không còn dùng.
-- Màn hình module Cho thuê: khách thuê, hợp đồng, cọc, đánh dấu đã thu; dashboard doanh thu.
+- Dashboard doanh thu (hàm `dashboard_month` đã có, chưa có màn hình).
+- Nhật ký ai đã xem ảnh CCCD (hiện chỉ giới hạn quyền xem, chưa ghi lịch sử xem).
