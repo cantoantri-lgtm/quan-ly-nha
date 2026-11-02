@@ -99,3 +99,19 @@
 .dn-grid th, .dn-grid td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .dn-grid th { color: var(--muted); font-weight: 600; white-space: nowrap; }
 .dn-grid td.r, .dn-grid th.r { text-align: right; white-space: nowrap; }
+
+/* Bố cục rộng cho máy tính: các ô tự xếp thành nhiều cột, điện thoại vẫn 1 cột */
+.main-wide { max-width: 1100px; }
+.dn-sec { padding: 14px 16px; display: grid; gap: 12px; }
+.dn-h { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.dn-h-out { margin: 8px 2px 0; }
+.dn-fields { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); align-items: start; }
+.dn-span2 { grid-column: 1 / -1; }
+.input.ro { background: var(--surface-2); color: var(--muted); display: flex; align-items: center; min-height: 40px; }
+@media (min-width: 900px) {
+  .dn-span2 { grid-column: span 2; }
+  .dn-form { gap: 14px; }
+  .dn-submit { position: sticky; bottom: 0; z-index: 5; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 16px; }
+}
+.dn-submit { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dn-submit .btn { min-width: 160px; }

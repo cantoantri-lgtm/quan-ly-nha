@@ -196,6 +196,83 @@ export default function RequestForm() {
 
   if (!loaded) return (<><TopBar title="Sửa đề nghị" back /><div className="loading">Đang tải…</div></>);
 
+  if (isPay) {
+    const bankReq = payMethod === "chuyen_khoan";
+    return (
+      <>
+        <TopBar title={editing ? "Sửa đề nghị thanh toán" : meta.label} back />
+        <main className="main main-wide">
+          <form className="stack dn-form" onSubmit={submit}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault(); }}>
+            <section className="card dn-sec">
+              <h2 className="dn-h">Thông tin chứng từ</h2>
+              <div className="dn-fields">
+                <div className="field"><span>Người đề nghị</span><div className="input ro">{profile?.full_name}</div></div>
+                <div className="field"><span>Số chứng từ</span><div className="input ro num">{docNo ?? "Tự cấp khi gửi"}</div></div>
+                <div className="field"><span>Ngày chứng từ</span><div className="input ro num">{ddmmyyyy(today)}</div></div>
+                <div className="field"><span>Loại tiền</span><div className="input ro">VND</div></div>
+                <label className="field"><span>LOA No.</span>
+                  <input id="rq-loa" className="input" value={loa} onChange={(e) => setLoa(e.target.value)} /></label>
+                <label className="field"><span>Loại thanh toán *</span>
+                  <select id="rq-paytype" className="input" value={payType} onChange={(e) => setPayType(e.target.value)}>
+                    {Object.entries(PAY_TYPE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  </select></label>
+                <div className="field"><span>Hình thức thanh toán *</span><Options name="Hình thức thanh toán" value={payMethod} options={PAY_METHOD} onChange={setPayMethod} /></div>
+                <label className="field"><span>Ngày cần thanh toán *</span>
+                  <input id="rq-start" type="date" className="input" value={start} required onChange={(e) => setStart(e.target.value)} /></label>
+                {buildings.length ? (
+                  <label className="field"><span>Toà nhà liên quan</span>
+                    <select id="rq-building" className="input" value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
+                      <option value="">Không gắn toà</option>
+                      {buildings.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
+                    </select></label>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="card dn-sec">
+              <h2 className="dn-h">Đơn vị nhận tiền</h2>
+              <div className="dn-fields">
+                <label className="field"><span>Tên đơn vị</span>
+                  <input id="rq-payee" className="input" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="VD: Cửa hàng nội thất An Phát" /></label>
+                <label className="field"><span>Mã đơn vị</span>
+                  <input id="rq-vendor" className="input" value={vendorCode} onChange={(e) => setVendorCode(e.target.value)} /></label>
+                <label className="field"><span>Người liên hệ</span>
+                  <input id="rq-contact" className="input" value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
+                <label className="field"><span>Mã liên hệ</span>
+                  <input id="rq-contact-code" className="input" value={contactCode} onChange={(e) => setContactCode(e.target.value)} /></label>
+                <label className="field dn-span2"><span>{bankReq ? "Thông tin chuyển khoản (STK, ngân hàng) *" : "Số tài khoản, ngân hàng"}</span>
+                  <input id="rq-bank" className="input" value={bank} onChange={(e) => setBank(e.target.value)} required={bankReq}
+                    placeholder={bankReq ? "VD: 20338000 · VietinBank" : "Không cần nếu trả tiền mặt"} /></label>
+              </div>
+              <label className="field"><span>Nội dung *</span>
+                <textarea id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
+                  placeholder="VD: Mua 2 bộ bàn ghế ngoài trời cho 89CMT8" /></label>
+            </section>
+
+            {!hasLines ? (
+              <section className="card dn-sec">
+                <MoneyInput id="rq-amount" label="Số tiền" value={amount} onChange={setAmount} required />
+              </section>
+            ) : null}
+
+            <DnttEditor lines={lines} setLines={setLines} advs={advs} setAdvs={setAdvs}
+              files={editing ? undefined : files} setFiles={editing ? undefined : setFiles}
+              links={editing ? undefined : links} setLinks={editing ? undefined : setLinks}
+              onError={setErr} />
+            {editing ? <p className="muted small" style={{ margin: 0 }}>Tệp và link đính kèm thêm hoặc xoá ở trang chi tiết của đề nghị.</p> : null}
+
+            {err ? <div className="error-box" role="alert">{err}</div> : null}
+            <div className="dn-submit">
+              <div className="num">{hasLines ? <>Tổng tiền VNĐ: <b>{vnd(tot.net)}</b></> : amount ? <b>{vnd(parseMoney(amount))}</b> : null}</div>
+              <button className="btn" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu thay đổi" : "Gửi đề nghị"}</button>
+            </div>
+          </form>
+        </main>
+      </>
+    );
+  }
+
   return (
     <>
       <TopBar title={editing ? "Sửa đề nghị" : meta.label} back />
@@ -215,36 +292,13 @@ export default function RequestForm() {
               <input id="rq-location" className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="VD: Đà Lạt" required /></label>
           ) : null}
 
-          {isPay ? (
-            <>
-              <div className="section-title">Người đăng ký</div>
-              <dl className="card kv">
-                <dt>Người đề nghị</dt><dd>{profile?.full_name}</dd>
-              </dl>
-              <div className="section-title">Thông tin chứng từ</div>
-              <dl className="card kv">
-                <dt>Số chứng từ</dt><dd className="num">{docNo ?? "Tự cấp khi gửi"}</dd>
-                <dt>Ngày chứng từ</dt><dd className="num">{ddmmyyyy(today)}</dd>
-                <dt>Loại tiền</dt><dd>VND</dd>
-              </dl>
-              <label className="field"><span>LOA No.</span>
-                <input id="rq-loa" className="input" value={loa} onChange={(e) => setLoa(e.target.value)} /></label>
-              <div className="field"><span>Hình thức thanh toán *</span><Options name="Hình thức thanh toán" value={payMethod} options={PAY_METHOD} onChange={setPayMethod} /></div>
-              <label className="field"><span>Loại thanh toán *</span>
-                <select id="rq-paytype" className="input" value={payType} onChange={(e) => setPayType(e.target.value)}>
-                  {Object.entries(PAY_TYPE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-                </select></label>
-            </>
-          ) : null}
-
-          {isMoney && !hasLines ? (
+          {isMoney ? (
             <MoneyInput id="rq-amount" label="Số tiền" value={amount} onChange={setAmount} required />
           ) : null}
-          {hasLines ? <div className="calc-line num">Tổng tiền VNĐ: <b>{vnd(tot.net)}</b> <span className="muted">(từ chi tiết thanh toán bên dưới)</span></div> : null}
 
           <div className="row" style={{ alignItems: "flex-start" }}>
             <label className="field" style={{ flex: "1 1 140px" }}>
-              <span>{isPay ? "Ngày cần thanh toán *" : isMoney ? "Cần tiền trước ngày" : multiDay ? (kind === "cong_tac" ? "Ngày đi *" : "Từ ngày *") : "Ngày *"}</span>
+              <span>{isMoney ? "Cần tiền trước ngày" : multiDay ? (kind === "cong_tac" ? "Ngày đi *" : "Từ ngày *") : "Ngày *"}</span>
               <input id="rq-start" type="date" className="input" value={start} required
                 onChange={(e) => { setStart(e.target.value); if (end < e.target.value) setEnd(e.target.value); }} /></label>
             {multiDay ? (
@@ -275,7 +329,7 @@ export default function RequestForm() {
             </div>
           ) : null}
 
-          <label className="field"><span>{isMoney ? "Nội dung *" : kind === "cong_tac" ? "Mục đích công tác *" : kind === "ra_ngoai" ? "Công việc *" : "Lý do *"}</span>
+          <label className="field"><span>{isMoney ? "Nội dung chi *" : kind === "cong_tac" ? "Mục đích công tác *" : kind === "ra_ngoai" ? "Công việc *" : "Lý do *"}</span>
             <textarea id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
               placeholder={isMoney ? "VD: Mua 2 bộ bàn ghế ngoài trời cho 89CMT8" : kind === "nghi_phep" ? "VD: Việc gia đình" : ""} /></label>
 
@@ -285,31 +339,12 @@ export default function RequestForm() {
             <>
               <label className="field"><span>{kind === "tam_ung" ? "Người nhận tiền" : "Tên đơn vị nhận tiền"}</span>
                 <input id="rq-payee" className="input" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder={kind === "tam_ung" ? profile?.full_name : "VD: Cửa hàng nội thất An Phát"} /></label>
-              {isPay ? (
-                <>
-                  <div className="row" style={{ alignItems: "flex-start" }}>
-                    <label className="field" style={{ flex: "1 1 120px" }}><span>Mã đơn vị</span>
-                      <input id="rq-vendor" className="input" value={vendorCode} onChange={(e) => setVendorCode(e.target.value)} /></label>
-                    <label className="field" style={{ flex: "1 1 120px" }}><span>Mã liên hệ</span>
-                      <input id="rq-contact-code" className="input" value={contactCode} onChange={(e) => setContactCode(e.target.value)} /></label>
-                  </div>
-                  <label className="field"><span>Người liên hệ</span>
-                    <input id="rq-contact" className="input" value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
-                </>
-              ) : null}
-              <label className="field"><span>{isPay && payMethod === "chuyen_khoan" ? "Thông tin chuyển khoản (STK, ngân hàng) *" : "Số tài khoản, ngân hàng"}</span>
-                <input id="rq-bank" className="input" value={bank} onChange={(e) => setBank(e.target.value)} required={isPay && payMethod === "chuyen_khoan"}
-                  placeholder={isPay && payMethod === "tien_mat" ? "Không cần nếu trả tiền mặt" : "VD: 20338000 · VietinBank"} /></label>
+              <label className="field"><span>Số tài khoản, ngân hàng</span>
+                <input id="rq-bank" className="input" value={bank} onChange={(e) => setBank(e.target.value)}
+                  placeholder="Để trống nếu nhận tiền mặt" /></label>
             </>
           ) : null}
 
-          {isPay ? (
-            <DnttEditor lines={lines} setLines={setLines} advs={advs} setAdvs={setAdvs}
-              files={editing ? undefined : files} setFiles={editing ? undefined : setFiles}
-              links={editing ? undefined : links} setLinks={editing ? undefined : setLinks}
-              onError={setErr} />
-          ) : null}
-          {isPay && editing ? <p className="muted small" style={{ margin: 0 }}>Tệp và link đính kèm thêm hoặc xoá ở trang chi tiết của đề nghị.</p> : null}
 
           {kind !== "nghi_phep" && buildings.length ? (
             <label className="field"><span>Toà nhà liên quan</span>

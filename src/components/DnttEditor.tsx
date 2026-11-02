@@ -84,47 +84,41 @@ export default function DnttEditor({ lines, setLines, advs, setAdvs, files, setF
 
   return (
     <>
-      <div className="section-title">Chi tiết thanh toán</div>
+      <h2 className="dn-h dn-h-out">Chi tiết thanh toán</h2>
       {lines.length === 0 ? <p className="muted small" style={{ margin: 0 }}>Thêm từng hoá đơn / khoản chi. Nếu chỉ có một số tiền gộp, có thể bỏ qua và nhập số tiền ở trên.</p> : null}
       {lines.map((l, i) => {
         const c = calcLine(l);
         return (
           <fieldset key={i} className="card dn-line">
             <legend>Khoản {i + 1}</legend>
-            <div className="row" style={{ alignItems: "flex-start" }}>
-              <label className="field" style={{ flex: "1 1 110px" }}><span>Số serial</span>
+            <div className="dn-fields">
+              <label className="field"><span>Số serial</span>
                 <input className="input" value={l.invoice_serial} onChange={(e) => setLine(i, { invoice_serial: e.target.value })} placeholder="VD: C26TAA" /></label>
-              <label className="field" style={{ flex: "1 1 110px" }}><span>Số hoá đơn</span>
+              <label className="field"><span>Số hoá đơn</span>
                 <input className="input" value={l.invoice_no} onChange={(e) => setLine(i, { invoice_no: e.target.value })} /></label>
-            </div>
-            <label className="field"><span>Ngày hoá đơn</span>
-              <input type="date" className="input" value={l.invoice_date} onChange={(e) => setLine(i, { invoice_date: e.target.value })} /></label>
-            <div className="row" style={{ alignItems: "flex-start" }}>
-              <label className="field" style={{ flex: "2 1 160px" }}><span>Tên người bán</span>
+              <label className="field"><span>Ngày hoá đơn</span>
+                <input type="date" className="input" value={l.invoice_date} onChange={(e) => setLine(i, { invoice_date: e.target.value })} /></label>
+              <label className="field"><span>Tên người bán</span>
                 <input className="input" value={l.seller_name} onChange={(e) => setLine(i, { seller_name: e.target.value })} /></label>
-              <label className="field" style={{ flex: "1 1 120px" }}><span>MST người bán</span>
+              <label className="field"><span>MST người bán</span>
                 <input className="input num" inputMode="numeric" value={l.seller_tax} onChange={(e) => setLine(i, { seller_tax: e.target.value })} /></label>
-            </div>
-            <label className="field"><span>Tiền trước VAT *</span>
-              <input className="input num" inputMode="decimal" value={l.amount} onChange={(e) => setLine(i, { amount: e.target.value })} placeholder="VD: 3.500.000 hoặc 3tr5" />
-              {l.amount ? <small className={c.pre ? "muted" : "err-text"}>{c.pre ? vnd(c.pre) : "Chưa đọc được số tiền"}</small> : null}</label>
-            <div className="row" style={{ alignItems: "flex-start" }}>
-              <label className="field" style={{ flex: "1 1 100px" }}><span>Số lượng</span>
+              <label className="field"><span>Tiền trước VAT *</span>
+                <input className="input num" inputMode="decimal" value={l.amount} onChange={(e) => setLine(i, { amount: e.target.value })} placeholder="VD: 3.500.000 hoặc 3tr5" />
+                {l.amount ? <small className={c.pre ? "muted" : "err-text"}>{c.pre ? vnd(c.pre) : "Chưa đọc được số tiền"}</small> : null}</label>
+              <label className="field"><span>Số lượng</span>
                 <input className="input num" inputMode="decimal" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} /></label>
-              <label className="field" style={{ flex: "1 1 100px" }}><span>% VAT</span>
+              <label className="field"><span>% VAT</span>
                 <select className="input" value={l.vat_pct} onChange={(e) => setLine(i, { vat_pct: e.target.value })}>
                   {VAT_RATES.map((v) => <option key={v} value={v}>{v}%</option>)}
                 </select></label>
+              <label className="field"><span>Cost Center *</span>
+                <input className="input" value={l.cost_center} onChange={(e) => setLine(i, { cost_center: e.target.value })} placeholder="VD: 89CMT8" /></label>
+              <label className="field"><span>Vụ việc (IO/Object)</span>
+                <input className="input" value={l.object_ref} onChange={(e) => setLine(i, { object_ref: e.target.value })} /></label>
+              <label className="field dn-span2"><span>Diễn giải</span>
+                <input className="input" value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} /></label>
             </div>
             <div className="dn-calc num">VAT {vnd(c.vat)} · <b>Tổng {vnd(c.total)}</b></div>
-            <label className="field"><span>Diễn giải</span>
-              <input className="input" value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} /></label>
-            <div className="row" style={{ alignItems: "flex-start" }}>
-              <label className="field" style={{ flex: "1 1 130px" }}><span>Cost Center *</span>
-                <input className="input" value={l.cost_center} onChange={(e) => setLine(i, { cost_center: e.target.value })} placeholder="VD: 89CMT8" /></label>
-              <label className="field" style={{ flex: "1 1 130px" }}><span>Vụ việc (IO/Object)</span>
-                <input className="input" value={l.object_ref} onChange={(e) => setLine(i, { object_ref: e.target.value })} /></label>
-            </div>
             <button type="button" className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setLines(lines.filter((_, k) => k !== i))}>Xoá khoản {i + 1}</button>
           </fieldset>
         );
@@ -133,7 +127,7 @@ export default function DnttEditor({ lines, setLines, advs, setAdvs, files, setF
 
       {lines.length ? (
         <>
-          <div className="section-title">Chi tiết tạm ứng (trừ vào đề nghị)</div>
+          <h2 className="dn-h dn-h-out">Chi tiết tạm ứng (trừ vào đề nghị)</h2>
           {advs.map((a, i) => (
             <fieldset key={i} className="card dn-line">
               <legend>Tạm ứng {i + 1}</legend>
@@ -157,7 +151,7 @@ export default function DnttEditor({ lines, setLines, advs, setAdvs, files, setF
 
       {setFiles && setLinks ? (
         <>
-          <div className="section-title">Tập tin đính kèm</div>
+          <h2 className="dn-h dn-h-out">Tập tin đính kèm</h2>
           <div className="card dn-attach">
             <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
             <button type="button" className="btn secondary block" onClick={() => fileRef.current?.click()}>Tải lên (ảnh hoặc PDF)</button>

@@ -99,7 +99,7 @@ export default function RequestDetail() {
     <>
       <TopBar title={kindLabel(r)} back="/van-phong"
         action={mine && r.status === "cho_duyet" ? <Link className="tb-action" to={`/van-phong/${r.id}/sua`} style={{ color: "inherit" }}>Sửa</Link> : null} />
-      <main className="main stack">
+      <main className={`main stack${r.kind === "thanh_toan" ? " main-wide" : ""}`}>
         <section className={`card rq-head k-${r.kind}`}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <span className="rq-ico" aria-hidden="true">{KIND_ICON[r.kind]}</span>
