@@ -161,6 +161,7 @@ export default function Org() {
                   <div className="org-node org-deputy">
                     <b>{dep.person_name}</b><span>Phó Giám đốc{dep.rank ? ` · L4-${dep.rank}` : ""}</span>
                     {dep.duty ? <span className="badge duty">{DUTY_NAME[dep.duty]}</span> : null}
+                    {dep.hire_note ? <span className="badge tuyen">{dep.hire_note}</span> : null}
                     {canEdit ? <button className="btn ghost" onClick={() => open(dep)}>Sửa</button> : null}
                   </div>
                   {mine.map((d) => {
