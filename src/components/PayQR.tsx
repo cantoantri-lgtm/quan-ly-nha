@@ -24,7 +24,7 @@ export default function PayQR({ bank, amount, code, toast }: { bank: PaySettings
         <dt>Nội dung</dt><dd>{code} <button type="button" className="btn ghost sm" onClick={() => copy(code, "nội dung")}>Chép</button></dd>
       </dl>
       <p className="small" role="status" style={{ margin: 0, minHeight: 20, color: "var(--s-done)" }}>{copied}</p>
-      <p className="muted small" style={{ margin: 0 }}>Giữ nguyên nội dung chuyển khoản để hệ thống tự ghi nhận đã thu.</p>
+      <p className="muted small" style={{ margin: 0 }}>Giữ nguyên nội dung chuyển khoản để dễ đối chiếu.</p>
     </div>
   );
 }
