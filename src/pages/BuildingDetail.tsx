@@ -9,6 +9,7 @@ import { Empty, Sheet, TopBar } from "../components/ui";
 import { googleDirections } from "../lib/geo";
 import { BuildingSheet } from "./Buildings";
 import FileGallery from "../components/FileGallery";
+import { uploadFile } from "../lib/files";
 import "../rooms.css";
 
 export type RoomStatus = "trong" | "dang_o" | "dang_sua" | "giu_cho";
@@ -262,6 +263,9 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
   const [cStart, setCStart] = useState(todayVN());
   const [cRent, setCRent] = useState(room.list_price != null ? new Intl.NumberFormat("vi-VN").format(room.list_price) : "");
   const [cDep, setCDep] = useState("");
+  const [fFront, setFFront] = useState<File | null>(null);
+  const [fBack, setFBack] = useState<File | null>(null);
+  const [fContract, setFContract] = useState<File[]>([]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -277,6 +281,8 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
       if (!tConsent) { setErr("Cần tích xác nhận khách đồng ý cho lưu CCCD."); return; }
       if (r == null) { setErr("Nhập giá thuê tháng của hợp đồng."); return; }
       if (d == null) { setErr("Tiền cọc chưa đúng."); return; }
+      if (!fFront || !fBack) { setErr("Cần chụp hoặc chọn ảnh CCCD cả mặt trước và mặt sau."); return; }
+      if (!fContract.length) { setErr("Cần tải lên ít nhất một ảnh hoặc file PDF hợp đồng."); return; }
       rentN = r; depN = d;
     }
     setBusy(true);
@@ -297,9 +303,18 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
       const c = await supabase.from("contracts").insert({
         room_id: room.id!, tenant_id: t.data.id, start_date: cStart, rent_amount: rentN, deposit_amount: depN, billing_day: 5,
       }).select("id").single();
-      setBusy(false);
+      if (c.error) { setBusy(false); }
       if (c.error) { setErr(`Đã thêm khách nhưng chưa lập được hợp đồng: ${/contracts_one_active/.test(c.error.message) ? "phòng đang có hợp đồng hiệu lực." : friendlyError(c.error)}`); return; }
-      onSaved(`Đã lưu khách và hợp đồng phòng ${room.code}. Tải ảnh CCCD và file hợp đồng ở trang này.`);
+      // Tải ảnh CCCD và file hợp đồng (cần mã khách / mã hợp đồng nên làm sau khi đã tạo)
+      const bid = building.id, failed: string[] = [];
+      for (const [f, label] of [[fFront!, "truoc"], [fBack!, "sau"]] as [File, string][]) {
+        try { await uploadFile({ kind: "cccd", buildingId: bid, tenantId: t.data.id }, f, { label }); } catch (e) { failed.push(`CCCD: ${friendlyError(e)}`); }
+      }
+      for (const f of fContract) {
+        try { await uploadFile({ kind: "hop_dong", buildingId: bid, contractId: c.data.id }, f); } catch (e) { failed.push(`Hợp đồng: ${friendlyError(e)}`); }
+      }
+      onSaved(failed.length ? `Đã lưu khách và hợp đồng phòng ${room.code} nhưng chưa tải được: ${failed.join("; ")}. Hãy tải lại ở hồ sơ khách.` : `Đã lưu khách, ảnh CCCD và hợp đồng phòng ${room.code}.`);
+      setBusy(false);
       nav(`/khach/${t.data.id}`);
       return;
     }
@@ -359,11 +374,19 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
         {needTenant ? (
           <section className="fg" aria-label="Khách đang ở">
             <b>Khách đang ở và hợp đồng</b>
-            <p className="muted small" style={{ margin: 0 }}>Phòng "Đang ở" cần có khách đứng tên, số CCCD và hợp đồng. Sau khi lưu, bạn sẽ chụp ảnh CCCD và tải file hợp đồng.</p>
+            <p className="muted small" style={{ margin: 0 }}>Phòng "Đang ở" cần có khách đứng tên, số CCCD và hợp đồng. Ảnh CCCD hai mặt và file hợp đồng là bắt buộc.</p>
             <label className="field"><span>Họ tên khách *</span><input id="r-tname" className="input" value={tName} onChange={(e) => setTName(e.target.value)} /></label>
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: "1 1 150px" }}><span>Số điện thoại</span><input id="r-tphone" className="input" inputMode="tel" value={tPhone} onChange={(e) => setTPhone(e.target.value)} /></label>
               <label className="field" style={{ flex: "1 1 150px" }}><span>Số CCCD *</span><input id="r-tid" className="input num" inputMode="numeric" value={tIdNo} onChange={(e) => setTIdNo(e.target.value.replace(/[^\d\s]/g, ""))} placeholder="12 chữ số" /></label>
+            </div>
+            <div className="row" style={{ alignItems: "flex-start" }}>
+              <label className="field" style={{ flex: "1 1 150px" }}><span>Ảnh CCCD mặt trước *</span>
+                <input id="r-cccd-front" className="input" type="file" accept="image/*" onChange={(e) => setFFront(e.target.files?.[0] ?? null)} />
+                {fFront ? <small className="muted">{fFront.name}</small> : null}</label>
+              <label className="field" style={{ flex: "1 1 150px" }}><span>Ảnh CCCD mặt sau *</span>
+                <input id="r-cccd-back" className="input" type="file" accept="image/*" onChange={(e) => setFBack(e.target.files?.[0] ?? null)} />
+                {fBack ? <small className="muted">{fBack.name}</small> : null}</label>
             </div>
             <label className="row" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
               <input id="r-tconsent" type="checkbox" checked={tConsent} onChange={(e) => setTConsent(e.target.checked)} style={{ marginTop: 4 }} />
@@ -374,6 +397,9 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
               <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input id="r-crent" className="input num" inputMode="decimal" value={cRent} onChange={(e) => setCRent(e.target.value)} /></label>
             </div>
             <label className="field"><span>Tiền cọc</span><input id="r-cdep" className="input num" inputMode="decimal" value={cDep} onChange={(e) => setCDep(e.target.value)} /></label>
+            <label className="field"><span>File hợp đồng * (ảnh chụp hoặc PDF)</span>
+              <input id="r-cfile" className="input" type="file" multiple accept="image/*,application/pdf" onChange={(e) => setFContract([...(e.target.files ?? [])])} />
+              {fContract.length ? <small className="muted">{fContract.map((f) => f.name).join(", ")}</small> : null}</label>
           </section>
         ) : null}
         <label className="field"><span>Ghi chú</span>
