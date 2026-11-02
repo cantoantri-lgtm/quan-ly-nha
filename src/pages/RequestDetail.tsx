@@ -3,19 +3,21 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { clock, daysBetween, todayVN } from "../lib/dates";
-import { parseMoney, vnd } from "../lib/money";
-import { LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, fullDate, hhmm, kindLabel, statusLabel, summary, type Req } from "../lib/office";
+import { parseMoney, vnd, vndWords } from "../lib/money";
+import { DUTY_LABEL, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, fullDate, hhmm, kindLabel, statusLabel, summary, type Req, type ReqStep } from "../lib/office";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import FileGallery from "../components/FileGallery";
 import DnttView from "../components/DnttView";
+import { ApprovalSteps } from "../components/ApprovalChain";
 import { KIND_ICON, LeaveBalance } from "./Office";
 import "../office.css";
 
 export default function RequestDetail() {
   const { id } = useParams();
-  const { profile, people, buildings, isManager, toast, refreshUnread } = useSession();
+  const { profile, people, buildings, isManager, isAccountant, toast, refreshUnread } = useSession();
   const nav = useNavigate();
   const [r, setR] = useState<Req | null>(null);
+  const [steps, setSteps] = useState<ReqStep[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
   const [decide, setDecide] = useState<null | "da_duyet" | "tu_choi">(null);
@@ -29,9 +31,13 @@ export default function RequestDetail() {
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("requests").select("*").eq("id", id!).maybeSingle();
+    const [{ data }, st] = await Promise.all([
+      supabase.from("requests").select("*").eq("id", id!).maybeSingle(),
+      supabase.from("request_steps").select("*").eq("request_id", id!).order("step_no"),
+    ]);
     if (!data) { setNotFound(true); return; }
     setR(data as Req);
+    setSteps((st.data ?? []) as ReqStep[]);
   }, [id]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -53,6 +59,10 @@ export default function RequestDetail() {
   const mine = r.requester_id === profile.id;
   const isMoney = r.kind === "thanh_toan" || r.kind === "tam_ung";
   const today = todayVN();
+  const curStep = r.status === "cho_duyet" ? steps.find((x) => x.status === "cho") : undefined;
+  const canDecide = !!curStep && !mine && (curStep.approver_id === profile.id || (curStep.approver_id === null && isManager));
+  const canEdit = mine && r.status === "cho_duyet" && !steps.some((x) => x.status === "da_duyet");
+  const canPay = isMoney && r.status === "da_duyet" && (isManager || isAccountant);
   const canCancel = mine && (r.status === "cho_duyet" || (r.status === "da_duyet" && !isMoney && r.start_date > today));
   const canReport = mine && r.kind === "cong_tac" && (r.status === "da_duyet" || r.status === "hoan_tat");
   const building = buildings.find((b) => b.id === r.building_id);
@@ -71,8 +81,21 @@ export default function RequestDetail() {
   async function submitDecision(e: FormEvent) {
     e.preventDefault();
     if (decide === "tu_choi" && !note.trim()) { setErr("Ghi lý do từ chối để người đề nghị biết."); return; }
-    const ok = await update({ status: decide!, decision_note: note.trim() || null }, decide === "da_duyet" ? "Đã duyệt đề nghị." : "Đã từ chối đề nghị.");
-    if (ok) { setDecide(null); setNote(""); }
+    setBusy(true); setErr(null);
+    const { error } = await supabase.rpc("decide_step", { p_request: r!.id, p_approve: decide === "da_duyet", p_note: note.trim() || null });
+    setBusy(false);
+    if (error) { setErr(friendlyError(error)); return; }
+    toast(decide === "da_duyet" ? "Đã duyệt bước của bạn." : "Đã từ chối đề nghị.");
+    setDecide(null); setNote(""); await load(); refreshUnread();
+  }
+
+  async function markPaid() {
+    setBusy(true); setErr(null);
+    const { error } = await supabase.rpc("mark_paid", { p_request: r!.id });
+    setBusy(false);
+    if (error) { setErr(friendlyError(error)); toast(friendlyError(error)); return false; }
+    toast("Đã ghi nhận chi tiền."); await load(); refreshUnread();
+    return true;
   }
 
   function openReport() {
@@ -98,14 +121,15 @@ export default function RequestDetail() {
   return (
     <>
       <TopBar title={kindLabel(r)} back="/van-phong"
-        action={mine && r.status === "cho_duyet" ? <Link className="tb-action" to={`/van-phong/${r.id}/sua`} style={{ color: "inherit" }}>Sửa</Link> : null} />
-      <main className={`main stack${r.kind === "thanh_toan" ? " main-wide" : ""}`}>
+        action={canEdit ? <Link className="tb-action" to={`/van-phong/${r.id}/sua`} style={{ color: "inherit" }}>Sửa</Link> : null} />
+      <main className={`main stack${isMoney ? " main-wide" : ""}`}>
         <section className={`card rq-head k-${r.kind}`}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <span className="rq-ico" aria-hidden="true">{KIND_ICON[r.kind]}</span>
             <span className={`rq-pill ${r.status}`}>{statusLabel(r)}</span>
           </div>
           <h2 className="num">{isMoney ? vnd(r.amount) : summary(r)}</h2>
+          {isMoney && r.amount ? <p className="muted" style={{ margin: 0, fontSize: 13 }}>{vndWords(r.amount)}</p> : null}
           <p className="muted" style={{ margin: 0 }}>{requester?.full_name ?? "—"} · gửi {clock(r.created_at)}</p>
         </section>
 
@@ -128,7 +152,7 @@ export default function RequestDetail() {
             {r.location ? (<><dt>Đi đâu</dt><dd>{r.location}</dd></>) : null}
           </>) : null}
           {r.kind === "cong_tac" ? (<>
-            <dt>Nơi công tác</dt><dd>{r.location}</dd>
+            <dt>Nơi công tác</dt><dd>{r.location}{r.transport ? ` · ${r.transport}` : ""}</dd>
             <dt>Kế hoạch</dt><dd className="num">{fullDate(r.start_date)} – {fullDate(r.end_date)} ({fmtDays(r.days)})</dd>
             {r.amount ? (<><dt>Dự trù</dt><dd className="num">{vnd(r.amount)}</dd></>) : null}
           </>) : null}
@@ -138,12 +162,15 @@ export default function RequestDetail() {
             <dt>{r.kind === "thanh_toan" ? "Ngày cần TT" : "Cần trước"}</dt><dd className="num">{fullDate(r.start_date)}</dd>
             {r.kind === "thanh_toan" && r.pay_type ? (<><dt>Loại thanh toán</dt><dd>{PAY_TYPE[r.pay_type] ?? r.pay_type}</dd></>) : null}
             {r.loa_no ? (<><dt>LOA No.</dt><dd>{r.loa_no}</dd></>) : null}
+            {r.kind === "tam_ung" && r.settle_due ? (<><dt>Hạn hoàn ứng</dt><dd className="num">{fullDate(r.settle_due)}</dd></>) : null}
             {r.payee ? (<><dt>{r.kind === "thanh_toan" ? "Đơn vị nhận" : "Người nhận"}</dt><dd>{r.payee}{r.vendor_code ? ` (${r.vendor_code})` : ""}</dd></>) : null}
             {r.contact_name || r.contact_code ? (<><dt>Liên hệ</dt><dd>{[r.contact_name, r.contact_code].filter(Boolean).join(" · ")}</dd></>) : null}
             <dt>Hình thức</dt><dd>{r.pay_method ? PAY_METHOD[r.pay_method] : r.bank_info ? "Chuyển khoản" : "Tiền mặt"}{r.bank_info ? ` — ${r.bank_info}` : ""}</dd>
           </>) : null}
           <dt>{isMoney ? "Nội dung" : r.kind === "cong_tac" ? "Mục đích" : r.kind === "ra_ngoai" ? "Công việc" : "Lý do"}</dt><dd className="desc">{r.reason}</dd>
           {building ? (<><dt>Toà nhà</dt><dd>{building.code} · {building.name}</dd></>) : null}
+          {r.handover_to ? (<><dt>Bàn giao cho</dt><dd>{name(r.handover_to)}</dd></>) : null}
+          {r.contact_phone ? (<><dt>SĐT liên hệ</dt><dd className="num">{r.contact_phone}</dd></>) : null}
         </dl>
 
         {r.kind === "cong_tac" && r.status === "hoan_tat" ? (
@@ -176,10 +203,17 @@ export default function RequestDetail() {
             canDelete={isManager || (mine && r.status === "cho_duyet")} />
         ) : null}
 
+        {steps.length ? (
+          <>
+            <div className="section-title">Luồng duyệt</div>
+            <ApprovalSteps steps={steps} people={people} requesterName={requester?.full_name ?? "—"} sentAt={r.created_at} />
+          </>
+        ) : null}
+
         <div className="section-title">Lịch sử</div>
         <ol className="card rq-log">
           <li><b>{requester?.full_name}</b> gửi đề nghị<span>{clock(r.created_at)}</span></li>
-          {r.decided_at ? <li><b>{name(r.approver_id)}</b> {r.status === "tu_choi" ? "từ chối" : "duyệt"}{r.decision_note && r.status !== "tu_choi" ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at)}</span></li> : null}
+          {r.decided_at && !steps.length ? <li><b>{name(r.approver_id)}</b> {r.status === "tu_choi" ? "từ chối" : "duyệt"}{r.decision_note && r.status !== "tu_choi" ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at)}</span></li> : null}
           {r.reported_at ? <li><b>{requester?.full_name}</b> nhập thực tế công tác<span>{clock(r.reported_at)}</span></li> : null}
           {r.paid_at ? <li><b>{name(r.paid_by)}</b> đã chi tiền<span>{clock(r.paid_at)}</span></li> : null}
           {r.status === "da_huy" ? <li><b>{requester?.full_name}</b> rút lại đề nghị<span>{clock(r.updated_at)}</span></li> : null}
@@ -188,15 +222,16 @@ export default function RequestDetail() {
         {err && !decide && !report ? <div className="error-box" role="alert">{err}</div> : null}
 
         <div className="stack rq-actions">
-          {isManager && r.status === "cho_duyet" ? (
+          {canDecide ? (
             <div className="row">
               <button className="btn danger" style={{ flex: 1 }} disabled={busy} onClick={() => { setErr(null); setNote(""); setDecide("tu_choi"); }}>Từ chối</button>
               <button className="btn" style={{ flex: 2 }} disabled={busy} onClick={() => { setErr(null); setNote(""); setDecide("da_duyet"); }}>Duyệt</button>
             </div>
           ) : null}
-          {isManager && isMoney && r.status === "da_duyet" ? (
+          {canPay ? (
             <button className="btn block" disabled={busy} onClick={() => setConfirm("chi")}>Đánh dấu đã chi {vnd(r.amount)}</button>
           ) : null}
+          <Link className="btn secondary block" to={`/van-phong/${r.id}/in`}>In / lưu PDF</Link>
           {canReport ? (
             <button className={`btn block${r.status === "hoan_tat" ? " secondary" : ""}`} onClick={openReport}>
               {r.status === "hoan_tat" ? "Sửa báo cáo thực tế" : "Nhập thực tế công tác"}
@@ -208,7 +243,7 @@ export default function RequestDetail() {
 
       <Sheet open={!!decide} onClose={() => setDecide(null)} title={decide === "da_duyet" ? "Duyệt đề nghị" : "Từ chối đề nghị"}>
         <form className="stack" onSubmit={submitDecision}>
-          <p className="muted" style={{ margin: 0 }}>{requester?.full_name} · {kindLabel(r)} · {summary(r)}</p>
+          <p className="muted" style={{ margin: 0 }}>{requester?.full_name} · {kindLabel(r)} · {summary(r)}{curStep ? ` · bước ${DUTY_LABEL[curStep.duty]}` : ""}</p>
           <label className="field"><span>{decide === "tu_choi" ? "Lý do từ chối *" : "Ghi chú (không bắt buộc)"}</span>
             <textarea id="rq-decision" className="input" value={note} onChange={(e) => setNote(e.target.value)} autoFocus /></label>
           {err ? <div className="error-box" role="alert">{err}</div> : null}
@@ -244,7 +279,7 @@ export default function RequestDetail() {
           <button className="btn secondary" style={{ flex: 1 }} onClick={() => setConfirm(null)}>Thôi</button>
           <button className={`btn ${confirm === "huy" ? "danger" : ""}`} style={{ flex: 1 }} disabled={busy}
             onClick={async () => {
-              const ok = confirm === "chi" ? await update({ status: "hoan_tat" }, "Đã ghi nhận chi tiền.") : await update({ status: "da_huy" }, "Đã rút lại đề nghị.");
+              const ok = confirm === "chi" ? await markPaid() : await update({ status: "da_huy" }, "Đã rút lại đề nghị.");
               if (ok) { setConfirm(null); if (confirm === "huy") nav("/van-phong?tab=cua_toi", { replace: true }); }
             }}>{confirm === "chi" ? "Đã chi" : "Rút lại"}</button>
         </div>

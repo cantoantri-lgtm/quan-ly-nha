@@ -83,11 +83,13 @@ export function LeaveBalance({ userId, quota, compact }: { userId: string; quota
 }
 
 export default function Office() {
-  const { profile, isManager, pendingApprovals } = useSession();
+  const { profile, isManager, isApprover, pendingApprovals } = useSession();
+  const canApprove = isManager || isApprover;
   const [params, setParams] = useSearchParams();
-  const tab = (params.get("tab") as Tab) || (isManager ? "duyet" : "cua_toi");
+  const tab = (params.get("tab") as Tab) || (canApprove ? "duyet" : "cua_toi");
   const kindFilter = params.get("loai") || "";
   const [rows, setRows] = useState<Req[]>([]);
+  const [phases, setPhases] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -101,8 +103,16 @@ export default function Office() {
     if (!profile) return;
     setErr(null);
     let q = supabase.from("requests").select("*");
+    if (tab === "duyet") {
+      // Hàng đợi của tôi: đang đến lượt tôi duyệt, hoặc đã duyệt xong chờ tôi chi tiền
+      const { data: queue, error: qe } = await supabase.rpc("my_approval_queue");
+      if (qe) setErr(friendlyError(qe));
+      const items = (queue ?? []) as { request_id: string; phase: string }[];
+      setPhases(Object.fromEntries(items.map((i) => [i.request_id, i.phase])));
+      if (!items.length) { setRows([]); setLoading(false); return; }
+      q = q.in("id", items.map((i) => i.request_id));
+    }
     if (tab === "cua_toi") q = q.eq("requester_id", profile.id);
-    if (tab === "duyet") q = q.or("status.eq.cho_duyet,and(status.eq.da_duyet,kind.in.(thanh_toan,tam_ung))");
     if (tab === "tat_ca" && kindFilter) q = q.eq("kind", kindFilter);
     const { data, error } = await q.order("created_at", { ascending: tab === "duyet" }).limit(300);
     if (error) setErr(friendlyError(error));
@@ -118,16 +128,16 @@ export default function Office() {
     return () => { window.removeEventListener("neo:notification", h); window.removeEventListener("focus", h); };
   }, [load]);
 
-  const toApprove = useMemo(() => rows.filter((r) => r.status === "cho_duyet"), [rows]);
-  const toPay = useMemo(() => rows.filter((r) => r.status === "da_duyet"), [rows]);
+  const toApprove = useMemo(() => rows.filter((r) => phases[r.id] === "duyet"), [rows, phases]);
+  const toPay = useMemo(() => rows.filter((r) => phases[r.id] === "chi"), [rows, phases]);
 
   return (
     <>
-      <TopBar title="Văn phòng" />
+      <TopBar title="Văn phòng" action={<Link className="tb-action" to="/to-chuc" style={{ color: "inherit" }}>Sơ đồ công ty</Link>} />
       <main className="main stack">
-        {isManager ? (
+        {canApprove ? (
           <div className="tabs" role="tablist">
-            {([["duyet", "Cần xử lý"], ["cua_toi", "Của tôi"], ["tat_ca", "Tất cả"]] as [Tab, string][]).map(([k, l]) => (
+            {(([["duyet", "Cần xử lý"], ["cua_toi", "Của tôi"], ["tat_ca", "Tất cả"]] as [Tab, string][]).filter(([k]) => k !== "tat_ca" || isManager)).map(([k, l]) => (
               <button key={k} role="tab" aria-selected={tab === k} onClick={() => setParam("tab", k)}>
                 {l}{k === "duyet" && pendingApprovals ? <span className="tab-n num">{pendingApprovals}</span> : null}
               </button>
@@ -166,7 +176,7 @@ export default function Office() {
         {err ? <div className="error-box">{err}</div> : null}
         {loading ? <div className="loading">Đang tải…</div> : tab === "duyet" ? (
           toApprove.length + toPay.length === 0 ? (
-            <Empty title="Không có gì cần xử lý">Đề nghị mới của nhân sự sẽ hiện ở đây kèm thông báo.</Empty>
+            <Empty title="Không có gì cần xử lý">Đề nghị đến lượt bạn duyệt hoặc chờ bạn chi tiền sẽ hiện ở đây kèm thông báo.</Empty>
           ) : (
             <>
               {toApprove.length ? <div className="section-title" style={{ marginTop: 4 }}>Chờ duyệt · {toApprove.length}</div> : null}

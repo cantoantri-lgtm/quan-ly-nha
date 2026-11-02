@@ -1,0 +1,31 @@
+/* Bản in đề nghị: nền sáng, chữ đen theo màu hệ thống để in ra giấy */
+.print-doc { color-scheme: light; background: Canvas; color: CanvasText; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; font-size: 14px; line-height: 1.45; }
+.pd-head { text-align: center; display: grid; gap: 4px; margin-bottom: 14px; }
+.pd-brand { font-weight: 700; letter-spacing: .12em; font-size: 13px; }
+.pd-head h1 { margin: 0; font-size: 20px; }
+.pd-no, .pd-status { font-size: 13px; }
+.pd-kv { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+.pd-kv th { text-align: left; font-weight: 600; width: 36%; padding: 3px 8px 3px 0; vertical-align: top; }
+.pd-kv td { padding: 3px 0; overflow-wrap: anywhere; }
+.pd-methods { margin: 8px 0; }
+.pd-check { margin-right: 10px; white-space: nowrap; }
+.pd-grid { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
+.pd-grid th, .pd-grid td { border: 1px solid currentColor; padding: 4px 5px; vertical-align: top; }
+.pd-grid th { text-align: center; }
+.pd-grid td.r { text-align: right; white-space: nowrap; }
+.pd-sum td { font-weight: 700; }
+.pd-words { margin: 10px 0; }
+.pd-date { text-align: right; font-style: italic; margin: 14px 0 6px; }
+.pd-sign { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; text-align: center; }
+.pd-sign > div { flex: 1 1 110px; display: grid; gap: 3px; align-content: start; min-height: 130px; }
+.pd-sign small { font-style: italic; font-size: 11px; }
+.pd-sign .who { margin-top: 38px; font-weight: 600; }
+.pd-sign .when { font-size: 11.5px; }
+.pd-paid { margin-top: 14px; font-size: 13px; }
+@media print {
+  .topbar, .bottomnav, .toast, .fab { display: none !important; }
+  body, .app { background: Canvas !important; }
+  .main { max-width: none !important; padding: 0 !important; }
+  .print-doc { border: 0; padding: 0; border-radius: 0; }
+  @page { size: A4; margin: 14mm; }
+}

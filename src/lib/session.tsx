@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { Building, Profile } from "./labels";
+import type { Staff } from "./org";
 
 type Ctx = {
   session: Session | null;
@@ -18,6 +19,11 @@ type Ctx = {
   toastMsg: string | null;
   isManager: boolean;
   isSupervisor: boolean;
+  /** Dòng của tôi trong cơ cấu tổ chức (nếu đã được gán) */
+  myStaff: Staff | null;
+  /** Có thể đứng trong chuỗi duyệt: Leader, Trưởng phòng trở lên, hoặc giữ nhiệm vụ Nhân sự/Kế toán/Giám đốc */
+  isApprover: boolean;
+  isAccountant: boolean;
 };
 
 const SessionContext = createContext<Ctx | null>(null);
@@ -31,6 +37,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [unread, setUnread] = useState(0);
   const [pendingApprovals, setPending] = useState(0);
+  const [myStaff, setMyStaff] = useState<Staff | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<number>();
 
@@ -43,22 +50,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refreshUnread = useCallback(async () => {
     const { count } = await supabase.from("notifications").select("id", { count: "exact", head: true }).is("read_at", null);
     setUnread(count ?? 0);
-    // Quản lý: số đề nghị đang chờ duyệt (hiện trên nút Văn phòng)
-    const uid = (await supabase.auth.getSession()).data.session?.user.id;
-    const { data: p } = uid ? await supabase.from("profiles").select("role").eq("id", uid).maybeSingle() : { data: null };
-    if (p?.role === "quan_ly") {
-      const { count: c } = await supabase.from("requests").select("id", { count: "exact", head: true }).eq("status", "cho_duyet");
-      setPending(c ?? 0);
-    } else setPending(0);
+    // Số đề nghị đang chờ tôi duyệt (hoặc chờ tôi chi tiền)
+    const { data: q } = await supabase.rpc("my_approval_queue");
+    setPending(Array.isArray(q) ? q.length : 0);
   }, []);
 
   const loadBase = useCallback(async (uid: string) => {
-    const [p, b, ppl, mem] = await Promise.all([
+    const [p, b, ppl, mem, st] = await Promise.all([
       supabase.from("profiles").select("id,full_name,phone,role,is_active,annual_leave_days").eq("id", uid).maybeSingle(),
       supabase.from("buildings").select("*").order("code"),
       supabase.from("profiles").select("id,full_name,phone,role,is_active,annual_leave_days").order("full_name"),
       supabase.from("building_members").select("building_id").eq("user_id", uid),
+      supabase.from("org_staff").select("*").eq("profile_id", uid).maybeSingle(),
     ]);
+    setMyStaff((st.data as Staff) ?? null);
     setProfile((p.data as Profile) ?? null);
     setBuildings((b.data as Building[]) ?? []);
     setPeople((ppl.data as Profile[]) ?? []);
@@ -112,7 +117,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     session, profile, buildings, people, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg,
     isManager: profile?.role === "quan_ly",
     isSupervisor: profile?.role === "giam_sat",
-  }), [session, profile, buildings, people, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg]);
+    myStaff,
+    isApprover: !!myStaff && (myStaff.is_leader || !!myStaff.duty || (myStaff.level ?? 0) >= 3),
+    isAccountant: myStaff?.duty === "ke_toan",
+  }), [session, profile, buildings, people, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

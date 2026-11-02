@@ -14,7 +14,8 @@ Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện �
 | Bản đồ toà nhà | Một bản đồ hiện tất cả toà, mỗi toà một ghim ghi số phòng trống; bấm ghim xem tên toà, chỉ đường bằng Google Maps. Mọi người xem được tất cả toà (chỉ tên, vị trí, số phòng trống); Quản lý đặt vị trí (chạm/kéo ghim trên bản đồ, dán toạ độ / link Google Maps, vị trí hiện tại, hoặc nhập Lat/Long trong Sửa toà). |
 | Giao việc bằng giọng nói | Ghi âm hoặc dán tin nhắn Zalo → AI (Google Gemini) tách thành danh sách việc → kiểm tra rồi giao. Chỉ Quản lý / Giám sát. |
 | Toà nhà & phòng | Lưới phòng theo tầng, giá thuê, trạng thái phòng, tạo nhanh nhiều phòng, dán từ Excel, xoá toà / xoá phòng. |
-| Văn phòng | Xin nghỉ phép (phép năm / không lương, cả ngày / nửa ngày, không tính Chủ nhật), làm việc bên ngoài, đi công tác (duyệt trước, nhập thực tế sau), đề nghị thanh toán, tạm ứng. Chỉ Quản lý duyệt. |
+| Văn phòng | Xin nghỉ phép (phép năm / không lương, cả ngày / nửa ngày, không tính Chủ nhật), làm việc bên ngoài, đi công tác (duyệt trước, nhập thực tế sau), đề nghị thanh toán (số chứng từ tự cấp, chi tiết hoá đơn + VAT, trừ tạm ứng, đính kèm tệp và link, bằng chữ, bản in theo mẫu), đề nghị tạm ứng. Duyệt nhiều bước: nghỉ phép / ra ngoài / công tác đi Người đề nghị → Leader → Trưởng phòng → Nhân sự; thanh toán / tạm ứng đi Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc. Bước chưa có người giữ tự bỏ qua, một người đứng nhiều bước chỉ duyệt một lần. |
+| Sơ đồ công ty | `/to-chuc`: Chủ DN → 2 Phó Giám đốc → 5 phòng → vị trí / nhân sự (đang có, đang tuyển, thuê ngoài), thang lương L1–L4, lương cơ bản từng người (theo file Kế hoạch tái cấu trúc 2026–2027). Chỉ cấp Trưởng phòng trở lên xem sơ đồ; chỉ Phó Giám đốc xem và sửa lương; mỗi người xem được lương của chính mình. Người giữ nhiệm vụ Giám đốc / Kế toán / Nhân sự và Leader đặt ở từng vị trí. |
 | Khách thuê | Hồ sơ khách theo toà, đánh dấu (Khách quen / Cần lưu ý), ảnh CCCD hai mặt (chỉ Quản lý và Giám sát của toà xem; phải ghi nhận khách đồng ý trước khi tải). |
 | Hợp đồng | Lập hợp đồng gắn phòng và khách (phòng tự chuyển "Đang ở"), cách ký giấy hay điện tử, tải ảnh/PDF hợp đồng đã ký, thu và hoàn cọc, kết thúc hợp đồng. |
 | Thu tiền phòng | Hoá đơn tháng theo toà, mã QR chuyển khoản (VietQR) đúng số tiền và nội dung, link thanh toán gửi khách `/thanh-toan/<mã>`, tự đánh dấu "Đã thu" khi tiền về qua SePay, hoặc đánh dấu tay. |
@@ -59,6 +60,8 @@ supabase/
   005_vi_tri_toa.sql         toạ độ toà (lat/lng), hàm building_map() cho màn hình Bản đồ
   006_kho_anh_thanh_toan.sql kho tệp riêng tư + bảng files, đánh dấu khách, đồng ý lưu CCCD, tài khoản nhận tiền, mã chuyển khoản, đối soát SePay
   007_an_so_cccd.sql         ẩn cột số CCCD với nhân viên; Quản lý/Giám sát đọc qua tenant_private()
+  008_dntt_day_du.sql        đề nghị thanh toán đầy đủ: số chứng từ, chi tiết hoá đơn, tạm ứng trừ, link đính kèm
+  009_to_chuc_phe_duyet.sql  cơ cấu tổ chức, nhân sự, lương; luồng duyệt nhiều bước (request_steps, decide_step, mark_paid, my_approval_queue)
   thu_nghiem/                seed.sql / cleanup.sql: tài khoản + toà thử nghiệm (không phải migration)
   functions/quan-ly-tai-khoan    cấp / khoá tài khoản, đổi SĐT, cấp lại mật khẩu (dùng service role)
   functions/phan-tich-giao-viec  ghi âm / tin nhắn → danh sách việc (Gemini)

@@ -18,6 +18,8 @@ import BuildingDetail from "./pages/BuildingDetail";
 import Office from "./pages/Office";
 import RequestForm from "./pages/RequestForm";
 import RequestDetail from "./pages/RequestDetail";
+import RequestPrint from "./pages/RequestPrint";
+import Org from "./pages/Org";
 import Tenants, { TenantDetail } from "./pages/Tenants";
 import Contracts from "./pages/Contracts";
 import Invoices from "./pages/Invoices";
@@ -88,6 +90,8 @@ export default function App() {
         <Route path="van-phong/moi/:kind" element={<RequestForm />} />
         <Route path="van-phong/:id" element={<RequestDetail />} />
         <Route path="van-phong/:id/sua" element={<RequestForm />} />
+        <Route path="van-phong/:id/in" element={<RequestPrint />} />
+        <Route path="to-chuc" element={<Org />} />
         <Route path="thong-bao" element={<Notifications />} />
         <Route path="tai-khoan" element={<Account />} />
         <Route path="quan-tri" element={<ManagerOnly />}>

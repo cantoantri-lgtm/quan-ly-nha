@@ -44,6 +44,10 @@ export type Req = {
   vendor_code: string | null;
   contact_code: string | null;
   contact_name: string | null;
+  handover_to: string | null;
+  contact_phone: string | null;
+  transport: string | null;
+  settle_due: string | null;
 };
 
 export type ReqLine = {
@@ -56,7 +60,25 @@ export type ReqLine = {
 export type ReqAdvance = { id?: string; request_id?: string; amount: number; description: string | null };
 export type ReqLink = { id: string; request_id: string; url: string; title: string | null; created_at: string };
 
-export const PAY_METHOD: Record<string, string> = { chuyen_khoan: "Chuyển khoản", tien_mat: "Tiền mặt" };
+export const PAY_METHOD: Record<string, string> = { chuyen_khoan: "Chuyển khoản", tien_mat: "Tiền mặt", bu_tru: "Bù trừ", khac: "Khác" };
+
+/** Một bước trong luồng duyệt */
+export type ReqStep = {
+  id: string; request_id: string; step_no: number; duty: string; approver_id: string | null;
+  status: "cho" | "da_duyet" | "tu_choi" | "bo_qua"; skip_reason: string | null;
+  decided_by: string | null; decided_at: string | null; note: string | null;
+};
+export const DUTY_LABEL: Record<string, string> = {
+  leader: "Leader", truong_phong: "Trưởng phòng", nhan_su: "Nhân sự", ke_toan: "Kế toán", giam_doc: "Giám đốc",
+};
+/** Luồng duyệt theo loại đề nghị (mô tả cho người dùng) */
+export const FLOW_TEXT: Record<ReqKind, string> = {
+  nghi_phep: "Người đề nghị → Leader → Trưởng phòng → Nhân sự",
+  ra_ngoai: "Người đề nghị → Leader → Trưởng phòng → Nhân sự",
+  cong_tac: "Người đề nghị → Leader → Trưởng phòng → Nhân sự",
+  thanh_toan: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
+  tam_ung: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
+};
 export const PAY_TYPE: Record<string, string> = {
   nha_cung_cap: "Thanh toán nhà cung cấp", hoan_ung: "Hoàn ứng", chi_phi_van_hanh: "Chi phí vận hành",
   sua_chua: "Sửa chữa, bảo trì", luong_thuong: "Lương, thưởng", khac: "Khác",
