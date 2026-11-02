@@ -4,9 +4,10 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { clock, daysBetween, todayVN } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
-import { LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, fmtDays, fullDate, hhmm, kindLabel, statusLabel, summary, type Req } from "../lib/office";
+import { LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, fullDate, hhmm, kindLabel, statusLabel, summary, type Req } from "../lib/office";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import FileGallery from "../components/FileGallery";
+import DnttView from "../components/DnttView";
 import { KIND_ICON, LeaveBalance } from "./Office";
 import "../office.css";
 
@@ -132,10 +133,14 @@ export default function RequestDetail() {
             {r.amount ? (<><dt>Dự trù</dt><dd className="num">{vnd(r.amount)}</dd></>) : null}
           </>) : null}
           {isMoney ? (<>
+            {r.doc_no ? (<><dt>Số chứng từ</dt><dd className="num">{r.doc_no}{r.doc_date ? ` · ${fullDate(r.doc_date)}` : ""}</dd></>) : null}
             <dt>Số tiền</dt><dd className="num"><b>{vnd(r.amount)}</b></dd>
-            <dt>Cần trước</dt><dd className="num">{fullDate(r.start_date)}</dd>
-            {r.payee ? (<><dt>Người nhận</dt><dd>{r.payee}</dd></>) : null}
-            <dt>Hình thức</dt><dd>{r.bank_info ? r.bank_info : "Tiền mặt"}</dd>
+            <dt>{r.kind === "thanh_toan" ? "Ngày cần TT" : "Cần trước"}</dt><dd className="num">{fullDate(r.start_date)}</dd>
+            {r.kind === "thanh_toan" && r.pay_type ? (<><dt>Loại thanh toán</dt><dd>{PAY_TYPE[r.pay_type] ?? r.pay_type}</dd></>) : null}
+            {r.loa_no ? (<><dt>LOA No.</dt><dd>{r.loa_no}</dd></>) : null}
+            {r.payee ? (<><dt>{r.kind === "thanh_toan" ? "Đơn vị nhận" : "Người nhận"}</dt><dd>{r.payee}{r.vendor_code ? ` (${r.vendor_code})` : ""}</dd></>) : null}
+            {r.contact_name || r.contact_code ? (<><dt>Liên hệ</dt><dd>{[r.contact_name, r.contact_code].filter(Boolean).join(" · ")}</dd></>) : null}
+            <dt>Hình thức</dt><dd>{r.pay_method ? PAY_METHOD[r.pay_method] : r.bank_info ? "Chuyển khoản" : "Tiền mặt"}{r.bank_info ? ` — ${r.bank_info}` : ""}</dd>
           </>) : null}
           <dt>{isMoney ? "Nội dung" : r.kind === "cong_tac" ? "Mục đích" : r.kind === "ra_ngoai" ? "Công việc" : "Lý do"}</dt><dd className="desc">{r.reason}</dd>
           {building ? (<><dt>Toà nhà</dt><dd>{building.code} · {building.name}</dd></>) : null}
@@ -156,6 +161,12 @@ export default function RequestDetail() {
 
         {isManager && r.kind === "nghi_phep" && r.sub_type === "phep_nam" && requester ? (
           <LeaveBalance userId={requester.id} quota={requester.annual_leave_days == null ? null : Number(requester.annual_leave_days)} compact />
+        ) : null}
+
+        {r.kind === "thanh_toan" ? (
+          <DnttView requestId={r.id} refreshKey={r.updated_at}
+            canAddLink={isManager || (mine && (r.status === "cho_duyet" || r.status === "da_duyet"))}
+            canDeleteLink={isManager || (mine && r.status === "cho_duyet")} />
         ) : null}
 
         {isMoney ? (

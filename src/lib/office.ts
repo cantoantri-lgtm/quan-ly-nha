@@ -35,7 +35,33 @@ export type Req = {
   paid_by: string | null;
   created_at: string;
   updated_at: string;
+  doc_no: string | null;
+  doc_date: string | null;
+  currency: string;
+  loa_no: string | null;
+  pay_method: string | null;
+  pay_type: string | null;
+  vendor_code: string | null;
+  contact_code: string | null;
+  contact_name: string | null;
 };
+
+export type ReqLine = {
+  id?: string; request_id?: string; line_no: number;
+  invoice_serial: string | null; invoice_no: string | null; invoice_date: string | null;
+  seller_name: string | null; seller_tax: string | null;
+  amount_pre_vat: number; quantity: number | null; vat_pct: number; vat_amount: number; total: number;
+  description: string | null; cost_center: string; object_ref: string | null;
+};
+export type ReqAdvance = { id?: string; request_id?: string; amount: number; description: string | null };
+export type ReqLink = { id: string; request_id: string; url: string; title: string | null; created_at: string };
+
+export const PAY_METHOD: Record<string, string> = { chuyen_khoan: "Chuyển khoản", tien_mat: "Tiền mặt" };
+export const PAY_TYPE: Record<string, string> = {
+  nha_cung_cap: "Thanh toán nhà cung cấp", hoan_ung: "Hoàn ứng", chi_phi_van_hanh: "Chi phí vận hành",
+  sua_chua: "Sửa chữa, bảo trì", luong_thuong: "Lương, thưởng", khac: "Khác",
+};
+export const VAT_RATES = [0, 5, 8, 10];
 
 export const KINDS: { kind: ReqKind; label: string; hint: string }[] = [
   { kind: "nghi_phep", label: "Xin nghỉ phép", hint: "Nửa ngày, cả ngày" },

@@ -2,9 +2,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { daysBetween, todayVN, workDays } from "../lib/dates";
+import { daysBetween, ddmmyyyy, todayVN, workDays } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
-import { KINDS, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, fmtDays, type Req, type ReqKind } from "../lib/office";
+import { KINDS, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
+import { uploadFile } from "../lib/files";
+import DnttEditor, { advFromRow, calcLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
 import { TopBar } from "../components/ui";
 import { useLeaveBalance } from "./Office";
 import "../office.css";
@@ -53,6 +55,18 @@ export default function RequestForm() {
   const [err, setErr] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(!editing);
   const [origPending, setOrigPending] = useState(0);   // đơn đang sửa đã nằm trong số "chờ duyệt"
+  // Đề nghị thanh toán đầy đủ
+  const [payMethod, setPayMethod] = useState("chuyen_khoan");
+  const [payType, setPayType] = useState("nha_cung_cap");
+  const [loa, setLoa] = useState("");
+  const [vendorCode, setVendorCode] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactCode, setContactCode] = useState("");
+  const [docNo, setDocNo] = useState<string | null>(null);
+  const [lines, setLines] = useState<LineDraft[]>([]);
+  const [advs, setAdvs] = useState<AdvDraft[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const [links, setLinks] = useState<LinkDraft[]>([]);
 
   const balance = useLeaveBalance(profile?.id);
 
@@ -67,12 +81,29 @@ export default function RequestForm() {
       setLocation(r.location ?? ""); setReason(r.reason); setAmount(r.amount ? String(r.amount) : "");
       setPayee(r.payee ?? ""); setBank(r.bank_info ?? ""); setBuildingId(r.building_id ?? "");
       if (r.kind === "nghi_phep" && r.sub_type === "phep_nam" && r.status === "cho_duyet") setOrigPending(Number(r.days ?? 0));
+      setPayMethod(r.pay_method ?? (r.bank_info ? "chuyen_khoan" : "tien_mat")); setPayType(r.pay_type ?? "khac");
+      setLoa(r.loa_no ?? ""); setVendorCode(r.vendor_code ?? ""); setContactName(r.contact_name ?? ""); setContactCode(r.contact_code ?? "");
+      setDocNo(r.doc_no);
+      if (r.kind === "thanh_toan") {
+        Promise.all([
+          supabase.from("request_lines").select("*").eq("request_id", r.id).order("line_no"),
+          supabase.from("request_advances").select("*").eq("request_id", r.id).order("created_at"),
+        ]).then(([l, a]) => {
+          setLines(((l.data ?? []) as ReqLine[]).map(lineFromRow));
+          setAdvs(((a.data ?? []) as ReqAdvance[]).map(advFromRow));
+          setLoaded(true);
+        });
+        return;
+      }
       setLoaded(true);
     });
   }, [id, nav]);
 
   const meta = KINDS.find((k) => k.kind === kind)!;
   const isMoney = kind === "thanh_toan" || kind === "tam_ung";
+  const isPay = kind === "thanh_toan";
+  const hasLines = isPay && lines.length > 0;
+  const tot = totals(lines, advs);
   const multiDay = kind === "cong_tac" || (kind === "nghi_phep" && span === "ca_ngay") || kind === "ra_ngoai";
   const isSunday = (iso: string) => new Date(iso + "T00:00:00Z").getUTCDay() === 0;
   const days = kind === "nghi_phep"
@@ -85,9 +116,17 @@ export default function RequestForm() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
-    const amt = parseMoney(amount);
-    if (isMoney && !amt) { setErr("Nhập số tiền đề nghị."); return; }
-    if (amount && !amt) { setErr("Số tiền chưa đúng định dạng."); return; }
+    const amt = hasLines ? tot.net : parseMoney(amount);
+    if (isMoney && !amt) { setErr(hasLines ? "Tiền tạm ứng phải nhỏ hơn tổng thanh toán." : "Nhập số tiền đề nghị."); return; }
+    if (!hasLines && amount && !amt) { setErr("Số tiền chưa đúng định dạng."); return; }
+    if (isPay) {
+      if (payMethod === "chuyen_khoan" && !bank.trim()) { setErr("Nhập số tài khoản và ngân hàng nhận tiền."); return; }
+      for (let i = 0; i < lines.length; i++) {
+        if (!calcLine(lines[i]).pre) { setErr(`Khoản ${i + 1}: nhập tiền trước VAT.`); return; }
+        if (!lines[i].cost_center.trim()) { setErr(`Khoản ${i + 1}: nhập Cost Center.`); return; }
+      }
+      for (let i = 0; i < advs.length; i++) if (!parseMoney(advs[i].amount)) { setErr(`Tạm ứng ${i + 1}: nhập số tiền.`); return; }
+    }
     if (multiDay && end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
     if (kind === "nghi_phep" && days === 0) { setErr("Chủ nhật công ty nghỉ, không cần xin nghỉ phép."); return; }
     if (kind === "ra_ngoai" && t1 && t2 && t2 <= t1) { setErr("Giờ về phải sau giờ đi."); return; }
@@ -105,15 +144,54 @@ export default function RequestForm() {
       payee: isMoney ? payee.trim() || null : null,
       bank_info: isMoney ? bank.trim() || null : null,
       building_id: buildingId || null,
+      pay_method: isPay ? payMethod : null,
+      pay_type: isPay ? payType : null,
+      loa_no: isPay ? loa.trim() || null : null,
+      vendor_code: isPay ? vendorCode.trim() || null : null,
+      contact_name: isPay ? contactName.trim() || null : null,
+      contact_code: isPay ? contactCode.trim() || null : null,
     };
     setBusy(true);
     const res = editing
       ? await supabase.from("requests").update(row).eq("id", id!).select("id").single()
       : await supabase.from("requests").insert(row).select("id").single();
+    if (res.error) { setBusy(false); setErr(friendlyError(res.error)); return; }
+    const rid = res.data.id as string;
+    const problems: string[] = [];
+    if (isPay) {
+      // Xoá tạm ứng trước khoản chi để tổng không bao giờ âm giữa chừng
+      if (editing) {
+        const d1 = await supabase.from("request_advances").delete().eq("request_id", rid);
+        const d2 = await supabase.from("request_lines").delete().eq("request_id", rid);
+        if (d1.error || d2.error) problems.push(friendlyError((d1.error || d2.error)!));
+      }
+      if (lines.length) {
+        const r1 = await supabase.from("request_lines").insert(lines.map((l, i) => ({ ...lineToRow(l, i), request_id: rid })));
+        if (r1.error) problems.push(friendlyError(r1.error));
+        else if (advs.length) {
+          const r2 = await supabase.from("request_advances").insert(advs.map((a) => ({ request_id: rid, amount: parseMoney(a.amount), description: a.description.trim() || null })));
+          if (r2.error) problems.push(friendlyError(r2.error));
+        }
+      }
+      if (!editing) {
+        for (const f of files) {
+          try { await uploadFile({ kind: "dinh_kem_de_nghi", requestId: rid }, f); }
+          catch (ex) { problems.push(`${f.name}: ${ex instanceof Error ? ex.message : "không tải lên được"}`); }
+        }
+        if (links.length) {
+          const r3 = await supabase.from("request_links").insert(links.map((k) => ({ request_id: rid, url: k.url, title: k.title || null })));
+          if (r3.error) problems.push(friendlyError(r3.error));
+        }
+      }
+    }
     setBusy(false);
-    if (res.error) { setErr(friendlyError(res.error)); return; }
+    if (problems.length) {
+      toast(`Đã lưu đề nghị nhưng có lỗi: ${problems.join("; ")}. Mở đề nghị để bổ sung.`);
+      nav(`/van-phong/${rid}`, { replace: true });
+      return;
+    }
     toast(editing ? "Đã lưu thay đổi." : "Đã gửi đề nghị, chờ quản lý duyệt.");
-    nav(`/van-phong/${res.data.id}`, { replace: true });
+    nav(`/van-phong/${rid}`, { replace: true });
   }
 
   if (!loaded) return (<><TopBar title="Sửa đề nghị" back /><div className="loading">Đang tải…</div></>);
@@ -137,13 +215,36 @@ export default function RequestForm() {
               <input id="rq-location" className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="VD: Đà Lạt" required /></label>
           ) : null}
 
-          {isMoney ? (
+          {isPay ? (
+            <>
+              <div className="section-title">Người đăng ký</div>
+              <dl className="card kv">
+                <dt>Người đề nghị</dt><dd>{profile?.full_name}</dd>
+              </dl>
+              <div className="section-title">Thông tin chứng từ</div>
+              <dl className="card kv">
+                <dt>Số chứng từ</dt><dd className="num">{docNo ?? "Tự cấp khi gửi"}</dd>
+                <dt>Ngày chứng từ</dt><dd className="num">{ddmmyyyy(today)}</dd>
+                <dt>Loại tiền</dt><dd>VND</dd>
+              </dl>
+              <label className="field"><span>LOA No.</span>
+                <input id="rq-loa" className="input" value={loa} onChange={(e) => setLoa(e.target.value)} /></label>
+              <div className="field"><span>Hình thức thanh toán *</span><Options name="Hình thức thanh toán" value={payMethod} options={PAY_METHOD} onChange={setPayMethod} /></div>
+              <label className="field"><span>Loại thanh toán *</span>
+                <select id="rq-paytype" className="input" value={payType} onChange={(e) => setPayType(e.target.value)}>
+                  {Object.entries(PAY_TYPE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select></label>
+            </>
+          ) : null}
+
+          {isMoney && !hasLines ? (
             <MoneyInput id="rq-amount" label="Số tiền" value={amount} onChange={setAmount} required />
           ) : null}
+          {hasLines ? <div className="calc-line num">Tổng tiền VNĐ: <b>{vnd(tot.net)}</b> <span className="muted">(từ chi tiết thanh toán bên dưới)</span></div> : null}
 
           <div className="row" style={{ alignItems: "flex-start" }}>
             <label className="field" style={{ flex: "1 1 140px" }}>
-              <span>{isMoney ? "Cần tiền trước ngày" : multiDay ? (kind === "cong_tac" ? "Ngày đi *" : "Từ ngày *") : "Ngày *"}</span>
+              <span>{isPay ? "Ngày cần thanh toán *" : isMoney ? "Cần tiền trước ngày" : multiDay ? (kind === "cong_tac" ? "Ngày đi *" : "Từ ngày *") : "Ngày *"}</span>
               <input id="rq-start" type="date" className="input" value={start} required
                 onChange={(e) => { setStart(e.target.value); if (end < e.target.value) setEnd(e.target.value); }} /></label>
             {multiDay ? (
@@ -174,7 +275,7 @@ export default function RequestForm() {
             </div>
           ) : null}
 
-          <label className="field"><span>{isMoney ? "Nội dung chi *" : kind === "cong_tac" ? "Mục đích công tác *" : kind === "ra_ngoai" ? "Công việc *" : "Lý do *"}</span>
+          <label className="field"><span>{isMoney ? "Nội dung *" : kind === "cong_tac" ? "Mục đích công tác *" : kind === "ra_ngoai" ? "Công việc *" : "Lý do *"}</span>
             <textarea id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
               placeholder={isMoney ? "VD: Mua 2 bộ bàn ghế ngoài trời cho 89CMT8" : kind === "nghi_phep" ? "VD: Việc gia đình" : ""} /></label>
 
@@ -182,12 +283,33 @@ export default function RequestForm() {
 
           {isMoney ? (
             <>
-              <label className="field"><span>{kind === "tam_ung" ? "Người nhận tiền" : "Trả cho ai"}</span>
+              <label className="field"><span>{kind === "tam_ung" ? "Người nhận tiền" : "Tên đơn vị nhận tiền"}</span>
                 <input id="rq-payee" className="input" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder={kind === "tam_ung" ? profile?.full_name : "VD: Cửa hàng nội thất An Phát"} /></label>
-              <label className="field"><span>Số tài khoản, ngân hàng</span>
-                <input id="rq-bank" className="input" value={bank} onChange={(e) => setBank(e.target.value)} placeholder="Để trống nếu nhận tiền mặt" /></label>
+              {isPay ? (
+                <>
+                  <div className="row" style={{ alignItems: "flex-start" }}>
+                    <label className="field" style={{ flex: "1 1 120px" }}><span>Mã đơn vị</span>
+                      <input id="rq-vendor" className="input" value={vendorCode} onChange={(e) => setVendorCode(e.target.value)} /></label>
+                    <label className="field" style={{ flex: "1 1 120px" }}><span>Mã liên hệ</span>
+                      <input id="rq-contact-code" className="input" value={contactCode} onChange={(e) => setContactCode(e.target.value)} /></label>
+                  </div>
+                  <label className="field"><span>Người liên hệ</span>
+                    <input id="rq-contact" className="input" value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
+                </>
+              ) : null}
+              <label className="field"><span>{isPay && payMethod === "chuyen_khoan" ? "Thông tin chuyển khoản (STK, ngân hàng) *" : "Số tài khoản, ngân hàng"}</span>
+                <input id="rq-bank" className="input" value={bank} onChange={(e) => setBank(e.target.value)} required={isPay && payMethod === "chuyen_khoan"}
+                  placeholder={isPay && payMethod === "tien_mat" ? "Không cần nếu trả tiền mặt" : "VD: 20338000 · VietinBank"} /></label>
             </>
           ) : null}
+
+          {isPay ? (
+            <DnttEditor lines={lines} setLines={setLines} advs={advs} setAdvs={setAdvs}
+              files={editing ? undefined : files} setFiles={editing ? undefined : setFiles}
+              links={editing ? undefined : links} setLinks={editing ? undefined : setLinks}
+              onError={setErr} />
+          ) : null}
+          {isPay && editing ? <p className="muted small" style={{ margin: 0 }}>Tệp và link đính kèm thêm hoặc xoá ở trang chi tiết của đề nghị.</p> : null}
 
           {kind !== "nghi_phep" && buildings.length ? (
             <label className="field"><span>Toà nhà liên quan</span>

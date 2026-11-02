@@ -81,3 +81,21 @@
 .rq-log li span { color: var(--muted); font-size: 13px; margin-left: auto; font-variant-numeric: tabular-nums; }
 .rq-actions { margin-top: 8px; }
 .leave-card .lc-none { font-size: 14px; font-weight: 600; color: var(--muted); }
+
+/* Đề nghị thanh toán đầy đủ */
+.dn-line { padding: 12px 14px; display: grid; gap: 10px; margin: 0; min-width: 0; }
+.dn-line legend { font-size: 13px; font-weight: 700; color: var(--brand); padding: 0 6px; }
+.dn-calc { font-size: 13.5px; color: var(--muted); text-align: right; }
+.dn-calc b { color: var(--ink); }
+.dn-total { margin: 0; }
+.dn-attach { padding: 12px 14px; display: grid; gap: 10px; }
+.dn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dn-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; background: var(--surface-2); border-radius: 10px; padding: 6px 10px; }
+.dn-list li span { min-width: 0; overflow-wrap: anywhere; }
+.dn-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13.5px; padding: 12px 14px; }
+.dn-info span { color: var(--muted); }
+.dn-grid { overflow-x: auto; }
+.dn-grid table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.dn-grid th, .dn-grid td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.dn-grid th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.dn-grid td.r, .dn-grid th.r { text-align: right; white-space: nowrap; }
