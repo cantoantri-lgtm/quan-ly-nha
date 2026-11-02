@@ -4,6 +4,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { KIND_LABEL, type Building } from "../lib/labels";
 import { naturalCompare, parseMoney, vnd, vndShort } from "../lib/money";
+import { todayVN } from "../lib/dates";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import { googleDirections } from "../lib/geo";
 import { BuildingSheet } from "./Buildings";
@@ -242,20 +243,67 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
   const [err, setErr] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
   const types = useMemo(() => [...new Set(existing.map((r) => r.room_type).filter(Boolean) as string[])], [existing]);
+  const nav = useNavigate();
+
+  // Phòng đã có hợp đồng hiệu lực chưa? (null = đang kiểm tra)
+  const [hasContract, setHasContract] = useState<boolean | null>(isNew ? false : null);
+  useEffect(() => {
+    if (isNew) return;
+    supabase.from("contracts").select("id").eq("room_id", room.id!).eq("status", "hieu_luc").limit(1)
+      .then(({ data }) => setHasContract(!!data?.length));
+  }, [isNew, room.id]);
+
+  // Chọn "Đang ở" cho phòng thuê tháng chưa có hợp đồng → phải nhập khách, CCCD, hợp đồng
+  const needTenant = status === "dang_o" && mode === "thang" && hasContract === false && canManage && !isNew;
+  const [tName, setTName] = useState("");
+  const [tPhone, setTPhone] = useState("");
+  const [tIdNo, setTIdNo] = useState("");
+  const [tConsent, setTConsent] = useState(false);
+  const [cStart, setCStart] = useState(todayVN());
+  const [cRent, setCRent] = useState(room.list_price != null ? new Intl.NumberFormat("vi-VN").format(room.list_price) : "");
+  const [cDep, setCDep] = useState("");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
     const p = price.trim() ? parseMoney(price) : null;
     if (price.trim() && p == null) { setErr("Giá chưa đúng. Nhập dạng 4500000, 4.500.000 hoặc 4,5tr."); return; }
+    let rentN = 0, depN = 0, idDigits = "";
+    if (needTenant) {
+      idDigits = tIdNo.replace(/\s/g, "");
+      const r = parseMoney(cRent), d = cDep.trim() ? parseMoney(cDep) : 0;
+      if (!tName.trim()) { setErr("Nhập họ tên khách đang ở."); return; }
+      if (!/^(\d{9}|\d{12})$/.test(idDigits)) { setErr("Nhập số CCCD của khách (12 chữ số, CMND cũ 9 số)."); return; }
+      if (!tConsent) { setErr("Cần tích xác nhận khách đồng ý cho lưu CCCD."); return; }
+      if (r == null) { setErr("Nhập giá thuê tháng của hợp đồng."); return; }
+      if (d == null) { setErr("Tiền cọc chưa đúng."); return; }
+      rentN = r; depN = d;
+    }
     setBusy(true);
+    // Khi cần lập hợp đồng: lưu phòng trước với trạng thái cũ, hợp đồng sẽ tự chuyển phòng sang "Đang ở"
+    const saveStatus = needTenant ? (room.status === "dang_o" ? "dang_o" : (room.status ?? "trong")) : status;
     const row = canManage
       ? { building_id: building.id, code: code.trim().toUpperCase(), floor: floor ? Number(floor) : guessFloor(code), room_type: type.trim() || null,
-          rent_mode: mode, list_price: p, max_occupants: maxOcc ? Number(maxOcc) : null, status, note: note.trim() || null }
+          rent_mode: mode, list_price: p, max_occupants: maxOcc ? Number(maxOcc) : null, status: saveStatus, note: note.trim() || null }
       : { status, note: note.trim() || null };
     const { error } = isNew ? await supabase.from("rooms").insert(row) : await supabase.from("rooms").update(row).eq("id", room.id!);
+    if (error) { setBusy(false); setErr(/duplicate/i.test(error.message) ? `Phòng ${code} đã có trong toà này.` : friendlyError(error)); return; }
+    if (needTenant) {
+      const t = await supabase.from("tenants").insert({
+        building_id: building.id, full_name: tName.trim(), phone: tPhone.trim() || null, id_number: idDigits,
+        cccd_consent_at: new Date().toISOString(), cccd_consent_note: "Khách đồng ý trực tiếp",
+      }).select("id").single();
+      if (t.error) { setBusy(false); setErr(`Đã lưu phòng nhưng chưa thêm được khách: ${friendlyError(t.error)}`); return; }
+      const c = await supabase.from("contracts").insert({
+        room_id: room.id!, tenant_id: t.data.id, start_date: cStart, rent_amount: rentN, deposit_amount: depN, billing_day: 5,
+      }).select("id").single();
+      setBusy(false);
+      if (c.error) { setErr(`Đã thêm khách nhưng chưa lập được hợp đồng: ${/contracts_one_active/.test(c.error.message) ? "phòng đang có hợp đồng hiệu lực." : friendlyError(c.error)}`); return; }
+      onSaved(`Đã lưu khách và hợp đồng phòng ${room.code}. Tải ảnh CCCD và file hợp đồng ở trang này.`);
+      nav(`/khach/${t.data.id}`);
+      return;
+    }
     setBusy(false);
-    if (error) { setErr(/duplicate/i.test(error.message) ? `Phòng ${code} đã có trong toà này.` : friendlyError(error)); return; }
     onSaved(isNew ? `Đã thêm phòng ${code.trim().toUpperCase()}.` : `Đã lưu phòng ${room.code}.`);
   }
 
@@ -305,8 +353,29 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
               <button type="button" key={s} className={`st-${s}`} aria-pressed={status === s} onClick={() => setStatus(s)}>{ROOM_STATUS[s]}</button>
             ))}
           </div>
-          {status === "dang_o" && room.status !== "dang_o" ? <small className="muted">Phòng thuê tháng sẽ tự chuyển "Đang ở" khi tạo hợp đồng (module Cho thuê).</small> : null}
+          {isNew && status === "dang_o" ? <small className="muted">Lưu phòng trước, rồi mở lại phòng để nhập khách đang ở, CCCD và hợp đồng.</small> : null}
+          {!canManage && status === "dang_o" && room.status !== "dang_o" ? <small style={{ color: "var(--danger)" }}>Chỉ Quản lý hoặc Giám sát toà lập hợp đồng để chuyển phòng sang "Đang ở".</small> : null}
         </div>
+        {needTenant ? (
+          <section className="fg" aria-label="Khách đang ở">
+            <b>Khách đang ở và hợp đồng</b>
+            <p className="muted small" style={{ margin: 0 }}>Phòng "Đang ở" cần có khách đứng tên, số CCCD và hợp đồng. Sau khi lưu, bạn sẽ chụp ảnh CCCD và tải file hợp đồng.</p>
+            <label className="field"><span>Họ tên khách *</span><input id="r-tname" className="input" value={tName} onChange={(e) => setTName(e.target.value)} /></label>
+            <div className="row" style={{ alignItems: "flex-start" }}>
+              <label className="field" style={{ flex: "1 1 150px" }}><span>Số điện thoại</span><input id="r-tphone" className="input" inputMode="tel" value={tPhone} onChange={(e) => setTPhone(e.target.value)} /></label>
+              <label className="field" style={{ flex: "1 1 150px" }}><span>Số CCCD *</span><input id="r-tid" className="input num" inputMode="numeric" value={tIdNo} onChange={(e) => setTIdNo(e.target.value.replace(/[^\d\s]/g, ""))} placeholder="12 chữ số" /></label>
+            </div>
+            <label className="row" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
+              <input id="r-tconsent" type="checkbox" checked={tConsent} onChange={(e) => setTConsent(e.target.checked)} style={{ marginTop: 4 }} />
+              <span className="small">Khách đã được thông báo và đồng ý để công ty lưu số CCCD và ảnh CCCD nhằm quản lý lưu trú, lập hợp đồng.</span>
+            </label>
+            <div className="row" style={{ alignItems: "flex-start" }}>
+              <label className="field" style={{ flex: "1 1 150px" }}><span>Hợp đồng bắt đầu *</span><input id="r-cstart" className="input" type="date" value={cStart} onChange={(e) => setCStart(e.target.value)} /></label>
+              <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input id="r-crent" className="input num" inputMode="decimal" value={cRent} onChange={(e) => setCRent(e.target.value)} /></label>
+            </div>
+            <label className="field"><span>Tiền cọc</span><input id="r-cdep" className="input num" inputMode="decimal" value={cDep} onChange={(e) => setCDep(e.target.value)} /></label>
+          </section>
+        ) : null}
         <label className="field"><span>Ghi chú</span>
           <textarea id="r-note" className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} /></label>
         {err ? <div className="error-box" role="alert">{err}</div> : null}
