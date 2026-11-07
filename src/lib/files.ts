@@ -7,6 +7,10 @@ export type StoredFile = {
   id: string; kind: FileKind; path: string; file_name: string | null; mime_type: string | null; size_bytes: number | null;
   building_id: string | null; tenant_id: string | null; contract_id: string | null; room_id: string | null; request_id: string | null;
   label: string | null; is_cover: boolean; created_by: string | null; created_at: string;
+  /** Tệp nằm ở đâu: kho Supabase (tệp cũ) hay Cloudflare R2 (tệp mới) */
+  store: "supabase" | "r2";
+  /** Có ảnh nhỏ <đường dẫn>_t.jpg để hiện danh sách nhanh */
+  thumb: boolean;
 };
 
 /** Thư mục gốc trong kho theo loại tệp. Mã chủ = mã toà (hoặc mã đề nghị với đính kèm đề nghị). */
@@ -25,29 +29,99 @@ const ownerColumn = (o: FileOwner): Record<string, string> =>
   : o.kind === "anh_phong" ? { room_id: o.roomId } : { request_id: o.requestId };
 
 export const MAX_BYTES = 10 * 1024 * 1024;
+const THUMB_EDGE = 480;
+
+/** Vẽ ảnh về JPEG với cạnh dài tối đa `maxEdge` */
+async function renderJpeg(file: Blob, maxEdge: number, quality: number): Promise<Blob | null> {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  canvas.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
+  return new Promise((res) => canvas.toBlob(res, "image/jpeg", quality));
+}
 
 /** Thu nhỏ ảnh chụp từ điện thoại (thường 3–8 MB) xuống cạnh dài 1800px, JPEG 0,82. PDF giữ nguyên. */
 export async function prepareFile(file: File): Promise<File> {
   if (file.type === "application/pdf") return file;
   if (!file.type.startsWith("image/")) throw new Error("Chỉ nhận ảnh (JPG, PNG, WebP) hoặc PDF.");
   try {
-    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
-    const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
-    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
-    const canvas = document.createElement("canvas");
-    canvas.width = w; canvas.height = h;
-    canvas.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
-    bmp.close?.();
-    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.82));
+    const blob = await renderJpeg(file, 1800, 0.82);
     if (blob && blob.size < file.size) return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
   } catch { /* trình duyệt không đọc được định dạng (VD HEIC) → gửi nguyên bản nếu đủ nhẹ */ }
   if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error("Định dạng ảnh này chưa hỗ trợ. Hãy chụp lại ở chế độ JPG hoặc chụp ảnh màn hình.");
   return file;
 }
 
-export async function uploadFile(owner: FileOwner, raw: File, extra: { label?: string; is_cover?: boolean } = {}): Promise<StoredFile> {
-  const file = await prepareFile(raw);
-  if (file.size > MAX_BYTES) throw new Error("Tệp lớn hơn 10 MB. Hãy chụp lại hoặc nén nhỏ hơn.");
+/** Ảnh nhỏ (cạnh dài 480px, ~30–60 KB) cho danh sách; null nếu không tạo được */
+async function makeThumb(file: File): Promise<Blob | null> {
+  if (!file.type.startsWith("image/")) return null;
+  try { return await renderJpeg(file, THUMB_EDGE, 0.7); } catch { return null; }
+}
+
+const thumbPath = (path: string) => path.replace(/\.[a-z]+$/, "_t.jpg");
+
+// ---------- Cloudflare R2 (qua Edge Function kho-anh) ----------
+type R2Config = { enabled: boolean; publicBase: string | null };
+let r2cache: R2Config | null = null;
+
+/** Kho R2 đã được cấu hình chưa. Chỉ nhớ kết quả khi hỏi thành công, để cấu hình xong là dùng ngay. */
+export async function r2Config(): Promise<R2Config> {
+  if (r2cache) return r2cache;
+  try {
+    const { data, error } = await supabase.functions.invoke("kho-anh", { body: { action: "config" } });
+    if (!error && data) { r2cache = data as R2Config; return r2cache; }
+  } catch { /* bỏ qua */ }
+  return { enabled: false, publicBase: null };
+}
+
+async function fnError(error: unknown, fallback: string): Promise<string> {
+  try {
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.json === "function") { const j = await ctx.json(); if (j?.error) return String(j.error); }
+  } catch { /* bỏ qua */ }
+  return fallback;
+}
+
+async function r2Call<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("kho-anh", { body });
+  if (error) throw new Error(await fnError(error, "Không kết nối được kho ảnh"));
+  return data as T;
+}
+
+async function r2Delete(paths: string[]): Promise<void> {
+  try { await r2Call({ action: "delete", paths }); } catch { /* tệp mồ côi nhỏ, không chặn thao tác */ }
+}
+
+async function uploadR2(owner: FileOwner, raw: File, file: File, extra: { label?: string; is_cover?: boolean }): Promise<StoredFile> {
+  const ext = file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${FOLDER[owner.kind]}/${ownerFolder(owner)}/${crypto.randomUUID()}.${ext}`;
+  const thumb = await makeThumb(file);
+  const tPath = thumbPath(path);
+  const items = [{ path, contentType: file.type }, ...(thumb ? [{ path: tPath, contentType: "image/jpeg" }] : [])];
+
+  // 1) xin link tải lên (một lần gọi cho cả ảnh và ảnh nhỏ) 2) tải THẲNG lên R2, song song
+  const { urls } = await r2Call<{ urls: Record<string, { url: string; headers: Record<string, string> }> }>({ action: "put", items });
+  await Promise.all(items.map(async (it) => {
+    const u = urls[it.path];
+    const res = await fetch(u.url, { method: "PUT", headers: u.headers, body: it.path === path ? file : thumb! });
+    if (!res.ok) throw new Error(`R2 từ chối tải lên (${res.status})`);
+  }));
+
+  const { data, error } = await supabase.from("files").insert({
+    kind: owner.kind, path, file_name: raw.name.slice(0, 120), mime_type: file.type, size_bytes: file.size,
+    store: "r2", thumb: !!thumb, ...ownerColumn(owner), ...extra,
+  }).select("*").single();
+  if (error) {
+    await r2Delete(items.map((i) => i.path));   // không để tệp mồ côi
+    throw new Error(error.message);
+  }
+  return data as StoredFile;
+}
+
+async function uploadSupabase(owner: FileOwner, raw: File, file: File, extra: { label?: string; is_cover?: boolean }): Promise<StoredFile> {
   const ext = file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `${FOLDER[owner.kind]}/${ownerFolder(owner)}/${crypto.randomUUID()}.${ext}`;
   const up = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
@@ -62,12 +136,27 @@ export async function uploadFile(owner: FileOwner, raw: File, extra: { label?: s
   return data as StoredFile;
 }
 
+export async function uploadFile(owner: FileOwner, raw: File, extra: { label?: string; is_cover?: boolean } = {}): Promise<StoredFile> {
+  const file = await prepareFile(raw);
+  if (file.size > MAX_BYTES) throw new Error("Tệp lớn hơn 10 MB. Hãy chụp lại hoặc nén nhỏ hơn.");
+  const cfg = await r2Config();
+  if (cfg.enabled) {
+    try { return await uploadR2(owner, raw, file, extra); }
+    catch (e) {
+      // Không có quyền thì dừng; lỗi mạng / R2 thì dự phòng bằng kho Supabase để việc nhập liệu không bị gián đoạn
+      if (e instanceof Error && /quyền/.test(e.message)) throw e;
+      console.warn("Tải lên R2 lỗi, dùng kho Supabase:", e);
+    }
+  }
+  return uploadSupabase(owner, raw, file, extra);
+}
+
 export async function listFiles(kind: FileKind, column: "tenant_id" | "contract_id" | "room_id" | "request_id", id: string): Promise<StoredFile[]> {
   const { data } = await supabase.from("files").select("*").eq("kind", kind).eq(column, id).order("created_at");
   return (data as StoredFile[]) ?? [];
 }
 
-/** Đường dẫn xem tạm (hết hạn sau 10 phút) — kho là riêng tư, không có link công khai */
+/** Đường dẫn xem tạm của kho Supabase (hết hạn sau 10 phút) */
 export async function signedUrls(paths: string[]): Promise<Record<string, string>> {
   if (!paths.length) return {};
   const { data } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 600);
@@ -76,8 +165,45 @@ export async function signedUrls(paths: string[]): Promise<Record<string, string
   return m;
 }
 
+/**
+ * Link xem cho một nhóm tệp, khoá theo mã tệp.
+ *  - Ảnh phòng trên R2: địa chỉ công khai (qua mạng Cloudflare, không cần gọi máy chủ).
+ *  - Tệp riêng tư trên R2: link ký tạm 10 phút, ký cả nhóm trong MỘT lần gọi.
+ *  - Tệp cũ ở Supabase: link ký tạm như trước.
+ * size "thumb" dùng ảnh nhỏ nếu có (danh sách), "full" dùng ảnh gốc (xem to).
+ */
+export async function fileUrls(files: StoredFile[], size: "thumb" | "full"): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const old = files.filter((f) => f.store !== "r2");
+  const r2 = files.filter((f) => f.store === "r2");
+
+  const jobs: Promise<void>[] = [];
+  if (old.length) {
+    jobs.push(signedUrls(old.map((f) => f.path)).then((m) => { old.forEach((f) => { if (m[f.path]) out[f.id] = m[f.path]; }); }));
+  }
+  if (r2.length) {
+    jobs.push((async () => {
+      const cfg = await r2Config();
+      const toSign: { f: StoredFile; key: string }[] = [];
+      for (const f of r2) {
+        const key = size === "thumb" && f.thumb ? thumbPath(f.path) : f.path;
+        if (key.startsWith("anh-phong/") && cfg.publicBase) out[f.id] = `${cfg.publicBase}/${key}`;
+        else toSign.push({ f, key });
+      }
+      for (let i = 0; i < toSign.length; i += 100) {
+        const chunk = toSign.slice(i, i + 100);
+        const { urls } = await r2Call<{ urls: Record<string, string> }>({ action: "get", paths: chunk.map((c) => c.key) });
+        chunk.forEach((c) => { if (urls[c.key]) out[c.f.id] = urls[c.key]; });
+      }
+    })().catch(() => { /* không lấy được link thì ảnh hiện khung trống, không làm hỏng cả trang */ }));
+  }
+  await Promise.all(jobs);
+  return out;
+}
+
 export async function removeFile(f: StoredFile): Promise<void> {
   const { error } = await supabase.from("files").delete().eq("id", f.id);
   if (error) throw new Error(error.message);
-  await supabase.storage.from(BUCKET).remove([f.path]);
+  if (f.store === "r2") await r2Delete([f.path, ...(f.thumb ? [thumbPath(f.path)] : [])]);
+  else await supabase.storage.from(BUCKET).remove([f.path]);
 }

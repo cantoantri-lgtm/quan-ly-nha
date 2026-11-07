@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { listFiles, removeFile, signedUrls, uploadFile, type FileOwner, type StoredFile } from "../lib/files";
+import { fileUrls, listFiles, removeFile, uploadFile, type FileOwner, type StoredFile } from "../lib/files";
 import { Sheet } from "./ui";
 import "../files.css";
 
@@ -9,7 +9,7 @@ type Column = "tenant_id" | "contract_id" | "room_id" | "request_id";
 const COLUMN: Record<FileOwner["kind"], Column> = { cccd: "tenant_id", hop_dong: "contract_id", anh_phong: "room_id", dinh_kem_de_nghi: "request_id" };
 const ownerId = (o: FileOwner) => (o.kind === "cccd" ? o.tenantId : o.kind === "hop_dong" ? o.contractId : o.kind === "anh_phong" ? o.roomId : o.requestId);
 
-/** Kho ảnh/tệp gắn với một đối tượng (khách, hợp đồng, phòng, đề nghị). Mở ảnh bằng link tạm, không có link công khai. */
+/** Kho ảnh/tệp gắn với một đối tượng (khách, hợp đồng, phòng, đề nghị). Danh sách hiện ảnh nhỏ cho nhanh, bấm vào mới tải ảnh to. Tệp riêng tư mở bằng link tạm. */
 export default function FileGallery({ owner, title, hint, canUpload, canDelete, slots, cover, pdf = true, onChange }: {
   owner: FileOwner; title: string; hint?: string; canUpload: boolean; canDelete: boolean;
   slots?: { label: string; text: string }[];   // VD CCCD: mặt trước / mặt sau
@@ -21,6 +21,7 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<StoredFile | null>(null);
+  const [full, setFull] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const pendingLabel = useRef<string | undefined>(undefined);
@@ -29,9 +30,15 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
   const load = useCallback(async () => {
     const list = await listFiles(owner.kind, COLUMN[owner.kind], id);
     setFiles(list);
-    setUrls(await signedUrls(list.filter((f) => f.mime_type?.startsWith("image/")).map((f) => f.path)));
+    setUrls(await fileUrls(list.filter((f) => f.mime_type?.startsWith("image/")), "thumb"));
   }, [owner.kind, id]);
   useEffect(() => { load(); }, [load]);
+
+  // Mở xem to: lúc đó mới lấy ảnh gốc (danh sách chỉ tải ảnh nhỏ)
+  useEffect(() => {
+    setFull(null);
+    if (view && view.mime_type?.startsWith("image/")) fileUrls([view], "full").then((m) => setFull(m[view.id] ?? urls[view.id] ?? null));
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function onPick(list: FileList | null) {
     const picked = [...(list ?? [])];
@@ -39,9 +46,9 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
     if (!picked.length) return;
     setBusy(true);
     let ok = 0, lastErr = "";
-    for (const f of picked) {
+    const label = pendingLabel.current;
+    const one = async (f: File) => {
       try {
-        const label = pendingLabel.current;
         // Khe CCCD chỉ giữ một ảnh: ảnh mới thay ảnh cũ
         if (label && slots) {
           const old = files.filter((x) => x.label === label);
@@ -50,7 +57,12 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
         await uploadFile(owner, f, { label });
         ok++;
       } catch (e) { lastErr = friendlyError(e); }
-    }
+    };
+    // Nhiều ảnh: tải 3 ảnh cùng lúc cho nhanh
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(3, picked.length) }, async () => {
+      while (next < picked.length) await one(picked[next++]);
+    }));
     setBusy(false);
     if (lastErr) toast(lastErr);
     else if (ok) toast(ok === 1 ? "Đã tải ảnh lên." : `Đã tải ${ok} tệp lên.`);
@@ -75,7 +87,7 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
   const thumb = (f: StoredFile) => (
     <button key={f.id} type="button" className={`fg-thumb${f.is_cover ? " cover" : ""}`} onClick={() => setView(f)}
       aria-label={f.file_name ?? "Tệp đính kèm"}>
-      {urls[f.path] ? <img src={urls[f.path]} alt="" loading="lazy" /> : <span className="fg-doc">{f.mime_type === "application/pdf" ? "PDF" : "…"}</span>}
+      {urls[f.id] ? <img src={urls[f.id]} alt="" loading="lazy" decoding="async" /> : <span className="fg-doc">{f.mime_type === "application/pdf" ? "PDF" : "…"}</span>}
       {f.is_cover ? <i className="fg-badge">Đại diện</i> : null}
     </button>
   );
@@ -109,8 +121,8 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
         {view ? (
           <div className="stack">
             {view.mime_type === "application/pdf" ? (
-              <PdfOpen path={view.path} />
-            ) : urls[view.path] ? <img className="fg-full" src={urls[view.path]} alt={view.file_name ?? ""} /> : null}
+              <PdfOpen file={view} />
+            ) : full ? <img className="fg-full" src={full} alt={view.file_name ?? ""} /> : <div className="loading">Đang tải ảnh…</div>}
             <div className="row">
               {cover && view.room_id && !view.is_cover && canUpload ? <button className="btn secondary sm" disabled={busy} onClick={() => setCover(view)}>Đặt làm ảnh đại diện</button> : null}
               {canDelete ? (
@@ -130,8 +142,8 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
   );
 }
 
-function PdfOpen({ path }: { path: string }) {
+function PdfOpen({ file }: { file: StoredFile }) {
   const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => { signedUrls([path]).then((m) => setUrl(m[path] ?? null)); }, [path]);
+  useEffect(() => { fileUrls([file], "full").then((m) => setUrl(m[file.id] ?? null)); }, [file]);
   return url ? <a className="btn block" href={url} target="_blank" rel="noopener">Mở tệp PDF</a> : <div className="loading">Đang tạo liên kết…</div>;
 }

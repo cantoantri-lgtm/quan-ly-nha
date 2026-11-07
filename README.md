@@ -19,7 +19,7 @@ Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện �
 | Khách thuê | Hồ sơ khách theo toà, đánh dấu (Khách quen / Cần lưu ý), ảnh CCCD hai mặt (chỉ Quản lý và Giám sát của toà xem; phải ghi nhận khách đồng ý trước khi tải). |
 | Hợp đồng | Lập hợp đồng gắn phòng và khách (phòng tự chuyển "Đang ở"), cách ký giấy hay điện tử, tải ảnh/PDF hợp đồng đã ký, thu và hoàn cọc, kết thúc hợp đồng. |
 | Thu tiền phòng | Hoá đơn tháng theo toà, mã QR chuyển khoản (VietQR) đúng số tiền và nội dung, link thanh toán gửi khách `/thanh-toan/<mã>`, tự đánh dấu "Đã thu" khi tiền về qua SePay, hoặc đánh dấu tay. |
-| Kho ảnh | Bucket riêng tư `kho-tai-lieu`: CCCD, hợp đồng, ảnh phòng, chứng từ đính kèm đề nghị thanh toán. Ảnh được thu nhỏ trước khi tải; xem bằng link tạm 10 phút. |
+| Kho ảnh | Ảnh phòng, CCCD, hợp đồng, chứng từ đính kèm đề nghị thanh toán. Tệp mới nằm ở Cloudflare R2 (tải thẳng từ trình duyệt bằng link tạm do Edge Function `kho-anh` ký, kèm ảnh nhỏ cho danh sách nhanh; ảnh phòng xem qua địa chỉ công khai, các tệp riêng tư xem bằng link tạm 10 phút). Tệp cũ ở bucket riêng tư `kho-tai-lieu` của Supabase vẫn xem được (cột `files.store`). Chưa cấu hình R2 thì app tự dùng kho Supabase. Ảnh được thu nhỏ trước khi tải. |
 | Quản trị | Cấp tài khoản, cấp lại mật khẩu, khoá tài khoản, gán toà, nhập số ngày phép năm. |
 | Thông báo | Trong app, thời gian thực. |
 
@@ -62,9 +62,12 @@ supabase/
   007_an_so_cccd.sql         ẩn cột số CCCD với nhân viên; Quản lý/Giám sát đọc qua tenant_private()
   008_dntt_day_du.sql        đề nghị thanh toán đầy đủ: số chứng từ, chi tiết hoá đơn, tạm ứng trừ, link đính kèm
   009_to_chuc_phe_duyet.sql  cơ cấu tổ chức, nhân sự, lương; luồng duyệt nhiều bước (request_steps, decide_step, mark_paid, my_approval_queue)
+  010_ban_giam_doc_duyet.sql Ban Giám đốc duyệt thay khi Trưởng phòng / Kế toán chưa có người
+  011_kho_r2.sql            files.store / files.thumb (tệp ở Supabase hay R2), hàm storage_paths_ok() cho Edge Function kho-anh
   thu_nghiem/                seed.sql / cleanup.sql: tài khoản + toà thử nghiệm (không phải migration)
   functions/quan-ly-tai-khoan    cấp / khoá tài khoản, đổi SĐT, cấp lại mật khẩu (dùng service role)
   functions/phan-tich-giao-viec  ghi âm / tin nhắn → danh sách việc (Gemini)
+  functions/kho-anh          ký link tải lên / xem tệp trên Cloudflare R2 (SigV4), hỏi quyền qua storage_paths_ok; cần secrets R2_*
   functions/sepay-webhook        nhận "tiền vào tài khoản" từ SePay, tự đánh dấu hoá đơn đã thu (không dùng JWT, tự kiểm khoá)
 ```
 
@@ -167,3 +170,13 @@ Thứ tự khi một thay đổi đụng cả dữ liệu lẫn giao diện: **c
 - Xoá Edge Function tạm `do-toc-do-ai` (Supabase → Edge Functions) — đã vô hiệu, không còn dùng.
 - Dashboard doanh thu (hàm `dashboard_month` đã có, chưa có màn hình).
 - Nhật ký ai đã xem ảnh CCCD (hiện chỉ giới hạn quyền xem, chưa ghi lịch sử xem).
+
+## Kho ảnh trên Cloudflare R2
+
+Hai bucket: ảnh phòng (công khai qua tên miền ảnh) và tài liệu riêng tư (CCCD, hợp đồng, chứng từ). Cơ sở dữ liệu chỉ giữ đường dẫn tệp (`files.path`) và nơi lưu (`files.store`).
+
+Secrets của Edge Function `kho-anh` (đặt trong Supabase, không bao giờ xuống trình duyệt):
+`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_PUBLIC`, `R2_BUCKET_PRIVATE`, `R2_PUBLIC_BASE_URL`.
+
+Mỗi bucket cần CORS cho phép `PUT`/`GET`/`HEAD` từ địa chỉ web của app, header `Content-Type`.
+Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như cũ.
