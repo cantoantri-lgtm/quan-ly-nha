@@ -4,7 +4,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { daysBetween, ddmmyyyy, todayVN, workDays } from "../lib/dates";
 import { parseMoney, vnd, vndWords } from "../lib/money";
-import { KINDS, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
+import { KINDS, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, isEditableStatus, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
 import { uploadFile } from "../lib/files";
 import DnttEditor, { advFromRow, calcLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
 import { TopBar } from "../components/ui";
@@ -36,7 +36,7 @@ function MoneyInput({ id, value, onChange, label, required }: { id: string; valu
 export default function RequestForm() {
   const { kind: kindParam, id } = useParams();
   const editing = !!id;
-  const { profile, buildings, people, toast } = useSession();
+  const { profile, buildings, people, toast, refreshUnread } = useSession();
   const nav = useNavigate();
   const [kind, setKind] = useState<ReqKind>((kindParam as ReqKind) || "nghi_phep");
   const today = todayVN();
@@ -80,6 +80,7 @@ export default function RequestForm() {
     supabase.from("requests").select("*").eq("id", id).maybeSingle().then(({ data }) => {
       const r = data as Req | null;
       if (!r) { nav("/van-phong", { replace: true }); return; }
+      if (!isEditableStatus(r.status)) { toast("Đề nghị đang trong quá trình duyệt nên chưa sửa được."); nav(`/van-phong/${r.id}`, { replace: true }); return; }
       setKind(r.kind); setSubType(r.sub_type ?? ""); setSpan(r.span ?? "ca_ngay");
       setStart(r.start_date); setEnd(r.end_date ?? r.start_date);
       setT1(r.start_time?.slice(0, 5) ?? ""); setT2(r.end_time?.slice(0, 5) ?? "");
@@ -202,7 +203,13 @@ export default function RequestForm() {
       nav(`/van-phong/${rid}`, { replace: true });
       return;
     }
-    toast(editing ? "Đã lưu thay đổi." : "Đã gửi đề nghị, đang chờ cấp duyệt đầu tiên.");
+    if (editing) {
+      // Sửa xong thì gửi lại: luồng duyệt dựng lại, duyệt lại từ cấp đầu
+      const { error: re } = await supabase.rpc("resubmit_request", { p_request: rid });
+      if (re) { toast(`Đã lưu nhưng chưa gửi lại được: ${friendlyError(re)}`); nav(`/van-phong/${rid}`, { replace: true }); return; }
+      refreshUnread();
+    }
+    toast(editing ? "Đã lưu và gửi lại, đề nghị đi duyệt lại từ cấp đầu." : "Đã gửi đề nghị, đang chờ cấp duyệt đầu tiên.");
     nav(`/van-phong/${rid}`, { replace: true });
   }
 
@@ -401,9 +408,9 @@ export default function RequestForm() {
           {err ? <div className="error-box" role="alert">{err}</div> : null}
           <div className="dn-submit">
             <div className="dn-total-words">
-              {isMoney && total ? <><b className="num">{vnd(total)}</b><small>{vndWords(total)}</small></> : <small>{editing ? "Lưu để cập nhật đề nghị." : "Gửi để bắt đầu luồng duyệt."}</small>}
+              {isMoney && total ? <><b className="num">{vnd(total)}</b><small>{vndWords(total)}</small></> : <small>{editing ? "Lưu và gửi lại để duyệt lại từ cấp đầu." : "Gửi để bắt đầu luồng duyệt."}</small>}
             </div>
-            <button className="btn" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu thay đổi" : "Gửi đề nghị"}</button>
+            <button className="btn" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu và gửi lại" : "Gửi đề nghị"}</button>
           </div>
         </form>
       </main>

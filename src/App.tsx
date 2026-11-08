@@ -2,9 +2,10 @@ import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { useSession } from "./lib/session";
 import { supabase } from "./lib/supabase";
-import { BottomNav, Toast } from "./components/ui";
+import { AppHeader, BottomNav, Toast } from "./components/ui";
 import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
+import Home from "./pages/Home";
 import Tasks from "./pages/Tasks";
 import TaskDetail from "./pages/TaskDetail";
 import TaskForm from "./pages/TaskForm";
@@ -19,6 +20,7 @@ import Office from "./pages/Office";
 import RequestForm from "./pages/RequestForm";
 import RequestDetail from "./pages/RequestDetail";
 import RequestPrint from "./pages/RequestPrint";
+import RequestList from "./pages/RequestList";
 import Org from "./pages/Org";
 import Tenants, { TenantDetail } from "./pages/Tenants";
 import Contracts from "./pages/Contracts";
@@ -32,6 +34,7 @@ const MapPage = lazy(() => import("./pages/MapPage"));
 function Shell() {
   return (
     <div className="app">
+      <AppHeader />
       <Outlet />
       <BottomNav />
       <Toast />
@@ -73,7 +76,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Shell />}>
-        <Route index element={<Tasks />} />
+        <Route index element={<Home />} />
+        <Route path="viec" element={<Tasks />} />
         <Route element={<AssignerOnly />}>
           <Route path="viec/moi" element={<TaskForm />} />
           <Route path="viec/giong-noi" element={<VoiceTask />} />
@@ -87,6 +91,7 @@ export default function App() {
         <Route path="khach/:id" element={<TenantDetail />} />
         <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
         <Route path="van-phong" element={<Office />} />
+        <Route path="van-phong/ds/:kind" element={<RequestList />} />
         <Route path="van-phong/moi/:kind" element={<RequestForm />} />
         <Route path="van-phong/:id" element={<RequestDetail />} />
         <Route path="van-phong/:id/sua" element={<RequestForm />} />

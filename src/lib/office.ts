@@ -1,9 +1,11 @@
 // Module Văn phòng: nghỉ phép, làm việc bên ngoài, công tác, thanh toán, tạm ứng
 import { ddmm, ddmmyyyy } from "./dates";
 import { vnd } from "./money";
+import { supabase } from "./supabase";
+import { listFiles, removeFile } from "./files";
 
 export type ReqKind = "nghi_phep" | "ra_ngoai" | "cong_tac" | "thanh_toan" | "tam_ung";
-export type ReqStatus = "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy" | "hoan_tat";
+export type ReqStatus = "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy" | "hoan_tat" | "tra_lai";
 
 export type Req = {
   id: string;
@@ -65,7 +67,7 @@ export const PAY_METHOD: Record<string, string> = { chuyen_khoan: "Chuyển kho�
 /** Một bước trong luồng duyệt */
 export type ReqStep = {
   id: string; request_id: string; step_no: number; duty: string; approver_id: string | null;
-  status: "cho" | "da_duyet" | "tu_choi" | "bo_qua"; skip_reason: string | null;
+  status: "cho" | "da_duyet" | "tu_choi" | "bo_qua" | "tra_lai"; skip_reason: string | null;
   decided_by: string | null; decided_at: string | null; note: string | null;
 };
 export const DUTY_LABEL: Record<string, string> = {
@@ -115,6 +117,7 @@ export function statusLabel(r: Pick<Req, "kind" | "status">): string {
   switch (r.status) {
     case "cho_duyet": return "Chờ duyệt";
     case "tu_choi": return "Từ chối";
+    case "tra_lai": return "Trả lại";
     case "da_huy": return "Đã rút";
     case "da_duyet":
       return r.kind === "cong_tac" ? "Đã duyệt · chờ báo cáo" : (r.kind === "thanh_toan" || r.kind === "tam_ung") ? "Đã duyệt · chờ chi" : "Đã duyệt";
@@ -146,3 +149,26 @@ export function summary(r: Req): string {
 
 export function fullDate(iso: string | null) { return iso ? ddmmyyyy(iso) : "—"; }
 export { hhmm };
+
+/** Chỉ sửa / xoá được khi đề nghị KHÔNG đang trong quá trình duyệt (khớp request_editable ở cơ sở dữ liệu) */
+export const EDITABLE_STATUS: ReqStatus[] = ["tra_lai", "tu_choi", "da_huy"];
+export const isEditableStatus = (s: ReqStatus) => EDITABLE_STATUS.includes(s);
+/** Đã xong hẳn: nghỉ phép / ra ngoài chỉ cần duyệt; còn lại đợi chi tiền hoặc báo cáo thực tế */
+export const isFinished = (r: Pick<Req, "kind" | "status">) =>
+  r.status === "hoan_tat" || (r.status === "da_duyet" && (r.kind === "nghi_phep" || r.kind === "ra_ngoai"));
+export const EDIT_LOCK_TIP = "Đang trong quá trình phê duyệt hoặc đã duyệt xong nên không sửa / xoá được. Chỉ sửa được khi bị trả lại, bị từ chối hoặc đã rút.";
+
+/** Ngày theo giờ Việt Nam (yyyy-mm-dd) của một thời điểm ISO */
+export const vnDate = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
+
+/** Xoá đề nghị: gỡ tệp đính kèm (kho ảnh) trước, rồi xoá dòng. Cơ sở dữ liệu từ chối nếu đang trong quá trình duyệt. */
+export async function deleteRequest(id: string): Promise<void> {
+  const { data: cur } = await supabase.from("requests").select("status").eq("id", id).maybeSingle();
+  if (!cur) throw new Error("Không tìm thấy đề nghị.");
+  if (!isEditableStatus((cur as { status: ReqStatus }).status)) throw new Error(EDIT_LOCK_TIP);
+  const files = await listFiles("dinh_kem_de_nghi", "request_id", id);
+  for (const f of files) await removeFile(f);
+  const { data, error } = await supabase.from("requests").delete().eq("id", id).select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("Bạn không có quyền xoá đề nghị này.");
+}

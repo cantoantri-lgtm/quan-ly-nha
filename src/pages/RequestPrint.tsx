@@ -143,8 +143,8 @@ export default function RequestPrint() {
               return (
                 <div key={s.id}>
                   <b>{DUTY_LABEL[s.duty]}</b><small>(ký và ghi rõ họ tên)</small>
-                  <span className="who">{o.status === "tu_choi" || o.status === "da_duyet" ? name(o.decided_by) : s.approver_id ? name(s.approver_id) : "Quản lý"}</span>
-                  {o.status === "da_duyet" ? <span className="pd-ok">Đã phê duyệt</span> : o.status === "tu_choi" ? <span className="pd-no-ok">Đã từ chối</span> : <span className="when">Chờ duyệt</span>}
+                  <span className="who">{o.status === "tu_choi" || o.status === "da_duyet" || o.status === "tra_lai" ? name(o.decided_by) : s.approver_id ? name(s.approver_id) : "Quản lý"}</span>
+                  {o.status === "da_duyet" ? <span className="pd-ok">Đã phê duyệt</span> : o.status === "tu_choi" ? <span className="pd-no-ok">Đã từ chối</span> : o.status === "tra_lai" ? <span className="pd-no-ok">Đã trả lại</span> : <span className="when">Chờ duyệt</span>}
                   {o.decided_at ? <span className="when">{dt(o.decided_at)}</span> : null}
                 </div>
               );

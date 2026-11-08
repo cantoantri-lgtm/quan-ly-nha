@@ -158,12 +158,12 @@ export default function VoiceTask() {
       setDrafts((ds) => ds.filter((x) => x.key !== d.key));
     }
     toast(`Đã giao ${ok} việc. Người làm sẽ nhận thông báo.`);
-    nav(canAssign ? "/?tab=given" : "/", { replace: true });
+    nav(canAssign ? "/viec?tab=given" : "/viec", { replace: true });
   }
 
   return (
     <>
-      <TopBar title="Giao việc bằng giọng nói" back="/" />
+      <TopBar title="Giao việc bằng giọng nói" back="/viec" />
       <main className="main stack">
         {phase === "idle" || phase === "recording" || phase === "processing" ? (
           <>

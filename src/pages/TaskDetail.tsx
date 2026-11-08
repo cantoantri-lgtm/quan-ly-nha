@@ -53,8 +53,8 @@ export default function TaskDetail() {
       .eq("entity_id", id).is("read_at", null).then(() => window.dispatchEvent(new Event("focus")));
   }, [id, profile]);
 
-  if (notFound) return (<><TopBar title="Công việc" back="/" /><main className="main"><Empty title="Không tìm thấy việc này">Có thể việc đã bị xoá hoặc bạn không có quyền xem.</Empty></main></>);
-  if (!t || !profile) return (<><TopBar title="Công việc" back="/" /><div className="loading">Đang tải…</div></>);
+  if (notFound) return (<><TopBar title="Công việc" back="/viec" /><main className="main"><Empty title="Không tìm thấy việc này">Có thể việc đã bị xoá hoặc bạn không có quyền xem.</Empty></main></>);
+  if (!t || !profile) return (<><TopBar title="Công việc" back="/viec" /><div className="loading">Đang tải…</div></>);
 
   const isOwner = isManager || (isSupervisor && t.created_by === profile.id) || (isSupervisor && !!t.building_id && myBuildingIds.includes(t.building_id));
   const isAssignee = t.assignee_id === profile.id;
@@ -106,12 +106,12 @@ export default function TaskDetail() {
     const { error } = await supabase.from("tasks").delete().eq("id", t!.id);
     if (error) { toast(friendlyError(error)); return; }
     toast("Đã xoá việc.");
-    nav("/", { replace: true });
+    nav("/viec", { replace: true });
   }
 
   return (
     <>
-      <TopBar title="Chi tiết việc" back="/"
+      <TopBar title="Chi tiết việc" back="/viec"
         action={isOwner ? <Link className="tb-action" to={`/viec/${t.id}/sua`} style={{ color: "inherit" }}>Sửa</Link> : null} />
       <main className="main stack">
         <section className="card detail-head">

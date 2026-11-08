@@ -25,12 +25,9 @@ export default function Login() {
   return (
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
-        <div className="brand">
-          <img src="/favicon.svg" alt="" />
-          <div>
-            <div className="bn">Neo Nestly</div>
-            <div className="bs">Giao việc & quản lý nhà cho thuê</div>
-          </div>
+        <div className="brand-logo">
+          <img src="/logo-neo-nestly.svg" alt="Neo Nestly · Serviced Apartment & Residence" />
+          <div className="bs">Giao việc & quản lý nhà cho thuê</div>
         </div>
         <label className="field">
           <span>Số điện thoại</span>

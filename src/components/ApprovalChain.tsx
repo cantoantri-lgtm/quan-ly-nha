@@ -4,7 +4,7 @@ import { clock } from "../lib/dates";
 import { DUTY_LABEL, type ReqKind, type ReqStep } from "../lib/office";
 import type { Profile } from "../lib/labels";
 
-const STATE: Record<ReqStep["status"], string> = { cho: "Chờ duyệt", da_duyet: "Đã duyệt", tu_choi: "Từ chối", bo_qua: "Bỏ qua" };
+const STATE: Record<ReqStep["status"], string> = { cho: "Chờ duyệt", da_duyet: "Đã duyệt", tu_choi: "Từ chối", bo_qua: "Bỏ qua", tra_lai: "Trả lại" };
 
 /** Các bước duyệt của một đề nghị đã gửi */
 export function ApprovalSteps({ steps, people, requesterName, sentAt }: {

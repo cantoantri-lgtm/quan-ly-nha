@@ -1,0 +1,59 @@
+/* ---------- Khung chung: thanh trên có logo, nút Apps, bảng chức năng ---------- */
+.apphead {
+  position: sticky; top: 0; z-index: 40; background: var(--surface); border-bottom: 1px solid var(--line);
+  min-height: var(--head-h); padding: env(safe-area-inset-top, 0px) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
+  display: flex; align-items: center; gap: 8px;
+}
+.ah-logo { display: flex; align-items: center; flex: none; border-radius: 10px; padding: 4px 6px; background: var(--logo-bg); }
+.ah-logo img { height: 38px; width: auto; display: block; }
+.ah-co { flex: 1; text-align: center; display: none; line-height: 1.2; }
+.ah-co b { display: block; font-size: 17px; letter-spacing: .1em; color: var(--brand); }
+.ah-co small { color: var(--muted); font-size: 12.5px; }
+.ah-tools { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.ah-btn {
+  width: 42px; height: 42px; border-radius: 50%; border: 0; background: transparent; color: var(--ink); display: grid; place-items: center;
+  cursor: pointer; position: relative; flex: none;
+}
+.ah-btn:hover, .ah-btn[aria-expanded="true"] { background: var(--surface-2); }
+.ah-btn svg { width: 22px; height: 22px; }
+.ah-btn.apps { background: var(--brand-soft); color: var(--brand); }
+.ah-badge {
+  position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff;
+  font-size: 11px; font-weight: 700; display: grid; place-items: center;
+}
+.ah-me { width: 38px; height: 38px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; margin-left: 4px; }
+.ah-tip {
+  position: absolute; top: calc(100% + 4px); right: 0; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 3px 9px; border-radius: 7px;
+  white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s;
+}
+.ah-btn:hover .ah-tip, .ah-btn:focus-visible .ah-tip { opacity: 1; }
+.apps-pop {
+  position: absolute; right: max(10px, env(safe-area-inset-right)); top: calc(100% + 6px); width: min(440px, calc(100vw - 20px));
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-lg); padding: 12px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; z-index: 45; max-height: calc(100vh - var(--head-h) - 20px); overflow: auto;
+}
+.apps-pop a { display: grid; justify-items: center; align-content: start; gap: 6px; padding: 14px 6px 12px; border-radius: 12px; color: var(--ink); text-align: center; font-size: 13.5px; line-height: 1.25; position: relative; }
+.apps-pop a:hover, .apps-pop a.active { background: var(--surface-2); }
+.apps-pop a.active { font-weight: 700; }
+.apps-pop .ai { width: 44px; height: 44px; display: grid; place-items: center; color: var(--brand); }
+.apps-pop .ai svg { width: 32px; height: 32px; }
+.apps-pop .n { position: absolute; top: 8px; right: calc(50% - 36px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.apps-back { position: fixed; inset: 0; z-index: 44; background: transparent; }
+
+.topbar { top: var(--head-h); }
+@media (min-width: 900px) {
+  :root { --head-h: 64px; }
+  .ah-logo img { height: 46px; }
+  .ah-co { display: block; }
+  .bottomnav { display: none; }
+  .main { max-width: 1000px; padding-bottom: 40px; }
+  .main.main-full { max-width: 1560px; }
+  .topbar { background: var(--surface); color: var(--ink); border-bottom: 1px solid var(--line); }
+  .topbar .back:hover { background: var(--surface-2); }
+  .topbar .tb-action { background: var(--brand-soft); color: var(--brand) !important; }
+  .toast { bottom: 24px; }
+  .fab { bottom: 24px; }
+}
+@media (max-width: 899px) { .ah-tip { display: none; } }
+
+@media print { .apphead { display: none !important; } }

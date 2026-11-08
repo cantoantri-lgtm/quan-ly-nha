@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { friendlyError, supabase } from "../lib/supabase";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { timeAgo, todayVN } from "../lib/dates";
 import { KINDS, fmtDays, kindLabel, statusLabel, summary, type Req, type ReqKind } from "../lib/office";
-import { Empty, TopBar } from "../components/ui";
+import { Icon } from "../components/ui";
 import "../office.css";
-
-type Tab = "duyet" | "cua_toi" | "tat_ca";
+import "../table.css";
 
 export const KIND_ICON: Record<ReqKind, JSX.Element> = {
   nghi_phep: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18M9 15l2 2 4-4" /></svg>,
@@ -82,115 +81,59 @@ export function LeaveBalance({ userId, quota, compact }: { userId: string; quota
   );
 }
 
+/** Văn phòng số: trang các chức năng phụ. Mỗi ô mở danh sách của loại đề nghị đó. */
 export default function Office() {
-  const { profile, isManager, isApprover, pendingApprovals } = useSession();
-  const canApprove = isManager || isApprover;
-  const [params, setParams] = useSearchParams();
-  const tab = (params.get("tab") as Tab) || (canApprove ? "duyet" : "cua_toi");
-  const kindFilter = params.get("loai") || "";
-  const [rows, setRows] = useState<Req[]>([]);
-  const [phases, setPhases] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const { profile, isManager, isApprover } = useSession();
+  const [waiting, setWaiting] = useState<Partial<Record<ReqKind, number>>>({});
+  const [fix, setFix] = useState<Partial<Record<ReqKind, number>>>({});
 
-  const setParam = (k: string, v: string) => {
-    const p = new URLSearchParams(params);
-    if (v) p.set(k, v); else p.delete(k);
-    setParams(p, { replace: true });
-  };
-
-  const load = useCallback(async () => {
-    if (!profile) return;
-    setErr(null);
-    let q = supabase.from("requests").select("*");
-    if (tab === "duyet") {
-      // Hàng đợi của tôi: đang đến lượt tôi duyệt, hoặc đã duyệt xong chờ tôi chi tiền
-      const { data: queue, error: qe } = await supabase.rpc("my_approval_queue");
-      if (qe) setErr(friendlyError(qe));
-      const items = (queue ?? []) as { request_id: string; phase: string }[];
-      setPhases(Object.fromEntries(items.map((i) => [i.request_id, i.phase])));
-      if (!items.length) { setRows([]); setLoading(false); return; }
-      q = q.in("id", items.map((i) => i.request_id));
-    }
-    if (tab === "cua_toi") q = q.eq("requester_id", profile.id);
-    if (tab === "tat_ca" && kindFilter) q = q.eq("kind", kindFilter);
-    const { data, error } = await q.order("created_at", { ascending: tab === "duyet" }).limit(300);
-    if (error) setErr(friendlyError(error));
-    setRows((data as Req[]) ?? []);
-    setLoading(false);
-  }, [profile, tab, kindFilter]);
-
-  useEffect(() => { setLoading(true); load(); }, [load]);
   useEffect(() => {
-    const h = () => load();
-    window.addEventListener("neo:notification", h);
-    window.addEventListener("focus", h);
-    return () => { window.removeEventListener("neo:notification", h); window.removeEventListener("focus", h); };
-  }, [load]);
-
-  const toApprove = useMemo(() => rows.filter((r) => phases[r.id] === "duyet"), [rows, phases]);
-  const toPay = useMemo(() => rows.filter((r) => phases[r.id] === "chi"), [rows, phases]);
+    if (!profile) return;
+    (async () => {
+      const { data: q } = await supabase.rpc("my_approval_queue");
+      const ids = ((q ?? []) as { request_id: string }[]).map((x) => x.request_id);
+      const w: Partial<Record<ReqKind, number>> = {};
+      if (ids.length) {
+        const { data } = await supabase.from("requests").select("kind").in("id", ids);
+        ((data ?? []) as { kind: ReqKind }[]).forEach((r) => { w[r.kind] = (w[r.kind] ?? 0) + 1; });
+      }
+      setWaiting(w);
+      const { data: f } = await supabase.from("requests").select("kind").eq("requester_id", profile.id).in("status", ["tra_lai", "tu_choi"]);
+      const fx: Partial<Record<ReqKind, number>> = {};
+      ((f ?? []) as { kind: ReqKind }[]).forEach((r) => { fx[r.kind] = (fx[r.kind] ?? 0) + 1; });
+      setFix(fx);
+    })();
+  }, [profile]);
 
   return (
-    <>
-      <TopBar title="Văn phòng" action={<Link className="tb-action" to="/to-chuc" style={{ color: "inherit" }}>Sơ đồ công ty</Link>} />
-      <main className="main stack">
-        {canApprove ? (
-          <div className="tabs" role="tablist">
-            {(([["duyet", "Cần xử lý"], ["cua_toi", "Của tôi"], ["tat_ca", "Tất cả"]] as [Tab, string][]).filter(([k]) => k !== "tat_ca" || isManager)).map(([k, l]) => (
-              <button key={k} role="tab" aria-selected={tab === k} onClick={() => setParam("tab", k)}>
-                {l}{k === "duyet" && pendingApprovals ? <span className="tab-n num">{pendingApprovals}</span> : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {tab === "cua_toi" && profile ? (
-          <>
-            <LeaveBalance userId={profile.id} quota={profile.annual_leave_days == null ? null : Number(profile.annual_leave_days)} />
-            <div className="section-title" style={{ marginTop: 6 }}>Tạo đề nghị</div>
-            <div className="kind-grid">
-              {KINDS.map((k) => (
-                <Link key={k.kind} to={`/van-phong/moi/${k.kind}`} className={`kind-tile k-${k.kind}`}>
-                  <span className="rq-ico">{KIND_ICON[k.kind]}</span>
-                  <span className="kt-label">{k.label}</span>
-                  <span className="kt-hint">{k.hint}</span>
-                </Link>
-              ))}
-            </div>
-            <div className="section-title">Đề nghị của tôi</div>
-          </>
-        ) : null}
-
-        {tab === "tat_ca" ? (
-          <div className="chips" role="group" aria-label="Lọc theo loại">
-            <button className="chip" aria-pressed={!kindFilter} onClick={() => setParam("loai", "")}>Tất cả</button>
-            {KINDS.map((k) => (
-              <button key={k.kind} className="chip" aria-pressed={kindFilter === k.kind} onClick={() => setParam("loai", k.kind)}>
-                {k.label.replace(/^(Xin |Đề nghị |Đi )/, "").replace(/^./, (c) => c.toUpperCase())}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {err ? <div className="error-box">{err}</div> : null}
-        {loading ? <div className="loading">Đang tải…</div> : tab === "duyet" ? (
-          toApprove.length + toPay.length === 0 ? (
-            <Empty title="Không có gì cần xử lý">Đề nghị đến lượt bạn duyệt hoặc chờ bạn chi tiền sẽ hiện ở đây kèm thông báo.</Empty>
-          ) : (
-            <>
-              {toApprove.length ? <div className="section-title" style={{ marginTop: 4 }}>Chờ duyệt · {toApprove.length}</div> : null}
-              <div className="stack">{toApprove.map((r) => <ReqCard key={r.id} r={r} showWho />)}</div>
-              {toPay.length ? <div className="section-title">Đã duyệt, chờ chi tiền · {toPay.length}</div> : null}
-              <div className="stack">{toPay.map((r) => <ReqCard key={r.id} r={r} showWho />)}</div>
-            </>
-          )
-        ) : rows.length === 0 ? (
-          <Empty title="Chưa có đề nghị nào">{tab === "cua_toi" ? "Chọn một loại ở trên để tạo đề nghị gửi quản lý duyệt." : null}</Empty>
-        ) : (
-          <div className="stack">{rows.map((r) => <ReqCard key={r.id} r={r} showWho={tab !== "cua_toi"} />)}</div>
-        )}
-      </main>
-    </>
+    <main className="main stack">
+      <section className="pg-card">
+        <div className="pg-head">
+          <span className="pg-ico">{Icon.office}</span>
+          <div className="grow"><h2>Văn phòng số</h2><p>Chọn nghiệp vụ để xem danh sách và lập đề nghị</p></div>
+        </div>
+        <div className="kind-grid" style={{ padding: 16 }}>
+          {KINDS.map((k) => (
+            <Link key={k.kind} to={`/van-phong/ds/${k.kind}`} className={`kind-tile k-${k.kind}`}>
+              <span className="rq-ico">{KIND_ICON[k.kind]}</span>
+              <span className="kt-label">{k.label}</span>
+              <span className="kt-hint">
+                {waiting[k.kind] ? <b style={{ color: "var(--danger)" }}>{waiting[k.kind]} chờ bạn duyệt · </b> : null}
+                {fix[k.kind] ? <b style={{ color: "var(--today)" }}>{fix[k.kind]} cần sửa · </b> : null}
+                {k.hint}
+              </span>
+            </Link>
+          ))}
+          {isManager || isApprover ? (
+            <Link to="/to-chuc" className="kind-tile k-thanh_toan">
+              <span className="rq-ico">{Icon.org}</span>
+              <span className="kt-label">Sơ đồ công ty</span>
+              <span className="kt-hint">Cơ cấu tổ chức, người duyệt</span>
+            </Link>
+          ) : null}
+        </div>
+      </section>
+      {profile ? <LeaveBalance userId={profile.id} quota={profile.annual_leave_days == null ? null : Number(profile.annual_leave_days)} /> : null}
+    </main>
   );
 }

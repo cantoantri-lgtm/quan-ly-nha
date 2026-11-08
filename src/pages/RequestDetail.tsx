@@ -4,8 +4,9 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { clock, daysBetween, todayVN } from "../lib/dates";
 import { parseMoney, vnd, vndWords } from "../lib/money";
-import { DUTY_LABEL, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, fullDate, hhmm, kindLabel, statusLabel, summary, type Req, type ReqStep } from "../lib/office";
-import { Empty, Sheet, TopBar } from "../components/ui";
+import { EDIT_LOCK_TIP, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, deleteRequest, fmtDays, fullDate, hhmm, isEditableStatus, kindLabel, statusLabel, summary, type Req, type ReqStep } from "../lib/office";
+import { Empty, Icon, Sheet, TopBar } from "../components/ui";
+import DecideSheet, { type DecideMode } from "../components/DecideSheet";
 import FileGallery from "../components/FileGallery";
 import DnttView from "../components/DnttView";
 import { ApprovalSteps } from "../components/ApprovalChain";
@@ -20,9 +21,8 @@ export default function RequestDetail() {
   const [steps, setSteps] = useState<ReqStep[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [decide, setDecide] = useState<null | "da_duyet" | "tu_choi">(null);
-  const [note, setNote] = useState("");
-  const [confirm, setConfirm] = useState<null | "huy" | "chi">(null);
+  const [decide, setDecide] = useState<DecideMode | null>(null);
+  const [confirm, setConfirm] = useState<null | "huy" | "chi" | "xoa">(null);
   const [report, setReport] = useState(false);
   const [aStart, setAStart] = useState("");
   const [aEnd, setAEnd] = useState("");
@@ -61,7 +61,10 @@ export default function RequestDetail() {
   const today = todayVN();
   const curStep = r.status === "cho_duyet" ? steps.find((x) => x.status === "cho") : undefined;
   const canDecide = !!curStep && !mine && (curStep.approver_id === profile.id || (curStep.approver_id === null && isManager));
-  const canEdit = mine && r.status === "cho_duyet" && !steps.some((x) => x.status === "da_duyet");
+  const editable = isEditableStatus(r.status);                       // không đang trong quá trình duyệt
+  const canEdit = mine && editable;
+  const canDelete = (mine || isManager) && editable;
+  const listUrl = `/van-phong/ds/${r.kind}`;
   const canPay = isMoney && r.status === "da_duyet" && (isManager || isAccountant);
   const canCancel = mine && (r.status === "cho_duyet" || (r.status === "da_duyet" && !isMoney && r.start_date > today));
   const canReport = mine && r.kind === "cong_tac" && (r.status === "da_duyet" || r.status === "hoan_tat");
@@ -76,17 +79,6 @@ export default function RequestDetail() {
     toast(msg);
     refreshUnread();
     return true;
-  }
-
-  async function submitDecision(e: FormEvent) {
-    e.preventDefault();
-    if (decide === "tu_choi" && !note.trim()) { setErr("Ghi lý do từ chối để người đề nghị biết."); return; }
-    setBusy(true); setErr(null);
-    const { error } = await supabase.rpc("decide_step", { p_request: r!.id, p_approve: decide === "da_duyet", p_note: note.trim() || null });
-    setBusy(false);
-    if (error) { setErr(friendlyError(error)); return; }
-    toast(decide === "da_duyet" ? "Đã duyệt bước của bạn." : "Đã từ chối đề nghị.");
-    setDecide(null); setNote(""); await load(); refreshUnread();
   }
 
   async function markPaid() {
@@ -120,8 +112,7 @@ export default function RequestDetail() {
 
   return (
     <>
-      <TopBar title={kindLabel(r)} back="/van-phong"
-        action={canEdit ? <Link className="tb-action" to={`/van-phong/${r.id}/sua`} style={{ color: "inherit" }}>Sửa</Link> : null} />
+      <TopBar title={kindLabel(r)} back={listUrl} />
       <main className={`main stack${isMoney ? " main-wide" : ""}`}>
         <section className={`card rq-head k-${r.kind}`}>
           <div className="row" style={{ justifyContent: "space-between" }}>
@@ -135,6 +126,9 @@ export default function RequestDetail() {
 
         {r.status === "tu_choi" && r.decision_note ? (
           <div className="error-box"><b>Lý do từ chối:</b> {r.decision_note}</div>
+        ) : null}
+        {r.status === "tra_lai" ? (
+          <div className="error-box"><b>Đề nghị bị trả lại để sửa.</b>{r.decision_note ? ` Lý do: ${r.decision_note}` : ""}{mine ? " Bấm “Sửa và gửi lại” bên dưới; đề nghị sẽ được duyệt lại từ cấp đầu." : ""}</div>
         ) : null}
 
         <dl className="card kv">
@@ -192,15 +186,15 @@ export default function RequestDetail() {
 
         {r.kind === "thanh_toan" ? (
           <DnttView requestId={r.id} refreshKey={r.updated_at}
-            canAddLink={isManager || (mine && (r.status === "cho_duyet" || r.status === "da_duyet"))}
-            canDeleteLink={isManager || (mine && r.status === "cho_duyet")} />
+            canAddLink={isManager || (mine && (r.status === "cho_duyet" || r.status === "da_duyet" || editable))}
+            canDeleteLink={isManager || (mine && editable)} />
         ) : null}
 
         {isMoney ? (
           <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} title="Chứng từ đính kèm"
             hint="Hoá đơn, báo giá, ảnh chuyển khoản… (ảnh hoặc PDF, tối đa 10 MB mỗi tệp)."
-            canUpload={isManager || (mine && (r.status === "cho_duyet" || r.status === "da_duyet"))}
-            canDelete={isManager || (mine && r.status === "cho_duyet")} />
+            canUpload={isManager || (mine && (r.status === "cho_duyet" || r.status === "da_duyet" || editable))}
+            canDelete={isManager || (mine && editable)} />
         ) : null}
 
         {steps.length ? (
@@ -216,6 +210,7 @@ export default function RequestDetail() {
           {r.decided_at && !steps.length ? <li><b>{name(r.approver_id)}</b> {r.status === "tu_choi" ? "từ chối" : "duyệt"}{r.decision_note && r.status !== "tu_choi" ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at)}</span></li> : null}
           {r.reported_at ? <li><b>{requester?.full_name}</b> nhập thực tế công tác<span>{clock(r.reported_at)}</span></li> : null}
           {r.paid_at ? <li><b>{name(r.paid_by)}</b> đã chi tiền<span>{clock(r.paid_at)}</span></li> : null}
+          {r.status === "tra_lai" ? <li><b>{name(r.approver_id)}</b> trả lại đề nghị{r.decision_note ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at ?? r.updated_at)}</span></li> : null}
           {r.status === "da_huy" ? <li><b>{requester?.full_name}</b> rút lại đề nghị<span>{clock(r.updated_at)}</span></li> : null}
         </ol>
 
@@ -224,8 +219,9 @@ export default function RequestDetail() {
         <div className="stack rq-actions">
           {canDecide ? (
             <div className="row">
-              <button className="btn danger" style={{ flex: 1 }} disabled={busy} onClick={() => { setErr(null); setNote(""); setDecide("tu_choi"); }}>Từ chối</button>
-              <button className="btn" style={{ flex: 2 }} disabled={busy} onClick={() => { setErr(null); setNote(""); setDecide("da_duyet"); }}>Duyệt</button>
+              <button className="btn danger" style={{ flex: 1 }} disabled={busy} onClick={() => { setErr(null); setDecide("tu_choi"); }}>{Icon.x}Từ chối</button>
+              <button className="btn secondary" style={{ flex: 1 }} disabled={busy} onClick={() => { setErr(null); setDecide("tra_lai"); }}>{Icon.undo}Trả lại</button>
+              <button className="btn" style={{ flex: 2 }} disabled={busy} onClick={() => { setErr(null); setDecide("da_duyet"); }}>{Icon.check}Duyệt</button>
             </div>
           ) : null}
           {canPay ? (
@@ -237,19 +233,20 @@ export default function RequestDetail() {
               {r.status === "hoan_tat" ? "Sửa báo cáo thực tế" : "Nhập thực tế công tác"}
             </button>
           ) : null}
+          {mine || isManager ? (
+            <div className="row">
+              {mine ? (canEdit
+                ? <Link className="btn block" style={{ flex: 2 }} to={`/van-phong/${r.id}/sua`}>{Icon.edit}Sửa và gửi lại</Link>
+                : <button className="btn secondary block" style={{ flex: 2 }} disabled title={EDIT_LOCK_TIP}>{Icon.edit}Sửa</button>) : null}
+              <button className="btn danger" style={{ flex: 1 }} disabled={!canDelete} title={canDelete ? "Xoá đề nghị" : EDIT_LOCK_TIP} onClick={() => setConfirm("xoa")}>{Icon.trash}Xoá</button>
+            </div>
+          ) : null}
+          {(mine || isManager) && !editable && r.status !== "hoan_tat" ? <p className="muted small" style={{ margin: 0 }}>Sửa và Xoá chỉ mở khi đề nghị bị trả lại, bị từ chối hoặc đã rút. Đang chờ duyệt thì bấm “Rút lại” trước.</p> : null}
           {canCancel ? <button className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setConfirm("huy")}>Rút lại đề nghị</button> : null}
         </div>
       </main>
 
-      <Sheet open={!!decide} onClose={() => setDecide(null)} title={decide === "da_duyet" ? "Duyệt đề nghị" : "Từ chối đề nghị"}>
-        <form className="stack" onSubmit={submitDecision}>
-          <p className="muted" style={{ margin: 0 }}>{requester?.full_name} · {kindLabel(r)} · {summary(r)}{curStep ? ` · bước ${DUTY_LABEL[curStep.duty]}` : ""}</p>
-          <label className="field"><span>{decide === "tu_choi" ? "Lý do từ chối *" : "Ghi chú (không bắt buộc)"}</span>
-            <textarea id="rq-decision" className="input" value={note} onChange={(e) => setNote(e.target.value)} autoFocus /></label>
-          {err ? <div className="error-box" role="alert">{err}</div> : null}
-          <button className={`btn block${decide === "tu_choi" ? " danger" : ""}`} disabled={busy}>{decide === "da_duyet" ? "Duyệt" : "Từ chối"}</button>
-        </form>
-      </Sheet>
+      <DecideSheet req={decide ? r : null} mode={decide} onClose={() => setDecide(null)} onDone={() => { setDecide(null); load(); }} />
 
       <Sheet open={report} onClose={() => setReport(false)} title="Thực tế công tác">
         <form className="stack" onSubmit={submitReport}>
@@ -269,19 +266,27 @@ export default function RequestDetail() {
         </form>
       </Sheet>
 
-      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm === "chi" ? "Xác nhận đã chi tiền?" : "Rút lại đề nghị?"}>
+      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm === "chi" ? "Xác nhận đã chi tiền?" : confirm === "xoa" ? "Xoá đề nghị?" : "Rút lại đề nghị?"}>
         <p className="muted" style={{ marginTop: 0 }}>
           {confirm === "chi"
             ? `${vnd(r.amount)} cho ${r.payee || requester?.full_name}${r.bank_info ? ` (${r.bank_info})` : ""}. Người đề nghị sẽ nhận thông báo.`
+            : confirm === "xoa" ? "Xoá hẳn đề nghị cùng tệp đính kèm, không khôi phục được."
             : r.status === "da_duyet" ? "Đề nghị đã được duyệt. Rút lại sẽ báo cho quản lý biết." : "Đề nghị sẽ không còn chờ duyệt nữa."}
         </p>
         <div className="row">
           <button className="btn secondary" style={{ flex: 1 }} onClick={() => setConfirm(null)}>Thôi</button>
-          <button className={`btn ${confirm === "huy" ? "danger" : ""}`} style={{ flex: 1 }} disabled={busy}
+          <button className={`btn ${confirm === "huy" || confirm === "xoa" ? "danger" : ""}`} style={{ flex: 1 }} disabled={busy}
             onClick={async () => {
+              if (confirm === "xoa") {
+                setBusy(true);
+                try { await deleteRequest(r.id); toast("Đã xoá đề nghị."); refreshUnread(); nav(listUrl, { replace: true }); }
+                catch (e) { toast(friendlyError(e)); setConfirm(null); }
+                setBusy(false);
+                return;
+              }
               const ok = confirm === "chi" ? await markPaid() : await update({ status: "da_huy" }, "Đã rút lại đề nghị.");
-              if (ok) { setConfirm(null); if (confirm === "huy") nav("/van-phong?tab=cua_toi", { replace: true }); }
-            }}>{confirm === "chi" ? "Đã chi" : "Rút lại"}</button>
+              if (ok) { setConfirm(null); if (confirm === "huy") nav(listUrl, { replace: true }); }
+            }}>{confirm === "chi" ? "Đã chi" : confirm === "xoa" ? "Xoá" : "Rút lại"}</button>
         </div>
       </Sheet>
     </>

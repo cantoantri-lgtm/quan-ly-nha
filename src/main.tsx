@@ -3,7 +3,11 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { SessionProvider } from "./lib/session";
+import { applyTheme, savedTheme } from "./components/ui";
 import "./styles.css";
+import "./shell.css";
+
+applyTheme(savedTheme());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -7,13 +7,20 @@
   --k-adv: #9A3F5C;    --k-adv-bg: #F6E4EA;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --k-leave: #C29BE6; --k-leave-bg: #2B2135;
     --k-out: #79ACE6;   --k-out-bg: #182A3E;
     --k-trip: #E5AE52;  --k-trip-bg: #352812;
     --k-pay: #5FB39F;   --k-pay-bg: #1C332D;
     --k-adv: #E6909F;   --k-adv-bg: #3A1E26;
   }
+}
+:root[data-theme="dark"] {
+    --k-leave: #C29BE6; --k-leave-bg: #2B2135;
+    --k-out: #79ACE6;   --k-out-bg: #182A3E;
+    --k-trip: #E5AE52;  --k-trip-bg: #352812;
+    --k-pay: #5FB39F;   --k-pay-bg: #1C332D;
+    --k-adv: #E6909F;   --k-adv-bg: #3A1E26;
 }
 .k-nghi_phep  { --k: var(--k-leave); --k-bg: var(--k-leave-bg); }
 .k-ra_ngoai   { --k: var(--k-out);   --k-bg: var(--k-out-bg); }
@@ -40,6 +47,7 @@
 .rq-pill.hoan_tat  { background: var(--s-done-bg); color: var(--s-done); }
 .rq-pill.tu_choi   { background: var(--s-block-bg); color: var(--s-block); }
 .rq-pill.da_huy    { background: var(--s-todo-bg); color: var(--s-todo); }
+.rq-pill.tra_lai   { background: var(--cream); color: var(--today); }
 
 .tab-n { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11.5px; line-height: 18px; }
 

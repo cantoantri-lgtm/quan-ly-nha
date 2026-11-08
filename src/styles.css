@@ -22,18 +22,31 @@
   --shadow: 0 1px 2px rgba(22, 33, 29, .06), 0 4px 16px rgba(22, 33, 29, .06);
   --font: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --nav-h: 64px;
+  --head-h: 56px;
+  --logo-bg: transparent;
+  --shadow-lg: 0 8px 28px rgba(22, 33, 29, .18);
   color-scheme: light;
 }
+:root[data-theme="light"] { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0F1513; --surface: #161E1B; --surface-2: #1B2420; --ink: #E4ECE8; --muted: #95A39D; --line: #2A3531;
     --brand: #5FB39F; --brand-ink: #0B1210; --brand-soft: #1C332D; --cream: #2A261E; --danger: #EE8270;
     --s-todo: #A0ACA7; --s-todo-bg: #232C29; --s-doing: #79ACE6; --s-doing-bg: #182A3E;
     --s-block: #EE8270; --s-block-bg: #3A1F1A; --s-done: #66C391; --s-done-bg: #17321F;
     --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6;
-    --shadow: 0 1px 2px rgba(0,0,0,.4);
+    --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 8px 28px rgba(0,0,0,.5); --logo-bg: #EEF1EA;
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+    --bg: #0F1513; --surface: #161E1B; --surface-2: #1B2420; --ink: #E4ECE8; --muted: #95A39D; --line: #2A3531;
+    --brand: #5FB39F; --brand-ink: #0B1210; --brand-soft: #1C332D; --cream: #2A261E; --danger: #EE8270;
+    --s-todo: #A0ACA7; --s-todo-bg: #232C29; --s-doing: #79ACE6; --s-doing-bg: #182A3E;
+    --s-block: #EE8270; --s-block-bg: #3A1F1A; --s-done: #66C391; --s-done-bg: #17321F;
+    --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6;
+    --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 8px 28px rgba(0,0,0,.5); --logo-bg: #EEF1EA;
+    color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -235,6 +248,10 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 .brand img { width: 44px; height: 44px; }
 .brand .bn { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
 .brand .bs { font-size: 13px; color: var(--muted); }
+
+.brand-logo { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.brand-logo img { width: 200px; max-width: 70%; height: auto; background: var(--logo-bg); border-radius: 12px; }
+.brand-logo .bs { font-size: 13px; color: var(--muted); }
 
 .copybox { background: var(--surface-2); border: 1px dashed var(--line); border-radius: 10px; padding: 12px; white-space: pre-wrap; font-size: 14px; }
 .loading { display: grid; place-items: center; min-height: 50vh; color: var(--muted); }
