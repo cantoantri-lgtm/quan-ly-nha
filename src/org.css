@@ -34,3 +34,81 @@
 .badge.acc { background: var(--s-done-bg); color: var(--s-done); }
 .badge.noacc { background: var(--s-block-bg); color: var(--s-block); }
 .check-row { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+
+/* Thanh Lưu / Trở về */
+.org-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px; position: sticky; top: calc(var(--head-h) + 64px); z-index: 5; }
+.ob-state { font-size: 13.5px; color: var(--muted); }
+.ob-state.dirty { color: var(--today); font-weight: 700; }
+.ob-btns { display: flex; gap: 8px; }
+.ob-btns .btn { min-height: 38px; padding: 6px 18px; }
+
+/* Nhân viên chưa có vị trí */
+.org-free { padding: 12px 14px; display: grid; gap: 8px; }
+.org-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.org-chips li { display: flex; align-items: center; gap: 4px; background: var(--surface-2); border: 1px dashed var(--line); border-radius: 999px; padding: 2px 4px 2px 14px; font-size: 14px; }
+
+/* Sơ đồ dạng cây */
+.otree-wrap { overflow-x: auto; padding: 8px 4px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.ot { --lc: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+.ot, .ot ul { display: flex; justify-content: center; align-items: flex-start; list-style: none; margin: 0; padding: 22px 0 0; position: relative; }
+.ot { padding-top: 6px; width: max-content; min-width: 100%; }
+.ot ul::before { content: ""; position: absolute; top: 0; left: 50%; height: 22px; border-left: 2px solid var(--lc); }
+.ot li { position: relative; display: flex; flex-direction: column; align-items: center; padding: 22px 5px 0; }
+.ot > li { padding-top: 0; }
+.ot li::before, .ot li::after { content: ""; position: absolute; top: 0; right: 50%; width: 50%; height: 22px; border-top: 2px solid var(--lc); }
+.ot li::after { right: auto; left: 50%; border-left: 2px solid var(--lc); }
+.ot > li::before, .ot > li::after, .ot li:only-child::before, .ot li:only-child::after { display: none; }
+.ot li:only-child { padding-top: 0; }
+.ot li:first-child::before, .ot li:last-child::after { border: 0; }
+.ot li:last-child::before { border-right: 2px solid var(--lc); border-radius: 0 8px 0 0; }
+.ot li:first-child::after { border-radius: 8px 0 0 0; }
+.ot-node { border: 1.5px solid var(--lc); border-radius: 12px; background: var(--surface); padding: 8px 14px; display: grid; gap: 2px; justify-items: center; text-align: center; min-width: 150px; max-width: 260px; }
+.ot-node b { font-size: 15px; }
+.ot-node span { color: var(--muted); font-size: 12.5px; }
+.ot-owner { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.ot-owner span { color: inherit; opacity: .85; }
+.ot-deputy { background: var(--brand-soft); border-color: var(--brand); }
+.ot-dept { --h: var(--s-done); --hb: var(--s-done-bg); background: var(--hb); border-color: var(--h); }
+.ot-team { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; min-width: 0; padding: 4px 12px; color: var(--muted); }
+.hue-0 { --h: var(--s-done); --hb: var(--s-done-bg); }
+.hue-1 { --h: var(--s-block); --hb: var(--s-block-bg); }
+.hue-2 { --h: var(--s-doing); --hb: var(--s-doing-bg); }
+.hue-3 { --h: var(--today); --hb: var(--today-bg); }
+.hue-4 { --h: var(--brand); --hb: var(--brand-soft); }
+.ot-dept .org-head { flex-direction: column; gap: 2px; }
+.ot-members { flex-direction: column; align-items: stretch; gap: 6px; padding-top: 12px; width: 140px; }
+.ot-members::before { height: 12px; }
+.ot-members li { padding: 0; display: block; }
+.ot-members li::before, .ot-members li::after { display: none; }
+.ot-person { position: relative; display: grid; gap: 1px; background: var(--surface-2); border: 1px solid var(--line); border-left: 3px solid var(--h, var(--s-done)); border-radius: 10px; padding: 6px 30px 6px 8px; text-align: left; }
+.ot-person b { font-size: 13px; }
+.ot-person span { font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+.ot-person em { font-style: normal; font-size: 11px; font-weight: 700; color: var(--brand); }
+.ot-person small { font-size: 11px; color: var(--today); }
+.ot-person.st-tuyen { background: var(--today-bg); border-style: dashed; border-left-style: solid; }
+.ot-person.st-tuyen b { color: var(--today); }
+.ot-edit { position: absolute; top: 4px; right: 4px; border: 0; background: transparent; color: var(--brand); font-weight: 700; font-size: 11.5px; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
+.ot-edit:hover { background: var(--brand-soft); }
+.ot-node { min-width: 130px; }
+.ot-dept .btn.sm { min-height: 28px; padding: 2px 8px; font-size: 12.5px; }
+
+@media (max-width: 760px) {
+  .otree-wrap { overflow: visible; padding: 10px; }
+  .ot, .ot ul { display: block; width: auto; min-width: 0; padding: 6px 0 0 14px; margin-left: 4px; border-left: 2px solid var(--lc); }
+  .ot { border-left: 0; margin-left: 0; padding-left: 0; }
+  .ot ul::before, .ot li::before, .ot li::after { display: none !important; }
+  .ot li { display: block; padding: 8px 0 0; }
+  .ot-node { justify-items: start; text-align: left; max-width: none; }
+  .ot-members { width: auto; padding-top: 8px; }
+  .ot-person { padding-right: 40px; }
+  .ot-members::before { display: none; }
+}
+@media print { .org-bar, .org-free { display: none; } }
+
+/* .badge toàn cục là chấm số trên thanh dưới; trong sơ đồ dùng dạng nhãn chữ */
+.ot-node .badge, .org-person .badge, .org-free .badge, .op-badges .badge, .dn-h .badge {
+  position: static; display: inline-block; height: auto; min-width: 0; padding: 1px 8px; font-size: 11.5px;
+}
+.ot-members .ot-person { display: grid; }
+.ot .ot-members { flex-direction: column; align-items: stretch; justify-content: flex-start; padding-top: 12px; width: 140px; }
+@media (max-width: 760px) { .ot .ot-members { display: block; width: auto; padding-top: 8px; } .ot .ot-members li { margin-top: 6px; } }
