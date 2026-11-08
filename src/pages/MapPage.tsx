@@ -139,6 +139,7 @@ export default function MapPage() {
     };
     link("btn sm", googleDirections(s), "Chỉ đường");
     if (s.can_open) btn("btn secondary sm", "Xem toà", () => nav(`/toa/${s.id}`));
+    if (!s.can_open) btn("btn secondary sm", "Xem phòng trống", () => nav(`/phong-trong?toa=${s.id}`));
     link("btn ghost sm", googlePlace(s), "Google Maps");
     if (isManager) btn("btn ghost sm", "Sửa vị trí", () => startPlacing(s));
     el.append(act);
@@ -235,6 +236,7 @@ export default function MapPage() {
     } else if (hasPos(s)) window.open(googlePlace(s), "_blank", "noopener");
     else if (isManager) startPlacing(s);
     else if (s.can_open) nav(`/toa/${s.id}`);
+    else nav(`/phong-trong?toa=${s.id}`);
   }
 
   const totalVacant = spots.reduce((n, s) => n + s.vacant_rooms, 0);

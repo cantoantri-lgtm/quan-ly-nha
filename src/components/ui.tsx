@@ -151,7 +151,7 @@ const isDark = () => (document.documentElement.dataset.theme ?? (matchMedia("(pr
 
 /** Thanh trên toàn app: logo (bấm về trang chủ), tên công ty, nút Apps, thông báo, chế độ tối, tài khoản */
 export function AppHeader() {
-  const { profile, unread, pendingApprovals, isManager, isApprover } = useSession();
+  const { profile, unread, pendingApprovals, isManager, isApprover, isCollaborator } = useSession();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(isDark());
   const loc = useLocation();
@@ -163,10 +163,15 @@ export function AppHeader() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = [
+  const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = isCollaborator ? [
+    { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
+    { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+    { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
+  ] : [
     { to: "/viec", label: "Công việc", icon: Icon.tasks },
     { to: "/van-phong", label: "Văn phòng số", icon: Icon.office, n: pendingApprovals },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
+    { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     ...(isManager ? [
       { to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
       { to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user },
@@ -188,16 +193,16 @@ export function AppHeader() {
 
   return (
     <header className="apphead">
-      <Link to="/" className="ah-logo" aria-label="Về trang chủ Neo Nestly"><img src="/logo-neo-nestly.svg" alt="Neo Nestly" /></Link>
+      <Link to={isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Neo Nestly"><img src="/logo-neo-nestly.svg" alt="Neo Nestly" /></Link>
       <div className="ah-co"><b>NEO NESTLY</b><small>Serviced Apartment &amp; Residence</small></div>
       <div className="ah-tools">
         <button type="button" className="ah-btn apps" aria-expanded={open} aria-haspopup="true" aria-label="Chức năng" onClick={() => setOpen((o) => !o)}>
           {Icon.grid}<span className="ah-tip">Apps</span>
         </button>
-        <Link to="/" className="ah-btn" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>
-        <Link to="/thong-bao" className="ah-btn" aria-label="Thông báo">
+        {isCollaborator ? null : <Link to="/" className="ah-btn" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>}
+        {isCollaborator ? null : <Link to="/thong-bao" className="ah-btn" aria-label="Thông báo">
           {Icon.bell}{unread > 0 ? <span className="ah-badge num">{unread > 99 ? "99+" : unread}</span> : null}<span className="ah-tip">Thông báo</span>
-        </Link>
+        </Link>}
         <button type="button" className="ah-btn" aria-label={dark ? "Chế độ sáng" : "Chế độ tối"} onClick={toggleTheme}>
           {dark ? Icon.sun : Icon.moon}<span className="ah-tip">{dark ? "Chế độ sáng" : "Chế độ tối"}</span>
         </button>
@@ -237,7 +242,18 @@ export function TopBar({ title, back, action }: { title: string; back?: boolean 
 }
 
 export function BottomNav() {
-  const { unread, isManager, pendingApprovals } = useSession();
+  const { unread, isManager, pendingApprovals, isCollaborator } = useSession();
+  if (isCollaborator) {
+    return (
+      <nav className="bottomnav" aria-label="Điều hướng chính">
+        <div className="inner">
+          <NavLink to="/ban-do">{Icon.map}<span>Bản đồ</span></NavLink>
+          <NavLink to="/phong-trong">{Icon.building}<span>Phòng trống</span></NavLink>
+          <NavLink to="/tai-khoan">{Icon.user}<span>Tài khoản</span></NavLink>
+        </div>
+      </nav>
+    );
+  }
   return (
     <nav className="bottomnav" aria-label="Điều hướng chính">
       <div className="inner">

@@ -27,6 +27,7 @@ import Contracts from "./pages/Contracts";
 import Invoices from "./pages/Invoices";
 import PayPage from "./pages/PayPage";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
+import VacantRooms from "./pages/VacantRooms";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
 const MapPage = lazy(() => import("./pages/MapPage"));
@@ -54,7 +55,7 @@ function ManagerOnly() {
 }
 
 export default function App() {
-  const { session, profile, loading } = useSession();
+  const { session, profile, loading, isCollaborator } = useSession();
 
   // Trang thanh toán cho khách thuê: công khai, không cần đăng nhập
   if (window.location.pathname.startsWith("/thanh-toan/")) return <Routes><Route path="/thanh-toan/:code" element={<PayPage />} /></Routes>;
@@ -73,10 +74,25 @@ export default function App() {
   }
   if (session.user.user_metadata?.must_change_password) return <><ChangePassword forced /><Toast /></>;
 
+  // Cộng tác viên: chỉ bản đồ, phòng trống, tài khoản
+  if (isCollaborator) {
+    return (
+      <Routes>
+        <Route element={<Shell />}>
+          <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
+          <Route path="phong-trong" element={<VacantRooms />} />
+          <Route path="tai-khoan" element={<Account />} />
+          <Route path="*" element={<Navigate to="/ban-do" replace />} />
+        </Route>
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
       <Route element={<Shell />}>
         <Route index element={<Home />} />
+        <Route path="phong-trong" element={<VacantRooms />} />
         <Route path="viec" element={<Tasks />} />
         <Route element={<AssignerOnly />}>
           <Route path="viec/moi" element={<TaskForm />} />

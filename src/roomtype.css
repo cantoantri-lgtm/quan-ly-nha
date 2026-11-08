@@ -19,3 +19,17 @@
 .rt-item b { display: block; }
 .rt-item span { color: var(--muted); font-size: 13px; }
 .rt-count { font-weight: 700; color: var(--brand) !important; white-space: nowrap; }
+
+/* Trang Phòng trống */
+.vr-sum { padding: 12px 14px; display: grid; gap: 10px; margin-bottom: 14px; }
+.vr-big { font-size: 26px; color: var(--brand); }
+.vr-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.vr-chips .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 999px; padding: 4px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.vr-chips .chip.on { background: var(--brand); border-color: var(--brand); color: var(--on-brand, #fff); }
+.vr-chips .chip .n { opacity: .75; font-variant-numeric: tabular-nums; }
+.vr-bld { display: grid; gap: 10px; margin-bottom: 18px; }
+.vr-bh { font-size: 16px; margin: 4px 0 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.vr-cnt { font-size: 13px; color: var(--brand); font-weight: 700; }
+.vr-rooms { display: flex; flex-wrap: wrap; gap: 6px; }
+.vr-room { border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; font-weight: 700; font-size: 13px; background: var(--surface-2); }
+.vr-room small { margin-left: 5px; color: var(--muted); font-weight: 500; }

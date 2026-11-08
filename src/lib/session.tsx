@@ -8,7 +8,10 @@ type Ctx = {
   session: Session | null;
   profile: Profile | null;
   buildings: Building[];
+  /** Người dùng nội bộ (không gồm Cộng tác viên) */
   people: Profile[];
+  /** Tất cả tài khoản, kể cả Cộng tác viên — dùng ở trang Nhân sự */
+  allPeople: Profile[];
   myBuildingIds: string[];
   loading: boolean;
   unread: number;
@@ -19,6 +22,8 @@ type Ctx = {
   toastMsg: string | null;
   isManager: boolean;
   isSupervisor: boolean;
+  /** Cộng tác viên: chỉ xem bản đồ + phòng trống */
+  isCollaborator: boolean;
   /** Dòng của tôi trong cơ cấu tổ chức (nếu đã được gán) */
   myStaff: Staff | null;
   /** Có thể đứng trong chuỗi duyệt: Leader, Trưởng phòng trở lên, hoặc giữ nhiệm vụ Nhân sự/Kế toán/Giám đốc */
@@ -32,7 +37,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [buildings, setBuildings] = useState<Building[]>([]);
-  const [people, setPeople] = useState<Profile[]>([]);
+  const [allPeople, setPeople] = useState<Profile[]>([]);
   const [myBuildingIds, setMyBuildingIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [unread, setUnread] = useState(0);
@@ -113,14 +118,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => { supabase.removeChannel(ch); window.removeEventListener("focus", onFocus); };
   }, [session?.user?.id, profile?.is_active, refreshUnread, toast]);
 
+  const people = useMemo(() => allPeople.filter((x) => x.role !== "cong_tac_vien"), [allPeople]);
   const value = useMemo<Ctx>(() => ({
-    session, profile, buildings, people, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg,
+    session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg,
     isManager: profile?.role === "quan_ly",
     isSupervisor: profile?.role === "giam_sat",
+    isCollaborator: profile?.role === "cong_tac_vien",
     myStaff,
     isApprover: !!myStaff && (myStaff.is_leader || !!myStaff.duty || (myStaff.level ?? 0) >= 3),
     isAccountant: myStaff?.duty === "ke_toan",
-  }), [session, profile, buildings, people, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff]);
+  }), [session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

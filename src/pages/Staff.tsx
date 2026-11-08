@@ -12,7 +12,7 @@ function credText(name: string, phone: string, pw: string) {
 }
 
 export default function Staff() {
-  const { people, buildings, reloadBase, toast, profile } = useSession();
+  const { allPeople: people, buildings, reloadBase, toast, profile } = useSession();
   const [members, setMembers] = useState<Member[]>([]);
   const [q, setQ] = useState("");
   const [roleF, setRoleF] = useState<"" | Role>("");
@@ -40,7 +40,7 @@ export default function Staff() {
       <main className="main stack">
         <input id="staff-search" className="input" placeholder="Tìm theo tên hoặc số điện thoại" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="chips">
-          {([["", "Tất cả"], ["quan_ly", "Quản lý"], ["giam_sat", "Giám sát"], ["nhan_vien", "Nhân viên"]] as ["" | Role, string][]).map(([k, l]) => (
+          {([["", "Tất cả"], ["quan_ly", "Quản lý"], ["giam_sat", "Giám sát"], ["nhan_vien", "Nhân viên"], ["cong_tac_vien", "Cộng tác viên"]] as ["" | Role, string][]).map(([k, l]) => (
             <button key={k} className="chip" aria-pressed={roleF === k} onClick={() => setRoleF(k)}>
               {l}<span className="n">{k ? people.filter((p) => p.role === k).length : people.length}</span>
             </button>
@@ -56,7 +56,7 @@ export default function Staff() {
                   <Avatar name={p.full_name} />
                   <div className="grow">
                     <div className="name">{p.full_name}{p.id === profile?.id ? " (bạn)" : ""}</div>
-                    <div className="sub">{p.phone} · {p.role === "quan_ly" ? "Tất cả toà" : bs.length ? bs.join(", ") : "Chưa gán toà"}{p.is_active ? "" : " · Đã khoá"}</div>
+                    <div className="sub">{p.phone} · {p.role === "quan_ly" ? "Tất cả toà" : p.role === "cong_tac_vien" ? "Chỉ xem bản đồ & phòng trống" : bs.length ? bs.join(", ") : "Chưa gán toà"}{p.is_active ? "" : " · Đã khoá"}</div>
                     <div className="sub">{p.annual_leave_days == null ? "Chưa nhập phép năm" : `Phép năm ${String(Number(p.annual_leave_days)).replace(".", ",")} ngày`}</div>
                   </div>
                   <span className={`role-pill ${p.role}`}>{ROLE_LABEL[p.role]}</span>
@@ -126,7 +126,7 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
     if (!/^0\d{9}$/.test(p)) { setErr("Số điện thoại phải có 10 số, bắt đầu bằng 0."); return; }
     setBusy(true);
     try {
-      await callAccountFn({ action: "create", full_name: name.trim(), phone: p, role, password: pw, building_ids: role === "quan_ly" ? [] : bIds });
+      await callAccountFn({ action: "create", full_name: name.trim(), phone: p, role, password: pw, building_ids: role === "quan_ly" || role === "cong_tac_vien" ? [] : bIds });
       onDone(credText(name.trim(), p, pw));
     } catch (ex) { setErr((ex as Error).message); }
     setBusy(false);
@@ -144,8 +144,9 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
             <option value="nhan_vien">Nhân viên — làm việc được giao, đánh dấu đã thu tiền</option>
             <option value="giam_sat">Giám sát — giao việc cho nhân viên, quản lý toà được gán</option>
             <option value="quan_ly">Quản lý — toàn quyền, xem tất cả toà</option>
+            <option value="cong_tac_vien">Cộng tác viên — chỉ xem bản đồ và phòng trống</option>
           </select></label>
-        {role !== "quan_ly" ? (<div className="field"><span>Làm ở toà nào</span><BuildingChecks value={bIds} onChange={setBIds} /></div>) : null}
+        {role !== "quan_ly" && role !== "cong_tac_vien" ? (<div className="field"><span>Làm ở toà nào</span><BuildingChecks value={bIds} onChange={setBIds} /></div>) : null}
         <label className="field"><span>Mật khẩu tạm</span>
           <div className="row" style={{ flexWrap: "nowrap" }}>
             <input id="c-pw" className="input mono" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} />
@@ -183,7 +184,7 @@ function EditSheet({ person, members, onClose, onChanged, onCred }: {
         if (error) throw new Error(friendlyError(error));
       }
       const before = members.filter((m) => m.user_id === person.id).map((m) => m.building_id);
-      const want = role === "quan_ly" ? [] : bIds;
+      const want = role === "quan_ly" || role === "cong_tac_vien" ? [] : bIds;
       const add = want.filter((b) => !before.includes(b));
       const del = before.filter((b) => !want.includes(b));
       if (add.length) {
@@ -239,13 +240,14 @@ function EditSheet({ person, members, onClose, onChanged, onCred }: {
             <option value="nhan_vien">Nhân viên</option>
             <option value="giam_sat">Giám sát</option>
             <option value="quan_ly">Quản lý</option>
+            <option value="cong_tac_vien">Cộng tác viên</option>
           </select></label>
         <label className="field"><span>Số ngày phép năm {new Date().getFullYear()}</span>
           <div className="row" style={{ flexWrap: "nowrap" }}>
             <input id="e-leave" className="input num" inputMode="decimal" value={leave} onChange={(e) => setLeave(e.target.value)} placeholder="VD: 12" style={{ maxWidth: 120 }} />
             <span className="muted small">ngày · để trống nếu chưa có</span>
           </div></label>
-        {role !== "quan_ly" ? (<div className="field"><span>Làm ở toà nào</span><BuildingChecks value={bIds} onChange={setBIds} /></div>) : null}
+        {role !== "quan_ly" && role !== "cong_tac_vien" ? (<div className="field"><span>Làm ở toà nào</span><BuildingChecks value={bIds} onChange={setBIds} /></div>) : null}
         {err ? <div className="error-box" role="alert">{err}</div> : null}
         <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Lưu"}</button>
         <div className="row">

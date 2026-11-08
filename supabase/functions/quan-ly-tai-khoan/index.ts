@@ -18,7 +18,7 @@ const normPhone = (p: string) => {
   else if (s.startsWith("84") && s.length === 11) s = "0" + s.slice(2);
   return s;
 };
-const ROLES = ["quan_ly", "giam_sat", "nhan_vien"];
+const ROLES = ["quan_ly", "giam_sat", "nhan_vien", "cong_tac_vien"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -44,7 +44,8 @@ Deno.serve(async (req) => {
         const full_name = String(body.full_name ?? "").trim();
         const role = String(body.role ?? "nhan_vien");
         const password = String(body.password ?? "");
-        const buildings = Array.isArray(body.building_ids) ? body.building_ids.map(String) : [];
+        // Cộng tác viên không gán toà: họ chỉ xem bản đồ và phòng trống chung
+        const buildings = role !== "cong_tac_vien" && Array.isArray(body.building_ids) ? body.building_ids.map(String) : [];
         if (!/^0\d{9}$/.test(phone)) return json({ error: "Số điện thoại phải có 10 số, bắt đầu bằng 0" }, 400);
         if (!full_name) return json({ error: "Thiếu họ tên" }, 400);
         if (!ROLES.includes(role)) return json({ error: "Vai trò không hợp lệ" }, 400);

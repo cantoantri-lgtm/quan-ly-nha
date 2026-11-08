@@ -6,7 +6,7 @@ import { Avatar, TopBar } from "../components/ui";
 import ChangePassword from "./ChangePassword";
 
 export default function Account() {
-  const { profile, buildings, isManager } = useSession();
+  const { profile, buildings, isManager, isCollaborator } = useSession();
   if (!profile) return null;
   return (
     <>
@@ -19,12 +19,12 @@ export default function Account() {
             <div className="sub">{profile.phone} · {ROLE_LABEL[profile.role]}</div>
           </div>
         </section>
-        <div className="section-title">Toà nhà phụ trách</div>
-        <section className="card" style={{ padding: "12px 16px" }}>
+        {isCollaborator ? null : <div className="section-title">Toà nhà phụ trách</div>}
+        {isCollaborator ? null : <section className="card" style={{ padding: "12px 16px" }}>
           {isManager ? <span>Quản lý xem được tất cả toà nhà.</span>
             : buildings.length ? buildings.map((b) => <Link key={b.id} to={`/toa/${b.id}`} style={{ display: "block", padding: "4px 0" }}>{b.code} · {b.name} ›</Link>)
             : <span className="muted">Chưa được gán toà nào. Liên hệ quản lý.</span>}
-        </section>
+        </section>}
         {isManager ? (
           <>
             <div className="section-title">Quản trị</div>

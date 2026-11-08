@@ -219,6 +219,7 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 .role-pill.quan_ly { background: var(--cream); color: #7A5418; }
 .role-pill.giam_sat { background: var(--s-doing-bg); color: var(--s-doing); }
 .role-pill.nhan_vien { background: var(--s-todo-bg); color: var(--s-todo); }
+.role-pill.cong_tac_vien { background: var(--s-done-bg, var(--s-todo-bg)); color: var(--s-done, var(--s-todo)); }
 .locked { opacity: .55; }
 
 .checks { display: grid; gap: 6px; }

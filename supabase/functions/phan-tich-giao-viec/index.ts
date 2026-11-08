@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
   if (!who?.user) return json({ error: "Phiên đăng nhập đã hết, vui lòng đăng nhập lại" }, 401);
   const { data: me } = await admin.from("profiles").select("id,full_name,role,is_active").eq("id", who.user.id).single();
   if (!me?.is_active) return json({ error: "Tài khoản chưa được kích hoạt" }, 403);
-  if (me.role === "nhan_vien") return json({ error: "Chỉ Quản lý và Giám sát được giao việc" }, 403);
+  if (me.role !== "quan_ly" && me.role !== "giam_sat") return json({ error: "Chỉ Quản lý và Giám sát được giao việc" }, 403);
 
   // Khoá lấy từ secret GEMINI_API_KEY, nếu không có thì từ Supabase Vault (tên gemini_api_key)
   let key = Deno.env.get("GEMINI_API_KEY");
@@ -149,6 +149,7 @@ Deno.serve(async (req) => {
     : (allBuildings ?? []).filter((b) => (members ?? []).some((m) => m.user_id === me.id && m.building_id === b.id));
   const myBIds = new Set(myBuildings.map((b) => b.id));
   const assignable = (allPeople ?? []).filter((p) => {
+    if (p.role === "cong_tac_vien") return false;   // không giao việc cho Cộng tác viên
     if (p.id === me.id) return true;
     if (RANK[p.role] >= RANK[me.role]) return false;
     if (me.role === "quan_ly") return true;
