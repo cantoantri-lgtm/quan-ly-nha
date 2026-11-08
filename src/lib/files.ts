@@ -1,11 +1,11 @@
 import { supabase } from "./supabase";
 
 export const BUCKET = "kho-tai-lieu";
-export type FileKind = "cccd" | "hop_dong" | "anh_phong" | "dinh_kem_de_nghi";
+export type FileKind = "cccd" | "hop_dong" | "anh_phong" | "anh_loai_phong" | "dinh_kem_de_nghi";
 
 export type StoredFile = {
   id: string; kind: FileKind; path: string; file_name: string | null; mime_type: string | null; size_bytes: number | null;
-  building_id: string | null; tenant_id: string | null; contract_id: string | null; room_id: string | null; request_id: string | null;
+  building_id: string | null; tenant_id: string | null; contract_id: string | null; room_id: string | null; room_type_id: string | null; request_id: string | null;
   label: string | null; is_cover: boolean; created_by: string | null; created_at: string;
   /** Tệp nằm ở đâu: kho Supabase (tệp cũ) hay Cloudflare R2 (tệp mới) */
   store: "supabase" | "r2";
@@ -14,19 +14,20 @@ export type StoredFile = {
 };
 
 /** Thư mục gốc trong kho theo loại tệp. Mã chủ = mã toà (hoặc mã đề nghị với đính kèm đề nghị). */
-const FOLDER: Record<FileKind, string> = { cccd: "cccd", hop_dong: "hop-dong", anh_phong: "anh-phong", dinh_kem_de_nghi: "de-nghi" };
+const FOLDER: Record<FileKind, string> = { cccd: "cccd", hop_dong: "hop-dong", anh_phong: "anh-phong", anh_loai_phong: "anh-phong", dinh_kem_de_nghi: "de-nghi" };
 
 /** Liên kết của tệp với đối tượng */
 export type FileOwner =
   | { kind: "cccd"; buildingId: string; tenantId: string }
   | { kind: "hop_dong"; buildingId: string; contractId: string }
   | { kind: "anh_phong"; buildingId: string; roomId: string }
+  | { kind: "anh_loai_phong"; buildingId: string; roomTypeId: string }
   | { kind: "dinh_kem_de_nghi"; requestId: string };
 
 const ownerFolder = (o: FileOwner) => (o.kind === "dinh_kem_de_nghi" ? o.requestId : o.buildingId);
 const ownerColumn = (o: FileOwner): Record<string, string> =>
   o.kind === "cccd" ? { tenant_id: o.tenantId } : o.kind === "hop_dong" ? { contract_id: o.contractId }
-  : o.kind === "anh_phong" ? { room_id: o.roomId } : { request_id: o.requestId };
+  : o.kind === "anh_phong" ? { room_id: o.roomId } : o.kind === "anh_loai_phong" ? { room_type_id: o.roomTypeId } : { request_id: o.requestId };
 
 export const MAX_BYTES = 10 * 1024 * 1024;
 const THUMB_EDGE = 480;
@@ -151,7 +152,7 @@ export async function uploadFile(owner: FileOwner, raw: File, extra: { label?: s
   return uploadSupabase(owner, raw, file, extra);
 }
 
-export async function listFiles(kind: FileKind, column: "tenant_id" | "contract_id" | "room_id" | "request_id", id: string): Promise<StoredFile[]> {
+export async function listFiles(kind: FileKind, column: "tenant_id" | "contract_id" | "room_id" | "room_type_id" | "request_id", id: string): Promise<StoredFile[]> {
   const { data } = await supabase.from("files").select("*").eq("kind", kind).eq(column, id).order("created_at");
   return (data as StoredFile[]) ?? [];
 }

@@ -5,9 +5,9 @@ import { fileUrls, listFiles, removeFile, uploadFile, type FileOwner, type Store
 import { Sheet } from "./ui";
 import "../files.css";
 
-type Column = "tenant_id" | "contract_id" | "room_id" | "request_id";
-const COLUMN: Record<FileOwner["kind"], Column> = { cccd: "tenant_id", hop_dong: "contract_id", anh_phong: "room_id", dinh_kem_de_nghi: "request_id" };
-const ownerId = (o: FileOwner) => (o.kind === "cccd" ? o.tenantId : o.kind === "hop_dong" ? o.contractId : o.kind === "anh_phong" ? o.roomId : o.requestId);
+type Column = "tenant_id" | "contract_id" | "room_id" | "room_type_id" | "request_id";
+const COLUMN: Record<FileOwner["kind"], Column> = { cccd: "tenant_id", hop_dong: "contract_id", anh_phong: "room_id", anh_loai_phong: "room_type_id", dinh_kem_de_nghi: "request_id" };
+const ownerId = (o: FileOwner) => (o.kind === "cccd" ? o.tenantId : o.kind === "hop_dong" ? o.contractId : o.kind === "anh_phong" ? o.roomId : o.kind === "anh_loai_phong" ? o.roomTypeId : o.requestId);
 
 /** Kho ảnh/tệp gắn với một đối tượng (khách, hợp đồng, phòng, đề nghị). Danh sách hiện ảnh nhỏ cho nhanh, bấm vào mới tải ảnh to. Tệp riêng tư mở bằng link tạm. */
 export default function FileGallery({ owner, title, hint, canUpload, canDelete, slots, cover, pdf = true, onChange }: {
@@ -72,7 +72,8 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
 
   async function setCover(f: StoredFile) {
     setBusy(true);
-    await supabase.from("files").update({ is_cover: false }).eq("room_id", f.room_id!).eq("is_cover", true);
+    const col = f.room_type_id ? "room_type_id" : "room_id";
+    await supabase.from("files").update({ is_cover: false }).eq(col, (f.room_type_id ?? f.room_id)!).eq("is_cover", true);
     const { error } = await supabase.from("files").update({ is_cover: true }).eq("id", f.id);
     setBusy(false);
     if (error) toast(friendlyError(error));
@@ -124,7 +125,7 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
               <PdfOpen file={view} />
             ) : full ? <img className="fg-full" src={full} alt={view.file_name ?? ""} /> : <div className="loading">Đang tải ảnh…</div>}
             <div className="row">
-              {cover && view.room_id && !view.is_cover && canUpload ? <button className="btn secondary sm" disabled={busy} onClick={() => setCover(view)}>Đặt làm ảnh đại diện</button> : null}
+              {cover && (view.room_id || view.room_type_id) && !view.is_cover && canUpload ? <button className="btn secondary sm" disabled={busy} onClick={() => setCover(view)}>Đặt làm ảnh đại diện</button> : null}
               {canDelete ? (
                 confirmDel ? (
                   <>

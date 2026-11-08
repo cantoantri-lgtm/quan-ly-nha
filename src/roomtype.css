@@ -1,0 +1,21 @@
+/* Thẻ loại phòng */
+.rtc { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.rtc-hero { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--surface-2); }
+.rtc-none { aspect-ratio: auto; height: 72px; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+.rtc-body { display: grid; gap: 8px; padding: 12px; }
+.rtc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rtc-head b { font-size: 16px; }
+.rtc-price { font-weight: 700; color: var(--brand); }
+.rtc-specs { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); }
+.rtc-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.rtc-chips li { background: var(--brand-soft); color: var(--brand); border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-weight: 600; }
+.rtc-more summary { cursor: pointer; font-weight: 600; color: var(--brand); font-size: 13.5px; }
+.rtc-more .fg { margin-top: 8px; }
+
+/* Quản lý loại phòng */
+.rt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rt-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; }
+.rt-item:hover { border-color: var(--brand); }
+.rt-item b { display: block; }
+.rt-item span { color: var(--muted); font-size: 13px; }
+.rt-count { font-weight: 700; color: var(--brand) !important; white-space: nowrap; }

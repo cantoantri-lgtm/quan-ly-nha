@@ -10,12 +10,16 @@ import { googleDirections } from "../lib/geo";
 import { BuildingSheet } from "./Buildings";
 import FileGallery from "../components/FileGallery";
 import { uploadFile } from "../lib/files";
+import RoomTypeCard from "../components/RoomTypeCard";
+import RoomTypesSheet from "../components/RoomTypesSheet";
+import type { RoomType } from "../lib/roomTypes";
 import "../rooms.css";
 
 export type RoomStatus = "trong" | "dang_o" | "dang_sua" | "giu_cho";
 export type Room = {
   id: string; building_id: string; code: string; floor: number | null; room_type: string | null;
   rent_mode: "thang" | "dem"; list_price: number | null; max_occupants: number | null; status: RoomStatus; note: string | null;
+  room_type_id: string | null;
 };
 const ROOM_STATUS: Record<RoomStatus, string> = { trong: "Trống", dang_o: "Đang ở", dang_sua: "Đang sửa", giu_cho: "Giữ chỗ" };
 const MODE: Record<string, string> = { thang: "Theo tháng", dem: "Theo đêm" };
@@ -33,6 +37,8 @@ export default function BuildingDetail() {
   const building = buildings.find((b) => b.id === id);
   const canManage = isManager || (isSupervisor && !!id && myBuildingIds.includes(id));
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [types, setTypes] = useState<RoomType[]>([]);
+  const [typesOpen, setTypesOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"" | RoomStatus>("");
   const [editing, setEditing] = useState<Partial<Room> | null>(null);
@@ -65,10 +71,19 @@ export default function BuildingDetail() {
   }
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("rooms").select("*").eq("building_id", id!);
-    setRooms(((data as Room[]) ?? []).sort((a, b) => (a.floor ?? 0) - (b.floor ?? 0) || naturalCompare(a.code, b.code)));
+    const [r, t] = await Promise.all([
+      supabase.from("rooms").select("*").eq("building_id", id!),
+      supabase.from("room_types").select("*").eq("building_id", id!).order("sort").order("name"),
+    ]);
+    setRooms(((r.data as Room[]) ?? []).sort((a, b) => (a.floor ?? 0) - (b.floor ?? 0) || naturalCompare(a.code, b.code)));
+    setTypes((t.data as RoomType[]) ?? []);
     setLoading(false);
   }, [id]);
+  const roomCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    rooms.forEach((r) => { if (r.room_type_id) m[r.room_type_id] = (m[r.room_type_id] ?? 0) + 1; });
+    return m;
+  }, [rooms]);
   useEffect(() => { load(); }, [load]);
 
   const stats = useMemo(() => {
@@ -135,6 +150,7 @@ export default function BuildingDetail() {
 
         {canManage ? (
           <div className="row">
+            <button className="btn secondary sm" onClick={() => setTypesOpen(true)}>Loại phòng{types.length ? ` (${types.length})` : ""}</button>
             <button className="btn secondary sm" onClick={() => setBulk(true)}>Tạo nhanh nhiều phòng</button>
             <button className="btn secondary sm" onClick={() => setPaste(true)}>Dán danh sách từ Excel</button>
             {rooms.length && !selecting ? <button className="btn ghost sm" style={{ color: "var(--danger)" }} onClick={() => setSelecting(true)}>Chọn phòng để xoá</button> : null}
@@ -202,12 +218,14 @@ export default function BuildingDetail() {
       ) : null}
 
       {editing ? (
-        <RoomSheet room={editing} building={building} canManage={canManage} existing={rooms}
+        <RoomSheet room={editing} building={building} canManage={canManage} types={types}
           onClose={() => setEditing(null)} onSaved={(msg) => { setEditing(null); load(); toast(msg); }} />
       ) : null}
-      <BulkSheet open={bulk} building={building} existing={rooms} onClose={() => setBulk(false)}
+      <RoomTypesSheet open={typesOpen} building={building} types={types} roomCounts={roomCounts}
+        onClose={() => setTypesOpen(false)} onChanged={(msg) => { load(); if (msg) toast(msg); }} />
+      <BulkSheet open={bulk} building={building} existing={rooms} types={types} onClose={() => setBulk(false)}
         onSaved={(msg) => { setBulk(false); load(); toast(msg); }} />
-      <PasteSheet open={paste} building={building} onClose={() => setPaste(false)}
+      <PasteSheet open={paste} building={building} types={types} onClose={() => setPaste(false)}
         onSaved={(msg) => { setPaste(false); load(); toast(msg); }} />
       {editBuilding ? (
         <BuildingSheet value={building} roomCount={rooms.length} onClose={() => setEditBuilding(false)}
@@ -228,13 +246,24 @@ function MoneyInput({ id, value, onChange, placeholder }: { id: string; value: s
   );
 }
 
-function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
-  room: Partial<Room>; building: Building; canManage: boolean; existing: Room[]; onClose: () => void; onSaved: (msg: string) => void;
+function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
+  room: Partial<Room>; building: Building; canManage: boolean; types: RoomType[]; onClose: () => void; onSaved: (msg: string) => void;
 }) {
   const isNew = !room.id;
   const [code, setCode] = useState(room.code ?? "");
   const [floor, setFloor] = useState(room.floor?.toString() ?? "");
-  const [type, setType] = useState(room.room_type ?? "");
+  const [typeId, setTypeId] = useState(room.room_type_id ?? "");
+  const curType = types.find((t) => t.id === typeId) ?? null;
+  const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
+  // Chọn loại → lấy giá, hình thức thuê, số người từ loại (phòng nào khác thì sửa riêng ngay bên dưới)
+  function pickType(id: string) {
+    setTypeId(id);
+    const t = types.find((x) => x.id === id);
+    if (!t) return;
+    setMode(t.rent_mode);
+    if (t.list_price != null) setPrice(fmt(t.list_price));
+    if (t.max_occupants != null) setMaxOcc(String(t.max_occupants));
+  }
   const [mode, setMode] = useState(room.rent_mode ?? "thang");
   const [price, setPrice] = useState(room.list_price != null ? new Intl.NumberFormat("vi-VN").format(room.list_price) : "");
   const [maxOcc, setMaxOcc] = useState(room.max_occupants?.toString() ?? "");
@@ -243,7 +272,6 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
-  const types = useMemo(() => [...new Set(existing.map((r) => r.room_type).filter(Boolean) as string[])], [existing]);
   const nav = useNavigate();
 
   // Phòng đã có hợp đồng hiệu lực chưa? (null = đang kiểm tra)
@@ -289,7 +317,8 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
     // Khi cần lập hợp đồng: lưu phòng trước với trạng thái cũ, hợp đồng sẽ tự chuyển phòng sang "Đang ở"
     const saveStatus = needTenant ? (room.status === "dang_o" ? "dang_o" : (room.status ?? "trong")) : status;
     const row = canManage
-      ? { building_id: building.id, code: code.trim().toUpperCase(), floor: floor ? Number(floor) : guessFloor(code), room_type: type.trim() || null,
+      ? { building_id: building.id, code: code.trim().toUpperCase(), floor: floor ? Number(floor) : guessFloor(code),
+          room_type_id: typeId || null, room_type: curType?.name ?? (room.room_type_id ? null : room.room_type ?? null),
           rent_mode: mode, list_price: p, max_occupants: maxOcc ? Number(maxOcc) : null, status: saveStatus, note: note.trim() || null }
       : { status, note: note.trim() || null };
     const { error } = isNew ? await supabase.from("rooms").insert(row) : await supabase.from("rooms").update(row).eq("id", room.id!);
@@ -342,8 +371,12 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
                 <input id="r-floor" className="input" inputMode="numeric" value={floor} onChange={(e) => setFloor(e.target.value.replace(/\D/g, ""))} placeholder={guessFloor(code)?.toString() ?? ""} /></label>
             </div>
             <label className="field"><span>Loại phòng</span>
-              <input id="r-type" className="input" list="room-types" value={type} onChange={(e) => setType(e.target.value)} placeholder="VD: Studio, 1PN, Deluxe" />
-              <datalist id="room-types">{types.map((t) => <option key={t} value={t} />)}</datalist></label>
+              <select id="r-type" className="input" value={typeId} onChange={(e) => pickType(e.target.value)}>
+                <option value="">{types.length ? "Chưa phân loại" : "Toà chưa có loại — tạo ở nút Loại phòng"}</option>
+                {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              {curType ? <small className="muted">Giá, số người lấy theo loại. Phòng này khác thì sửa riêng ở dưới.</small> : null}</label>
+            {curType ? <RoomTypeCard type={curType} /> : null}
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: "1 1 140px" }}><span>Cho thuê</span>
                 <select id="r-mode" className="input" value={mode} onChange={(e) => setMode(e.target.value as "thang" | "dem")}>
@@ -356,7 +389,10 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
               <input id="r-max" className="input" inputMode="numeric" value={maxOcc} onChange={(e) => setMaxOcc(e.target.value.replace(/\D/g, ""))} /></label>
           </>
         ) : (
-          <p className="muted small" style={{ margin: 0 }}>{room.room_type ? `${room.room_type} · ` : ""}{MODE[room.rent_mode ?? "thang"]} · {vnd(room.list_price)}</p>
+          <>
+            {curType ? <RoomTypeCard type={curType} /> : null}
+            <p className="muted small" style={{ margin: 0 }}>{room.room_type ? `${room.room_type} · ` : ""}{MODE[room.rent_mode ?? "thang"]} · {vnd(room.list_price)}</p>
+          </>
         )}
         {!isNew ? (
           <FileGallery owner={{ kind: "anh_phong", buildingId: building.id, roomId: room.id! }} title="Ảnh phòng" pdf={false} cover
@@ -420,15 +456,15 @@ function RoomSheet({ room, building, canManage, existing, onClose, onSaved }: {
   );
 }
 
-function BulkSheet({ open, building, existing, onClose, onSaved }: {
-  open: boolean; building: Building; existing: Room[]; onClose: () => void; onSaved: (msg: string) => void;
+function BulkSheet({ open, building, existing, types, onClose, onSaved }: {
+  open: boolean; building: Building; existing: Room[]; types: RoomType[]; onClose: () => void; onSaved: (msg: string) => void;
 }) {
   const [from, setFrom] = useState("1");
   const [to, setTo] = useState(building.total_floors?.toString() ?? "5");
   const [per, setPer] = useState("6");
   const [start, setStart] = useState("1");
   const [prefix, setPrefix] = useState("");
-  const [type, setType] = useState("");
+  const [typeId, setTypeId] = useState("");
   const [mode, setMode] = useState<"thang" | "dem">(building.kind === "khach_san" ? "dem" : "thang");
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -452,7 +488,8 @@ function BulkSheet({ open, building, existing, onClose, onSaved }: {
     if (!fresh.length) { setErr("Không có phòng mới nào để tạo."); return; }
     setBusy(true);
     const { error } = await supabase.from("rooms").insert(fresh.map((c) => ({
-      building_id: building.id, code: c.code, floor: c.floor, room_type: type.trim() || null, rent_mode: mode, list_price: p, status: "trong",
+      building_id: building.id, code: c.code, floor: c.floor, room_type_id: typeId || null, rent_mode: mode, list_price: p,
+      max_occupants: types.find((t) => t.id === typeId)?.max_occupants ?? null, status: "trong",
     })));
     setBusy(false);
     if (error) { setErr(friendlyError(error)); return; }
@@ -477,7 +514,14 @@ function BulkSheet({ open, building, existing, onClose, onSaved }: {
           ) : <span style={{ color: "var(--danger)" }}>Kiểm tra lại số tầng và số phòng.</span>}
         </div>
         <label className="field"><span>Loại phòng (áp cho tất cả, sửa riêng sau)</span>
-          <input id="bk-type" className="input" value={type} onChange={(e) => setType(e.target.value)} placeholder="VD: Studio" /></label>
+          <select id="bk-type" className="input" value={typeId} onChange={(e) => {
+            setTypeId(e.target.value);
+            const t = types.find((x) => x.id === e.target.value);
+            if (t) { setMode(t.rent_mode); if (t.list_price != null) setPrice(new Intl.NumberFormat("vi-VN").format(t.list_price)); }
+          }}>
+            <option value="">{types.length ? "Chưa phân loại" : "Toà chưa có loại — tạo ở nút Loại phòng"}</option>
+            {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select></label>
         <div className="row" style={{ alignItems: "flex-start" }}>
           <label className="field" style={{ flex: "1 1 140px" }}><span>Cho thuê</span>
             <select id="bk-mode" className="input" value={mode} onChange={(e) => setMode(e.target.value as "thang" | "dem")}>
@@ -514,18 +558,23 @@ function parseRows(text: string): Parsed[] {
   }).filter((r) => !r.bad);
 }
 
-function PasteSheet({ open, building, onClose, onSaved }: { open: boolean; building: Building; onClose: () => void; onSaved: (msg: string) => void }) {
+function PasteSheet({ open, building, types, onClose, onSaved }: { open: boolean; building: Building; types: RoomType[]; onClose: () => void; onSaved: (msg: string) => void }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const rows = useMemo(() => parseRows(text), [text]);
+  const typeOf = (name: string | null) => (name ? types.find((t) => t.name.trim().toLowerCase() === name.trim().toLowerCase()) ?? null : null);
 
   async function submit() {
     setErr(null);
     if (!rows.length) return;
     setBusy(true);
     const { error } = await supabase.from("rooms").upsert(
-      rows.map((r) => ({ building_id: building.id, code: r.code, floor: r.floor, room_type: r.room_type, list_price: r.list_price, rent_mode: r.rent_mode })),
+      rows.map((r) => {
+        const t = typeOf(r.room_type);
+        return { building_id: building.id, code: r.code, floor: r.floor, room_type_id: t?.id ?? null, room_type: t?.name ?? r.room_type,
+          list_price: r.list_price ?? t?.list_price ?? null, rent_mode: t && r.list_price == null ? t.rent_mode : r.rent_mode };
+      }),
       { onConflict: "building_id,code" });
     setBusy(false);
     if (error) { setErr(friendlyError(error)); return; }
@@ -537,7 +586,7 @@ function PasteSheet({ open, building, onClose, onSaved }: { open: boolean; build
       <div className="stack">
         <p className="muted small" style={{ margin: 0 }}>
           Trong Excel, chọn các cột <b>Số phòng · Tầng · Loại · Giá · Thuê theo (tháng/đêm)</b>, copy rồi dán vào đây. Chỉ cột số phòng là bắt buộc.
-          Phòng đã có sẽ được cập nhật giá và loại.
+          Phòng đã có sẽ được cập nhật giá và loại. Tên loại trùng với loại đã tạo (có dấu ✓) sẽ lấy giá và thông tin của loại đó.
         </p>
         <textarea id="paste-rooms" className="input mono" style={{ minHeight: 160 }} value={text} onChange={(e) => setText(e.target.value)}
           placeholder={"101\t1\tStudio\t4.500.000\ttháng\n102\t1\t1PN\t5.200.000\ttháng\n201\t2\tDeluxe\t650.000\tđêm"} />
@@ -547,7 +596,7 @@ function PasteSheet({ open, building, onClose, onSaved }: { open: boolean; build
               <thead><tr><th>Phòng</th><th>Tầng</th><th>Loại</th><th>Giá</th><th>Thuê</th></tr></thead>
               <tbody>
                 {rows.slice(0, 50).map((r, i) => (
-                  <tr key={i}><td>{r.code}</td><td className="num">{r.floor ?? ""}</td><td>{r.room_type ?? ""}</td>
+                  <tr key={i}><td>{r.code}</td><td className="num">{r.floor ?? ""}</td><td>{r.room_type ?? ""}{typeOf(r.room_type) ? " ✓" : ""}</td>
                     <td className="num">{r.list_price != null ? vnd(r.list_price) : <span className="muted">—</span>}</td><td>{r.rent_mode === "dem" ? "Đêm" : "Tháng"}</td></tr>
                 ))}
               </tbody>
