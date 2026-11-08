@@ -4,6 +4,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { KIND_LABEL, type Building } from "../lib/labels";
 import { Empty, Sheet, TopBar } from "../components/ui";
+import BuildingBank from "../components/BuildingBank";
 import { currentPosition, googlePlace, parseLatLng, round6 } from "../lib/geo";
 
 export default function Buildings() {
@@ -174,6 +175,7 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
           ) : <button type="button" className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setDelOpen(true)}>Xoá toà nhà</button>
         ) : null}
       </form>
+      {value.id && onDeleted ? <BuildingBank buildingId={value.id} /> : null}
     </Sheet>
   );
 }

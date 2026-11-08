@@ -70,6 +70,7 @@ supabase/
   013_loai_phong.sql        bảng room_types (ảnh, diện tích, nội thất, giá theo loại), rooms.room_type_id, trigger điền tên loại vào rooms.room_type
   014a_cong_tac_vien_gia_tri.sql  thêm vai trò 'cong_tac_vien'
   014_cong_tac_vien.sql     Cộng tác viên: app_role() = NULL (không thấy dữ liệu nghiệp vụ), is_active_user(), hàm vacant_rooms(); chỉ xem bản đồ + phòng trống (/phong-trong)
+  015_tk_ngan_hang_toa.sql  bảng building_bank_accounts: tài khoản nhận tiền riêng từng toà (QR tiền thuê + cọc trong hợp đồng)
   thu_nghiem/                seed.sql / cleanup.sql: tài khoản + toà thử nghiệm (không phải migration)
   functions/quan-ly-tai-khoan    cấp / khoá tài khoản, đổi SĐT, cấp lại mật khẩu (dùng service role)
   functions/phan-tich-giao-viec  ghi âm / tin nhắn → danh sách việc (Gemini)

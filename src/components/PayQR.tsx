@@ -5,12 +5,12 @@ import { copyText } from "./ui";
 import "../files.css";
 
 /** Mã QR chuyển khoản đúng số tiền và đúng nội dung (nội dung = mã hoá đơn để hệ thống tự đối soát). */
-export default function PayQR({ bank, amount, code, toast }: { bank: PaySettings; amount: number; code: string; toast?: (m: string) => void }) {
+export default function PayQR({ bank, amount, code, toast, maxLen, note }: { bank: PaySettings; amount: number; code: string; toast?: (m: string) => void; maxLen?: number; note?: string }) {
   const [svg, setSvg] = useState("");
   const [copied, setCopied] = useState("");
   useEffect(() => {
-    vietQrSvg({ bin: bank.bank_bin, account: bank.account_no, amount, content: code }).then(setSvg).catch(() => setSvg(""));
-  }, [bank.bank_bin, bank.account_no, amount, code]);
+    vietQrSvg({ bin: bank.bank_bin, account: bank.account_no, amount, content: code, maxLen }).then(setSvg).catch(() => setSvg(""));
+  }, [bank.bank_bin, bank.account_no, amount, code, maxLen]);
 
   const copy = async (t: string, what: string) => { await copyText(t); setCopied(`Đã chép ${what}.`); toast?.(`Đã chép ${what}.`); window.setTimeout(() => setCopied(""), 2500); };
   return (
@@ -24,7 +24,7 @@ export default function PayQR({ bank, amount, code, toast }: { bank: PaySettings
         <dt>Nội dung</dt><dd>{code} <button type="button" className="btn ghost sm" onClick={() => copy(code, "nội dung")}>Chép</button></dd>
       </dl>
       <p className="small" role="status" style={{ margin: 0, minHeight: 20, color: "var(--s-done)" }}>{copied}</p>
-      <p className="muted small" style={{ margin: 0 }}>Giữ nguyên nội dung chuyển khoản để dễ đối chiếu.</p>
+      <p className="muted small" style={{ margin: 0 }}>{note ?? "Giữ nguyên nội dung chuyển khoản để dễ đối chiếu."}</p>
     </div>
   );
 }

@@ -25,12 +25,18 @@ function crc16(s: string): string {
 }
 
 /** Chuỗi nội dung mã QR chuyển nhanh 24/7 tới số tài khoản, có số tiền và nội dung cố định */
-export function vietQrPayload(o: { bin: string; account: string; amount?: number; content?: string }): string {
+/** Bỏ dấu tiếng Việt, chỉ giữ chữ, số, khoảng trắng (ngân hàng hay làm mất ký tự lạ như - &) */
+export function plainText(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D")
+    .replace(/[^A-Za-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function vietQrPayload(o: { bin: string; account: string; amount?: number; content?: string; maxLen?: number }): string {
   const acct = tlv("00", "A000000727") + tlv("01", tlv("00", o.bin) + tlv("01", o.account)) + tlv("02", "QRIBFTTA");
   let s = tlv("00", "01") + tlv("01", o.amount ? "12" : "11") + tlv("38", acct) + tlv("53", "704");
   if (o.amount && o.amount > 0) s += tlv("54", String(Math.round(o.amount)));
   s += tlv("58", "VN");
-  if (o.content) s += tlv("62", tlv("08", o.content.replace(/[^A-Za-z0-9 ]/g, "").slice(0, 25)));
+  if (o.content) s += tlv("62", tlv("08", o.content.replace(/[^A-Za-z0-9 ]/g, "").slice(0, o.maxLen ?? 25)));
   s += "6304";
   return s + crc16(s);
 }

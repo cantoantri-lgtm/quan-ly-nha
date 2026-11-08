@@ -6,6 +6,7 @@ import { ddmmyyyy, todayVN } from "../lib/dates";
 import { naturalCompare, parseMoney, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import FileGallery from "../components/FileGallery";
+import ContractQR from "../components/ContractQR";
 import type { Room } from "./BuildingDetail";
 import "../files.css";
 
@@ -196,6 +197,8 @@ function ContractView({ c, canManage, onClose, onChanged }: { c: Contract; canMa
           {canManage && !c.sign_method ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ sign_method: "giay", signed_on: todayVN() }, "Đã ghi nhận ký giấy.")}>Ghi nhận đã ký giấy</button> : null}
           {canManage && !c.sign_method ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ sign_method: "dien_tu", signed_on: todayVN() }, "Đã ghi nhận ký điện tử.")}>Ghi nhận đã ký điện tử</button> : null}
         </div>
+
+        {c.status === "hieu_luc" ? <ContractQR buildingId={c.building_id} tenantName={c.tenants?.full_name ?? ""} roomCode={c.rooms?.code ?? ""} rent={c.rent_amount} deposit={c.deposit_amount} /> : null}
 
         <FileGallery owner={{ kind: "hop_dong", buildingId: c.building_id, contractId: c.id }} title="File hợp đồng (ảnh chụp, PDF đã ký)"
           canUpload={canManage} canDelete={canManage}
