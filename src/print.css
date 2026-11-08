@@ -1,6 +1,8 @@
 /* Bản in đề nghị: nền sáng, chữ đen theo màu hệ thống để in ra giấy */
 .print-doc { color-scheme: light; background: Canvas; color: CanvasText; border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; font-size: 14px; line-height: 1.45; }
-.pd-head { text-align: center; display: grid; gap: 4px; margin-bottom: 14px; }
+.pd-head { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; margin-bottom: 14px; }
+.pd-logo { width: 112px; height: auto; display: block; }
+.pd-title { text-align: center; display: grid; gap: 4px; padding-right: 112px; }   /* chừa bên phải bằng bề rộng logo để tiêu đề nằm giữa trang */
 .pd-brand { font-weight: 700; letter-spacing: .12em; font-size: 13px; }
 .pd-head h1 { margin: 0; font-size: 20px; }
 .pd-no, .pd-status { font-size: 13px; }
@@ -9,8 +11,9 @@
 .pd-kv td { padding: 3px 0; overflow-wrap: anywhere; }
 .pd-methods { margin: 8px 0; }
 .pd-check { margin-right: 10px; white-space: nowrap; }
-.pd-grid { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0; }
-.pd-grid th, .pd-grid td { border: 1px solid currentColor; padding: 4px 5px; vertical-align: top; }
+.pd-scroll { overflow-x: auto; margin: 8px 0; }   /* màn hình nhỏ: bảng cuộn ngang trong khung, không tràn viền */
+.pd-grid { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 12px; margin: 0; }
+.pd-grid th, .pd-grid td { border: 1px solid currentColor; padding: 4px 5px; vertical-align: top; overflow-wrap: break-word; }
 .pd-grid th { text-align: center; }
 .pd-grid td.r { text-align: right; white-space: nowrap; }
 .pd-sum td { font-weight: 700; }
@@ -21,11 +24,24 @@
 .pd-sign small { font-style: italic; font-size: 11px; }
 .pd-sign .who { margin-top: 38px; font-weight: 600; }
 .pd-sign .when { font-size: 11.5px; }
+.pd-sign .pd-ok { font-weight: 700; color: var(--s-done); }
+.pd-sign .pd-no-ok { font-weight: 700; color: var(--danger); }
 .pd-paid { margin-top: 14px; font-size: 13px; }
 @media print {
   .topbar, .bottomnav, .toast, .fab { display: none !important; }
   body, .app { background: Canvas !important; }
   .main { max-width: none !important; padding: 0 !important; }
-  .print-doc { border: 0; padding: 0; border-radius: 0; }
+  .print-doc { border: 0; padding: 0; border-radius: 0; font-size: 12px; }
+  .pd-scroll { overflow: visible; }
+  .pd-grid { font-size: 9.5px; min-width: 0; }
+  .pd-grid th, .pd-grid td { padding: 3px 3px; }
+  .pd-logo { width: 100px; }
+  .pd-title { padding-right: 100px; }
+  .pd-sign > div, .pd-grid tr { break-inside: avoid; }
   @page { size: A4; margin: 14mm; }
+}
+@media (max-width: 560px) {
+  .pd-head { grid-template-columns: 1fr; justify-items: start; }
+  .pd-title { padding-right: 0; width: 100%; }
+  .pd-logo { width: 96px; }
 }

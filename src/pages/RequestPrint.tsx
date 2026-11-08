@@ -50,7 +50,11 @@ export default function RequestPrint() {
   const gross = lines.reduce((t, l) => t + Number(l.total), 0);
   const adv = advs.reduce((t, a) => t + Number(a.amount), 0);
   const building = buildings.find((b) => b.id === r.building_id);
-  const signers = steps.filter((s) => s.status !== "bo_qua");
+  // Chữ ký: hiện đủ các cấp trong luồng. Bước bị bỏ vì "đã duyệt ở bước trước" (cùng một người kiêm nhiệm) vẫn có ô ký,
+  // trạng thái theo bước của người đó. Chỉ ẩn bước chưa có người giữ hoặc chính người đề nghị.
+  const sameApprover = (s: ReqStep) => steps.find((x) => x.id !== s.id && x.approver_id && x.approver_id === s.approver_id && x.status !== "bo_qua");
+  const signers = steps.filter((s) => s.status !== "bo_qua" || (s.skip_reason === "Đã duyệt ở bước trước" && !!sameApprover(s)));
+  const outcome = (s: ReqStep) => (s.status === "bo_qua" ? sameApprover(s) ?? s : s);
   const dt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
   return (
@@ -59,10 +63,13 @@ export default function RequestPrint() {
       <main className="main main-wide">
         <article className="print-doc">
           <header className="pd-head">
-            <div className="pd-brand">NEO NESTLY</div>
-            <h1>{kindLabel(r).toUpperCase()}</h1>
-            {r.doc_no ? <div className="pd-no">Số chứng từ: <b>{r.doc_no}</b>{r.doc_date ? ` · ${ddmmyyyy(r.doc_date)}` : ""}</div> : null}
-            <div className="pd-status">{statusLabel(r)}</div>
+            <img className="pd-logo" src="/logo-neo-nestly.svg" alt="Neo Nestly" />
+            <div className="pd-title">
+              <div className="pd-brand">NEO NESTLY</div>
+              <h1>{kindLabel(r).toUpperCase()}</h1>
+              {r.doc_no ? <div className="pd-no">Số chứng từ: <b>{r.doc_no}</b>{r.doc_date ? ` · ${ddmmyyyy(r.doc_date)}` : ""}</div> : null}
+              <div className="pd-status">{statusLabel(r)}</div>
+            </div>
           </header>
 
           <table className="pd-kv"><tbody>
@@ -105,7 +112,7 @@ export default function RequestPrint() {
                 {Object.entries(PAY_METHOD).map(([k, l]) => <span key={k} className="pd-check">{r.pay_method === k ? "☑" : "☐"} {l}</span>)}
                 {" "}· Loại tiền: {r.currency}</p>
               {lines.length ? (
-                <table className="pd-grid">
+                <div className="pd-scroll"><table className="pd-grid">
                   <thead><tr><th>Stt</th><th>Số hoá đơn</th><th>Ngày</th><th>Người bán</th><th>MST</th><th>Nội dung</th><th>Tiền trước VAT</th><th>SL</th><th>Thuế suất</th><th>Tiền thuế</th><th>Tổng</th><th>Cost center</th></tr></thead>
                   <tbody>
                     {lines.map((l) => (
@@ -120,7 +127,7 @@ export default function RequestPrint() {
                     {advs.map((a, i) => (<tr key={a.id}><td colSpan={5}>Trừ tạm ứng lần {i + 1}</td><td>{a.description}</td><td colSpan={4} /><td className="r">− {vnd(a.amount)}</td><td /></tr>))}
                     <tr className="pd-sum"><td colSpan={10}>TỔNG CÒN PHẢI THANH TOÁN</td><td className="r">{vnd(gross - adv)}</td><td /></tr>
                   </tbody>
-                </table>
+                </table></div>
               ) : null}
             </>
           ) : null}
@@ -131,13 +138,17 @@ export default function RequestPrint() {
           <p className="pd-date">Ngày {new Date(r.created_at).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" })}</p>
           <div className="pd-sign">
             <div><b>Đề nghị bởi</b><small>(ký và ghi rõ họ tên)</small><span className="who">{name(r.requester_id)}</span><span className="when">{dt(r.created_at)}</span></div>
-            {signers.map((s) => (
-              <div key={s.id}>
-                <b>{DUTY_LABEL[s.duty]}</b><small>(ký và ghi rõ họ tên)</small>
-                <span className="who">{s.status === "da_duyet" ? `Duyệt bởi: ${name(s.decided_by)}` : s.status === "tu_choi" ? `Từ chối: ${name(s.decided_by)}` : s.approver_id ? name(s.approver_id) : "Quản lý"}</span>
-                <span className="when">{s.decided_at ? dt(s.decided_at) : s.status === "cho" ? "Chờ duyệt" : ""}</span>
-              </div>
-            ))}
+            {signers.map((s) => {
+              const o = outcome(s);
+              return (
+                <div key={s.id}>
+                  <b>{DUTY_LABEL[s.duty]}</b><small>(ký và ghi rõ họ tên)</small>
+                  <span className="who">{o.status === "tu_choi" || o.status === "da_duyet" ? name(o.decided_by) : s.approver_id ? name(s.approver_id) : "Quản lý"}</span>
+                  {o.status === "da_duyet" ? <span className="pd-ok">Đã phê duyệt</span> : o.status === "tu_choi" ? <span className="pd-no-ok">Đã từ chối</span> : <span className="when">Chờ duyệt</span>}
+                  {o.decided_at ? <span className="when">{dt(o.decided_at)}</span> : null}
+                </div>
+              );
+            })}
           </div>
           {r.status === "hoan_tat" && r.paid_at && isMoney ? <p className="pd-paid">Đã chi tiền ngày {dt(r.paid_at)} — {name(r.paid_by)}</p> : null}
         </article>
