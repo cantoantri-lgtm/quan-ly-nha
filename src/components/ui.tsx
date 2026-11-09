@@ -151,7 +151,7 @@ const isDark = () => (document.documentElement.dataset.theme ?? (matchMedia("(pr
 
 /** Thanh trên toàn app: logo (bấm về trang chủ), tên công ty, nút Apps, thông báo, chế độ tối, tài khoản */
 export function AppHeader() {
-  const { profile, unread, pendingApprovals, isManager, isApprover, isCollaborator } = useSession();
+  const { profile, unread, pendingApprovals, isManager, isApprover, isCollaborator, isAccountant } = useSession();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(isDark());
   const loc = useLocation();
@@ -181,6 +181,7 @@ export function AppHeader() {
       { to: "/quan-tri/thu-tien", label: "Thu tiền", icon: Icon.money },
       { to: "/quan-tri", label: "Hệ thống", icon: Icon.gear },
     ] : []),
+    ...(isManager || isAccountant ? [{ to: "/hoa-don-gtgt", label: "Hoá đơn GTGT", icon: Icon.money }] : []),
     { to: "/thong-bao", label: "Thông báo", icon: Icon.bell, n: unread },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
   ];

@@ -28,6 +28,7 @@ import Invoices from "./pages/Invoices";
 import PayPage from "./pages/PayPage";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 import VacantRooms from "./pages/VacantRooms";
+import VatDaily from "./pages/VatDaily";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
 const MapPage = lazy(() => import("./pages/MapPage"));
@@ -47,6 +48,11 @@ function Shell() {
 function AssignerOnly() {
   const { isManager, isSupervisor } = useSession();
   return isManager || isSupervisor ? <Outlet /> : <Navigate to="/" replace />;
+}
+
+function MoneyOnly() {
+  const { isManager, isAccountant } = useSession();
+  return isManager || isAccountant ? <Outlet /> : <Navigate to="/" replace />;
 }
 
 function ManagerOnly() {
@@ -113,6 +119,9 @@ export default function App() {
         <Route path="van-phong/:id/sua" element={<RequestForm />} />
         <Route path="van-phong/:id/in" element={<RequestPrint />} />
         <Route path="to-chuc" element={<Org />} />
+        <Route element={<MoneyOnly />}>
+          <Route path="hoa-don-gtgt" element={<VatDaily />} />
+        </Route>
         <Route path="thong-bao" element={<Notifications />} />
         <Route path="tai-khoan" element={<Account />} />
         <Route path="quan-tri" element={<ManagerOnly />}>

@@ -108,6 +108,7 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
   const [idNo, setIdNo] = useState("");
   const [idDate, setIdDate] = useState("");
   const [idPlace, setIdPlace] = useState("");
+  const [idAddr, setIdAddr] = useState("");
   const [dob, setDob] = useState(tenant?.date_of_birth ?? "");
   const [home, setHome] = useState(tenant?.hometown ?? "");
   const [note, setNote] = useState(tenant?.note ?? "");
@@ -121,8 +122,8 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
   useEffect(() => {
     if (!tenant) return;
     supabase.rpc("tenant_private", { p_id: tenant.id }).then(({ data }) => {
-      const r = (Array.isArray(data) ? data[0] : data) as { id_number: string | null; id_issued_date: string | null; id_issued_place: string | null } | undefined;
-      if (r) { setIdNo(r.id_number ?? ""); setIdDate(r.id_issued_date ?? ""); setIdPlace(r.id_issued_place ?? ""); }
+      const r = (Array.isArray(data) ? data[0] : data) as { id_number: string | null; id_issued_date: string | null; id_issued_place: string | null; id_address: string | null } | undefined;
+      if (r) { setIdNo(r.id_number ?? ""); setIdDate(r.id_issued_date ?? ""); setIdPlace(r.id_issued_place ?? ""); setIdAddr(r.id_address ?? ""); }
     });
   }, [tenant]);
 
@@ -133,7 +134,7 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
     setBusy(true);
     const row = {
       building_id: buildingId, full_name: name.trim(), phone: phone.trim() || null, id_number: digits || null,
-      id_issued_date: idDate || null, id_issued_place: idPlace.trim() || null, date_of_birth: dob || null, hometown: home.trim() || null,
+      id_issued_date: idDate || null, id_issued_place: idPlace.trim() || null, id_address: idAddr.trim() || null, date_of_birth: dob || null, hometown: home.trim() || null,
       note: note.trim() || null, flag, flag_note: flag ? flagNote.trim() || null : null,
       cccd_consent_at: consent ? (tenant?.cccd_consent_at ?? new Date().toISOString()) : null,
       cccd_consent_note: consent ? consentNote : null,
@@ -160,6 +161,7 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
           <label className="field" style={{ flex: "1 1 150px" }}><span>Ngày cấp</span><input id="t-iddate" className="input" type="date" value={idDate} onChange={(e) => setIdDate(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Nơi cấp</span><input id="t-idplace" className="input" value={idPlace} onChange={(e) => setIdPlace(e.target.value)} placeholder="VD: Cục CSQLHC về TTXH" /></label>
         </div>
+        <label className="field"><span>Địa chỉ trên CCCD (để xuất hoá đơn)</span><input id="t-idaddr" className="input" value={idAddr} onChange={(e) => setIdAddr(e.target.value)} placeholder="Nơi thường trú ghi trên CCCD" /></label>
         <label className="field"><span>Quê quán / thường trú</span><input id="t-home" className="input" value={home} onChange={(e) => setHome(e.target.value)} /></label>
 
         <div className="field"><span>Đánh dấu khách</span>
@@ -196,7 +198,7 @@ export function TenantDetail() {
   const { id } = useParams();
   const { buildings } = useSession();
   const [t, setT] = useState<Tenant | null>(null);
-  const [priv, setPriv] = useState<{ id_number: string | null; id_issued_date: string | null; id_issued_place: string | null } | null>(null);
+  const [priv, setPriv] = useState<{ id_number: string | null; id_issued_date: string | null; id_issued_place: string | null; id_address: string | null } | null>(null);
   const [contracts, setContracts] = useState<{ id: string; code: string | null; start_date: string; end_date: string | null; rent_amount: number; status: string; rooms: { code: string } | null }[]>([]);
   const [editing, setEditing] = useState(false);
   const [missing, setMissing] = useState(false);
@@ -238,6 +240,7 @@ export function TenantDetail() {
               <><dt>Số CCCD</dt><dd className="num">{maskId(priv.id_number)} <button className="btn ghost sm" onClick={() => setShowId(!showId)}>{showId ? "Ẩn" : "Hiện"}</button></dd></>
             ) : null}
             {canManage && priv?.id_issued_date ? <><dt>Ngày cấp</dt><dd>{ddmmyyyy(priv.id_issued_date)}{priv.id_issued_place ? ` · ${priv.id_issued_place}` : ""}</dd></> : null}
+            {canManage && priv?.id_address ? <><dt>Địa chỉ CCCD</dt><dd>{priv.id_address}</dd></> : null}
             {t.note ? <><dt>Ghi chú</dt><dd>{t.note}</dd></> : null}
           </dl>
         </section>
