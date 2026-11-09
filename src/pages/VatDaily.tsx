@@ -19,6 +19,8 @@ export default function VatDaily() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [rate, setRate] = useState("10%");
+  const [inclusive, setInclusive] = useState(true);
 
   useEffect(() => {
     setRows(null); setErr(null);
@@ -29,6 +31,47 @@ export default function VatDaily() {
 
   const total = useMemo(() => (rows ?? []).reduce((n, r) => n + Number(r.amount), 0), [rows]);
   const missing = useMemo(() => (rows ?? []).filter((r) => !r.id_number || !r.id_address).length, [rows]);
+
+  async function save(wb: { xlsx: { writeBuffer: () => Promise<ArrayBuffer> } }, name: string) {
+    const buf = await wb.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = name; a.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  /** File nhập vào MISA meInvoice: mỗi khoản thu = một hoá đơn một dòng hàng. MISA cho ghép cột khi nhập nên tên cột không cần trùng tuyệt đối. */
+  async function downloadMisa() {
+    if (!rows?.length) return;
+    setBusy(true);
+    try {
+      const { Workbook } = await import("exceljs");
+      const wb = new Workbook();
+      const ws = wb.addWorksheet("MISA");
+      const pct = rate.endsWith("%") ? Number(rate.replace("%", "")) / 100 : 0;
+      ws.columns = [
+        { header: "Số thứ tự", width: 10 }, { header: "Ngày hóa đơn", width: 14, style: { numFmt: "dd/mm/yyyy" } },
+        { header: "Họ tên người mua", width: 26 }, { header: "Số CCCD / Mã số thuế người mua", width: 24, style: { numFmt: "@" } },
+        { header: "Địa chỉ người mua", width: 44 }, { header: "Số điện thoại", width: 15, style: { numFmt: "@" } },
+        { header: "Hình thức thanh toán", width: 18 }, { header: "Tên hàng hóa, dịch vụ", width: 40 }, { header: "Đơn vị tính", width: 12 },
+        { header: "Số lượng", width: 10 }, { header: "Đơn giá", width: 16, style: { numFmt: "#,##0" } },
+        { header: "Thành tiền (chưa thuế)", width: 18, style: { numFmt: "#,##0" } }, { header: "Thuế suất", width: 10 },
+        { header: "Tiền thuế", width: 14, style: { numFmt: "#,##0" } }, { header: "Tổng tiền thanh toán", width: 18, style: { numFmt: "#,##0" } },
+      ];
+      rows.forEach((r, i) => {
+        const pay = Number(r.amount);
+        const net = inclusive ? Math.round(pay / (1 + pct)) : pay;
+        const tax = inclusive ? pay - net : Math.round(pay * pct);
+        const [y, m, d] = r.collected_at.split("-").map(Number);
+        ws.addRow([i + 1, new Date(Date.UTC(y, m - 1, d)), r.tenant_name, r.id_number ?? "", r.id_address ?? "", r.phone ?? "",
+          r.paid_via === "chuyen_khoan" ? "CK" : "TM/CK", r.content, "Tháng", 1, net, net, rate, tax, net + tax]);
+      });
+      ws.getRow(1).font = { bold: true };
+      ws.views = [{ state: "frozen", ySplit: 1 }];
+      await save(wb, `misa-meinvoice-${day}.xlsx`);
+    } catch { toast("Không tạo được file Excel. Thử lại sau."); }
+    setBusy(false);
+  }
 
   async function download() {
     if (!rows?.length) return;
@@ -50,11 +93,7 @@ export default function VatDaily() {
       const t = ws.addRow(["", "TỔNG", "", "", "", "", "", "", total]); t.font = { bold: true };
       ws.getRow(1).font = { bold: true };
       ws.views = [{ state: "frozen", ySplit: 1 }];
-      const buf = await wb.xlsx.writeBuffer();
-      const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-      const a = document.createElement("a");
-      a.href = url; a.download = `hoa-don-gtgt-${day}.xlsx`; a.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+      await save(wb, `hoa-don-gtgt-${day}.xlsx`);
     } catch { toast("Không tạo được file Excel. Thử lại sau."); }
     setBusy(false);
   }
@@ -68,7 +107,16 @@ export default function VatDaily() {
             <input id="vat-day" className="input" type="date" value={day} max={todayVN()} onChange={(e) => e.target.value && setDay(e.target.value)} /></label>
           {rows ? <div><b className="num" style={{ fontSize: 22 }}>{rows.length}</b> khoản · tổng <b className="num">{vnd(total)}</b></div> : null}
           {missing ? <p className="small" style={{ margin: 0, color: "var(--today)" }}>{missing} khách thiếu số CCCD hoặc địa chỉ CCCD — bổ sung ở hồ sơ khách trước khi xuất hoá đơn.</p> : null}
-          <button className="btn" disabled={!rows?.length || busy} onClick={download}>{busy ? "Đang tạo file…" : "Tải Excel"}</button>
+          <div className="row" style={{ alignItems: "flex-end" }}>
+            <label className="field" style={{ flex: "1 1 120px" }}><span>Thuế suất GTGT (cho file MISA)</span>
+              <select id="vat-rate" className="input" value={rate} onChange={(e) => setRate(e.target.value)}>
+                {["10%", "8%", "5%", "0%", "KCT"].map((x) => <option key={x} value={x}>{x === "KCT" ? "KCT (không chịu thuế)" : x}</option>)}
+              </select></label>
+            <label className="field" style={{ flex: "1 1 160px", flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" checked={inclusive} onChange={(e) => setInclusive(e.target.checked)} /><span>Số tiền thu đã gồm VAT</span></label>
+          </div>
+          <button className="btn" disabled={!rows?.length || busy} onClick={downloadMisa}>{busy ? "Đang tạo file…" : "Tải file nhập MISA meInvoice"}</button>
+          <button className="btn secondary" disabled={!rows?.length || busy} onClick={download}>Tải Excel đầy đủ thông tin</button>
         </div>
         {err ? <div className="error-box" role="alert">{err}</div> : null}
         {!rows && !err ? <div className="loading">Đang tải…</div> : null}
