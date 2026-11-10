@@ -412,6 +412,21 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
               </select>
               {curType ? <small className="muted">Giá, số người lấy theo loại. Phòng này khác thì sửa riêng ở dưới.</small> : null}</label>
             {curType ? <RoomTypeCard type={curType} furniture={furn} /> : null}
+            <div className="field room-furn">
+              <span>Nội thất của phòng này</span>
+              {furn.trim() ? (
+                <>
+                  <textarea id="r-furn" className="input" style={{ minHeight: 110 }} value={furn} onChange={(e) => setFurn(e.target.value)} aria-label="Nội thất riêng của phòng, mỗi dòng một món" />
+                  <small className="muted">Mỗi dòng một món. Chỉ phòng này có danh sách riêng, các phòng khác vẫn theo nhóm.</small>
+                  <button type="button" className="btn ghost sm" onClick={() => setFurn("")}>Dùng lại nội thất của nhóm</button>
+                </>
+              ) : (
+                <>
+                  <small className="muted">{curType?.furniture ? "Đang dùng nội thất của nhóm phòng (hiện ở trên)." : "Chưa có nội thất. Nhóm phòng cũng chưa ghi nội thất."}</small>
+                  <button type="button" className="btn secondary sm" onClick={() => setFurn(curType?.furniture?.trim() || "Giường & nệm\nTủ quần áo")}>Nhập nội thất riêng cho phòng này</button>
+                </>
+              )}
+            </div>
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: "1 1 140px" }}><span>Cho thuê</span>
                 <select id="r-mode" className="input" value={mode} onChange={(e) => setMode(e.target.value as "thang" | "dem")}>
@@ -422,10 +437,6 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
             </div>
             <label className="field"><span>Số người ở tối đa</span>
               <input id="r-max" className="input" inputMode="numeric" value={maxOcc} onChange={(e) => setMaxOcc(e.target.value.replace(/\D/g, ""))} /></label>
-            <label className="field"><span>Nội thất riêng của phòng (mỗi dòng một món)</span>
-              <textarea id="r-furn" className="input" style={{ minHeight: 76 }} value={furn} onChange={(e) => setFurn(e.target.value)}
-                placeholder={curType?.furniture ? "Bỏ trống = theo nhóm phòng" : "VD: Giường, nệm"} />
-              <small className="muted">Bỏ trống thì phòng dùng nội thất của nhóm phòng. Ghi vào đây khi phòng này khác nhóm.</small></label>
           </>
         ) : (
           <>
