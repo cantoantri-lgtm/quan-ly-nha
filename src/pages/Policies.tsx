@@ -11,11 +11,11 @@ export type Fee = { label: string; amount: number; unit: string };
 export type Term = { months: number; pct: number };
 type Policy = {
   building_id: string; code: string; name: string; address: string | null;
-  fees: Fee[]; amenities: string[]; deposit_lines: string[]; commission_terms: Term[];
+  fees: Fee[]; amenities: string[]; furniture: string[]; deposit_lines: string[]; commission_terms: Term[];
   forfeit_min: number | null; forfeit_pct: number | null; note: string | null; updated_at: string | null;
 };
 
-const hasData = (p: Policy) => p.fees.length > 0 || p.amenities.length > 0 || p.deposit_lines.length > 0 || p.commission_terms.length > 0 || p.forfeit_pct != null;
+const hasData = (p: Policy) => p.fees.length > 0 || p.amenities.length > 0 || p.furniture.length > 0 || p.deposit_lines.length > 0 || p.commission_terms.length > 0 || p.forfeit_pct != null;
 const pctText = (n: number) => String(n).replace(".", ",");
 
 /** Dịch vụ và chính sách theo từng toà. Mọi vai trò (kể cả Cộng tác viên) xem; chỉ Quản lý sửa (RLS ở CSDL). */
@@ -25,6 +25,7 @@ export default function Policies() {
   const [rows, setRows] = useState<Policy[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [guest, setGuest] = useState(false);   // chế độ khách xem: ẩn ký hợp đồng và hoa hồng
   const { toast } = useSession();
 
   const load = useCallback(async () => {
@@ -57,7 +58,13 @@ export default function Policies() {
           </div>
         ) : null}
         {rows && !rows.length ? <Empty title="Chưa có toà nào" /> : null}
-        {current ? <PolicyView p={current} isManager={isManager} onEdit={() => setEditing(true)} /> : null}
+        {current && hasData(current) ? (
+          <label className="pl-guest">
+            <input type="checkbox" checked={guest} onChange={(e) => setGuest(e.target.checked)} />
+            <span><b>Chế độ khách xem</b><small className="muted"> Ẩn phần ký hợp đồng và hoa hồng, dùng khi đưa màn hình cho khách.</small></span>
+          </label>
+        ) : null}
+        {current ? <PolicyView p={current} isManager={isManager} guest={guest} onEdit={() => setEditing(true)} /> : null}
       </main>
       {editing && current ? (
         <PolicySheet p={current} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); toast("Đã lưu chính sách toà."); load(); }} />
@@ -66,7 +73,7 @@ export default function Policies() {
   );
 }
 
-function PolicyView({ p, isManager, onEdit }: { p: Policy; isManager: boolean; onEdit: () => void }) {
+function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManager: boolean; guest: boolean; onEdit: () => void }) {
   if (!hasData(p)) {
     return (
       <Empty title={`${p.code} chưa có chính sách`}>
@@ -99,16 +106,23 @@ function PolicyView({ p, isManager, onEdit }: { p: Policy; isManager: boolean; o
         </section>
       ) : null}
 
-      {p.deposit_lines.length ? (
+      {p.furniture.length ? (
         <section className="card pl-sec">
-          <h3>Đặt cọc và hợp đồng</h3>
+          <h3>Danh mục nội thất</h3>
+          <ul className="pl-chips-list">{p.furniture.map((a, i) => <li key={i}>{a}</li>)}</ul>
+        </section>
+      ) : null}
+
+      {guest ? null : p.deposit_lines.length ? (
+        <section className="card pl-sec">
+          <h3>Ký hợp đồng <span className="pl-tag">Chỉ Sale và CTV</span></h3>
           <ul className="pl-lines">{p.deposit_lines.map((a, i) => <li key={i}>{a}</li>)}</ul>
         </section>
       ) : null}
 
-      {p.commission_terms.length || p.forfeit_pct != null ? (
+      {guest ? null : p.commission_terms.length || p.forfeit_pct != null ? (
         <section className="card pl-sec pl-comm">
-          <h3>Hoa hồng Cộng tác viên</h3>
+          <h3>Hoa hồng Cộng tác viên <span className="pl-tag">Chỉ Sale và CTV</span></h3>
           {p.commission_terms.length ? (
             <>
               <p className="muted small" style={{ margin: 0 }}>Hợp đồng thành công, tính trên tiền thuê tháng đầu:</p>
@@ -132,8 +146,8 @@ function PolicyView({ p, isManager, onEdit }: { p: Policy; isManager: boolean; o
         </section>
       ) : null}
 
-      {p.note ? <section className="card pl-sec"><h3>Ghi chú</h3><p className="small" style={{ margin: 0, whiteSpace: "pre-line" }}>{p.note}</p></section> : null}
-      {p.updated_at ? <p className="muted small" style={{ margin: 0 }}>Cập nhật {ddmmyyyy(p.updated_at)}. Mức hoa hồng cuối cùng do Quản lý xác nhận.</p> : null}
+      {!guest && p.note ? <section className="card pl-sec"><h3>Ghi chú</h3><p className="small" style={{ margin: 0, whiteSpace: "pre-line" }}>{p.note}</p></section> : null}
+      {p.updated_at ? <p className="muted small" style={{ margin: 0 }}>Cập nhật {ddmmyyyy(p.updated_at)}.{guest ? "" : " Mức hoa hồng cuối cùng do Quản lý xác nhận."}</p> : null}
     </div>
   );
 }
@@ -145,6 +159,7 @@ const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 function PolicySheet({ p, onClose, onSaved }: { p: Policy; onClose: () => void; onSaved: () => void }) {
   const [fees, setFees] = useState<FeeRow[]>(p.fees.map((f) => ({ label: f.label, amount: new Intl.NumberFormat("vi-VN").format(f.amount), unit: f.unit })));
   const [amenities, setAmenities] = useState(p.amenities.join("\n"));
+  const [furn, setFurn] = useState(p.furniture.join("\n"));
   const [deposit, setDeposit] = useState(p.deposit_lines.join("\n"));
   const [terms, setTerms] = useState<TermRow[]>(p.commission_terms.map((t) => ({ months: String(t.months), pct: String(t.pct) })));
   const [fMin, setFMin] = useState(p.forfeit_min != null ? new Intl.NumberFormat("vi-VN").format(p.forfeit_min) : "");
@@ -175,7 +190,7 @@ function PolicySheet({ p, onClose, onSaved }: { p: Policy; onClose: () => void; 
     if (fp != null && (!Number.isFinite(fp) || fp < 0 || fp > 100)) { setErr("Tỷ lệ hoa hồng bỏ cọc phải từ 0 đến 100."); return; }
     setBusy(true);
     const { error } = await supabase.from("building_policy").upsert({
-      building_id: p.building_id, fees: feeOut, amenities: lines(amenities), deposit_lines: lines(deposit),
+      building_id: p.building_id, fees: feeOut, amenities: lines(amenities), furniture: lines(furn), deposit_lines: lines(deposit),
       commission_terms: termOut, forfeit_min: fm, forfeit_pct: fp, note: note.trim() || null,
     }, { onConflict: "building_id" });
     setBusy(false);
@@ -202,7 +217,10 @@ function PolicySheet({ p, onClose, onSaved }: { p: Policy; onClose: () => void; 
 
         <label className="field"><span>Tiện ích (mỗi dòng một mục)</span>
           <textarea className="input" style={{ minHeight: 90 }} value={amenities} onChange={(e) => setAmenities(e.target.value)} /></label>
-        <label className="field"><span>Đặt cọc và hợp đồng (mỗi dòng một ý)</span>
+        <label className="field"><span>Danh mục nội thất (mỗi dòng một món)</span>
+          <textarea className="input" style={{ minHeight: 90 }} value={furn} onChange={(e) => setFurn(e.target.value)} /></label>
+        <p className="muted small" style={{ margin: 0 }}>Từ đây xuống: chỉ Sale và Cộng tác viên thấy, khách không thấy.</p>
+        <label className="field"><span>Ký hợp đồng: đặt cọc, kỳ hợp đồng (mỗi dòng một ý)</span>
           <textarea className="input" style={{ minHeight: 110 }} value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
 
         <section className="stack">
