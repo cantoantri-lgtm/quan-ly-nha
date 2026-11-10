@@ -6,7 +6,7 @@ import FileGallery from "./FileGallery";
 import "../roomtype.css";
 
 /** Thông tin loại phòng: ảnh đại diện, diện tích, nội thất, giá. Hiện khi mở một phòng. */
-export default function RoomTypeCard({ type }: { type: RoomType }) {
+export default function RoomTypeCard({ type, furniture }: { type: RoomType; furniture?: string | null }) {
   const [hero, setHero] = useState<string | null>(null);
   const [count, setCount] = useState(0);
 
@@ -25,7 +25,8 @@ export default function RoomTypeCard({ type }: { type: RoomType }) {
     return () => { off = true; };
   }, [type.id]);
 
-  const items = furnitureList(type.furniture);
+  const own = furnitureList(furniture);          // nội thất riêng của phòng (nếu có) đè nội thất của nhóm
+  const items = own.length ? own : furnitureList(type.furniture);
   return (
     <section className="rtc" aria-label={`Loại phòng ${type.name}`}>
       {hero ? <img className="rtc-hero" src={hero} alt={`Ảnh đại diện loại ${type.name}`} decoding="async" />
@@ -39,7 +40,7 @@ export default function RoomTypeCard({ type }: { type: RoomType }) {
           {type.area_m2 != null ? <span>{String(type.area_m2).replace(".", ",")} m²</span> : null}
           {type.max_occupants ? <span>Tối đa {type.max_occupants} người</span> : null}
         </div>
-        {items.length ? <ul className="rtc-chips" aria-label="Nội thất">{items.map((x, i) => <li key={i}>{x}</li>)}</ul> : <p className="muted small" style={{ margin: 0 }}>Chưa ghi nội thất.</p>}
+        {items.length ? <ul className="rtc-chips" aria-label={own.length ? "Nội thất riêng của phòng" : "Nội thất"}>{items.map((x, i) => <li key={i}>{x}</li>)}</ul> : <p className="muted small" style={{ margin: 0 }}>Chưa ghi nội thất.</p>}
         {type.description ? <p className="small" style={{ margin: 0 }}>{type.description}</p> : null}
         {count > 1 ? (
           <details className="rtc-more">

@@ -28,6 +28,7 @@ import Invoices from "./pages/Invoices";
 import PayPage from "./pages/PayPage";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 import VacantRooms from "./pages/VacantRooms";
+import Policies from "./pages/Policies";
 import VatDaily from "./pages/VatDaily";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
@@ -87,6 +88,7 @@ export default function App() {
         <Route element={<Shell />}>
           <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
           <Route path="phong-trong" element={<VacantRooms />} />
+          <Route path="chinh-sach" element={<Policies />} />
           <Route path="tai-khoan" element={<Account />} />
           <Route path="*" element={<Navigate to="/ban-do" replace />} />
         </Route>
@@ -99,6 +101,7 @@ export default function App() {
       <Route element={<Shell />}>
         <Route index element={<Home />} />
         <Route path="phong-trong" element={<VacantRooms />} />
+        <Route path="chinh-sach" element={<Policies />} />
         <Route path="viec" element={<Tasks />} />
         <Route element={<AssignerOnly />}>
           <Route path="viec/moi" element={<TaskForm />} />

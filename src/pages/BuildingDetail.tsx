@@ -19,7 +19,7 @@ export type RoomStatus = "trong" | "dang_o" | "dang_sua" | "giu_cho";
 export type Room = {
   id: string; building_id: string; code: string; floor: number | null; room_type: string | null;
   rent_mode: "thang" | "dem"; list_price: number | null; max_occupants: number | null; status: RoomStatus; note: string | null;
-  room_type_id: string | null;
+  room_type_id: string | null; furniture?: string | null;
 };
 const ROOM_STATUS: Record<RoomStatus, string> = { trong: "Trống", dang_o: "Đang ở", dang_sua: "Đang sửa", giu_cho: "Giữ chỗ" };
 const MODE: Record<string, string> = { thang: "Theo tháng", dem: "Theo đêm" };
@@ -100,7 +100,7 @@ export default function BuildingDetail() {
     const shown = rooms.filter((r) => !filter || r.status === filter);
     const m = new Map<string, Room[]>();
     shown.forEach((r) => {
-      const k = r.floor == null ? "Khác" : `Tầng ${r.floor}`;
+      const k = r.floor == null ? "Khác" : r.floor === 0 ? "Trệt" : `Tầng ${r.floor}`;
       m.set(k, [...(m.get(k) ?? []), r]);
     });
     return [...m.entries()];
@@ -149,6 +149,7 @@ export default function BuildingDetail() {
           <Link className="btn secondary sm" to={`/toa/${building.id}/khach`}>Khách thuê</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hop-dong`}>Hợp đồng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hoa-don`}>Thu tiền phòng</Link>
+          <Link className="btn secondary sm" to={`/chinh-sach?toa=${building.id}`}>Dịch vụ &amp; chính sách</Link>
         </div>
 
         {canManage ? (
@@ -272,6 +273,7 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
   const [maxOcc, setMaxOcc] = useState(room.max_occupants?.toString() ?? "");
   const [status, setStatus] = useState<RoomStatus>(room.status ?? "trong");
   const [note, setNote] = useState(room.note ?? "");
+  const [furn, setFurn] = useState(room.furniture ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -286,7 +288,9 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
   }, [isNew, room.id]);
 
   // Chọn "Đang ở" cho phòng thuê tháng chưa có hợp đồng → phải nhập khách, CCCD, hợp đồng
-  const needTenant = status === "dang_o" && mode === "thang" && hasContract === false && canManage && !isNew;
+  // Phòng công ty cho nhân viên ở: ghi chú bắt đầu bằng HOME thì không cần khách và hợp đồng
+  const isHome = /^home\b/i.test(note.trim());
+  const needTenant = status === "dang_o" && mode === "thang" && hasContract === false && canManage && !isNew && !isHome;
   const [tName, setTName] = useState("");
   const [tPhone, setTPhone] = useState("");
   const [tIdNo, setTIdNo] = useState("");
@@ -322,7 +326,8 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
     const row = canManage
       ? { building_id: building.id, code: code.trim().toUpperCase(), floor: floor ? Number(floor) : guessFloor(code),
           room_type_id: typeId || null, room_type: curType?.name ?? (room.room_type_id ? null : room.room_type ?? null),
-          rent_mode: mode, list_price: p, max_occupants: maxOcc ? Number(maxOcc) : null, status: saveStatus, note: note.trim() || null }
+          rent_mode: mode, list_price: p, max_occupants: maxOcc ? Number(maxOcc) : null, status: saveStatus, note: note.trim() || null,
+          furniture: furn.trim() || null }
       : { status, note: note.trim() || null };
     const { error } = isNew ? await supabase.from("rooms").insert(row) : await supabase.from("rooms").update(row).eq("id", room.id!);
     if (error) { setBusy(false); setErr(/duplicate/i.test(error.message) ? `Phòng ${code} đã có trong toà này.` : friendlyError(error)); return; }
@@ -379,7 +384,7 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
                 {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               {curType ? <small className="muted">Giá, số người lấy theo loại. Phòng này khác thì sửa riêng ở dưới.</small> : null}</label>
-            {curType ? <RoomTypeCard type={curType} /> : null}
+            {curType ? <RoomTypeCard type={curType} furniture={furn} /> : null}
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: "1 1 140px" }}><span>Cho thuê</span>
                 <select id="r-mode" className="input" value={mode} onChange={(e) => setMode(e.target.value as "thang" | "dem")}>
@@ -390,10 +395,14 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
             </div>
             <label className="field"><span>Số người ở tối đa</span>
               <input id="r-max" className="input" inputMode="numeric" value={maxOcc} onChange={(e) => setMaxOcc(e.target.value.replace(/\D/g, ""))} /></label>
+            <label className="field"><span>Nội thất riêng của phòng (mỗi dòng một món)</span>
+              <textarea id="r-furn" className="input" style={{ minHeight: 76 }} value={furn} onChange={(e) => setFurn(e.target.value)}
+                placeholder={curType?.furniture ? "Bỏ trống = theo nhóm phòng" : "VD: Giường, nệm"} />
+              <small className="muted">Bỏ trống thì phòng dùng nội thất của nhóm phòng. Ghi vào đây khi phòng này khác nhóm.</small></label>
           </>
         ) : (
           <>
-            {curType ? <RoomTypeCard type={curType} /> : null}
+            {curType ? <RoomTypeCard type={curType} furniture={room.furniture} /> : null}
             <p className="muted small" style={{ margin: 0 }}>{room.room_type ? `${room.room_type} · ` : ""}{MODE[room.rent_mode ?? "thang"]} · {vnd(room.list_price)}</p>
           </>
         )}
@@ -442,7 +451,8 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
           </section>
         ) : null}
         <label className="field"><span>Ghi chú</span>
-          <textarea id="r-note" className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} /></label>
+          <textarea id="r-note" className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} />
+          {canManage ? <small className="muted">Phòng công ty cho nhân viên ở: ghi HOME ở đầu ghi chú để không phải nhập khách và hợp đồng.</small> : null}</label>
         {err ? <div className="error-box" role="alert">{err}</div> : null}
         <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : isNew ? "Thêm phòng" : "Lưu"}</button>
         {!isNew && canManage ? (

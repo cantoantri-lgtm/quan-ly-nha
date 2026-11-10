@@ -74,6 +74,8 @@ supabase/
   016_hoa_don_gtgt.sql      tenants.id_address, vat_daily_report(ngày) cho Quản lý/Kế toán, cron 21:00 báo danh sách xuất hoá đơn GTGT; trang /hoa-don-gtgt + tải Excel
   017_ctv_khong_doi_mat_khau.sql   trigger ctv_pw_guard: Cộng tác viên không tự đổi mật khẩu; quản lý đặt lại qua Edge Function (mở khoá 60 giây)
   018a_anh_toa_gia_tri.sql, 018_anh_toa.sql   ảnh đại diện toà nhà (kind anh_toa, thư mục anh-toa/ công khai trên R2); building_map() trả thêm photo_path/photo_store/photo_thumb
+  019_chinh_sach_toa.sql   bảng building_policy (phí dịch vụ, tiện ích, cọc, hoa hồng CTV theo toà; Quản lý ghi, mọi người đọc qua building_policies()); rooms.furniture; trigger rooms_guard (người không quản lý toà chỉ đổi trạng thái và ghi chú)
+  019b_du_lieu_339_le_van_si.sql   dữ liệu toà 339 Lê Văn Sĩ theo sơ đồ 10/11/2026 (17 phòng, chính sách)
   thu_nghiem/                seed.sql / cleanup.sql: tài khoản + toà thử nghiệm (không phải migration)
   functions/quan-ly-tai-khoan    cấp / khoá tài khoản, đổi SĐT, cấp lại mật khẩu (dùng service role)
   functions/phan-tich-giao-viec  ghi âm / tin nhắn → danh sách việc (Gemini)

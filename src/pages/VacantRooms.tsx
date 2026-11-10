@@ -38,7 +38,7 @@ export default function VacantRooms() {
       let b = m.get(r.building_id);
       if (!b) { b = { id: r.building_id, code: r.building_code, name: r.building_name, groups: [], count: 0 }; m.set(r.building_id, b); }
       b.count++;
-      const key = r.type_id ?? "none";
+      const key = `${r.type_id ?? "none"}|${r.furniture ?? ""}`;   // nội thất riêng của phòng khác nhóm thì tách thẻ
       let g = b.groups.find((x) => x.key === key);
       if (!g) { g = { key, name: r.type_name ?? "Chưa phân loại", rooms: [] }; b.groups.push(g); }
       g.rooms.push(r);
@@ -96,7 +96,7 @@ export default function VacantRooms() {
                         </div>
                         {items.length ? <ul className="rtc-chips">{items.map((f) => <li key={f}>{f}</li>)}</ul> : null}
                         <div className="vr-rooms">
-                          {g.rooms.map((r) => <span key={r.room_id} className="vr-room num">{r.code}{r.floor != null ? <small>T{r.floor}</small> : null}</span>)}
+                          {g.rooms.map((r) => <span key={r.room_id} className="vr-room num">{r.code}{r.floor != null ? <small>{r.floor === 0 ? "Trệt" : `T${r.floor}`}</small> : null}</span>)}
                         </div>
                       </div>
                     </article>

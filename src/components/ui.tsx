@@ -166,12 +166,14 @@ export function AppHeader() {
   const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = isCollaborator ? [
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+    { to: "/chinh-sach", label: "Chính sách toà", icon: Icon.money },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
   ] : [
     { to: "/viec", label: "Công việc", icon: Icon.tasks },
     { to: "/van-phong", label: "Văn phòng số", icon: Icon.office, n: pendingApprovals },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+    { to: "/chinh-sach", label: "Chính sách toà", icon: Icon.money },
     ...(isManager ? [
       { to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
       { to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user },
@@ -250,6 +252,7 @@ export function BottomNav() {
         <div className="inner">
           <NavLink to="/ban-do">{Icon.map}<span>Bản đồ</span></NavLink>
           <NavLink to="/phong-trong">{Icon.building}<span>Phòng trống</span></NavLink>
+          <NavLink to="/chinh-sach">{Icon.money}<span>Chính sách</span></NavLink>
           <NavLink to="/tai-khoan">{Icon.user}<span>Tài khoản</span></NavLink>
         </div>
       </nav>
