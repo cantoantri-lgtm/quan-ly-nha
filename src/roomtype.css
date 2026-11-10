@@ -37,3 +37,13 @@
 .vr-click { cursor: pointer; }
 .vr-click:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .vr-pol { margin: 0 0 8px; }
+
+.vr-card { padding: 14px; display: grid; gap: 8px; margin-bottom: 12px; }
+.vr-card .vr-bh { margin: 0; }
+.vr-l1 { margin: 0; font-size: 15px; }
+.vr-l1 b { color: var(--brand); }
+.vr-l2 { display: grid; gap: 6px; }
+.vr-room { cursor: pointer; font: inherit; color: var(--text); text-align: left; }
+.vr-room span { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+.vr-hint { color: var(--muted); }
+.vr-note { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--today-bg); color: var(--text); font-weight: 600; }

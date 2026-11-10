@@ -48,6 +48,7 @@ export type Building = {
   kind: string;
   total_floors: number | null;
   note: string | null;
+  public_note?: string | null;
   lat?: number | null;
   lng?: number | null;
 };

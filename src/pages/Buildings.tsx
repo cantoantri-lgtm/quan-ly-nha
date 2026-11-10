@@ -63,6 +63,7 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
   const [code, setCode] = useState(value.code ?? "");
   const [name, setName] = useState(value.name ?? "");
   const [address, setAddress] = useState(value.address ?? "");
+  const [pubNote, setPubNote] = useState(value.public_note ?? "");
   const [kind, setKind] = useState(value.kind ?? "hon_hop");
   const [floors, setFloors] = useState(value.total_floors?.toString() ?? "");
   const [lat, setLat] = useState(value.lat != null ? String(value.lat) : "");
@@ -113,7 +114,7 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
     }
     setBusy(true);
     const row = {
-      code: code.trim().toUpperCase(), name: name.trim(), address: address.trim() || null, kind, total_floors: floors ? Number(floors) : null,
+      code: code.trim().toUpperCase(), name: name.trim(), address: address.trim() || null, public_note: pubNote.trim() || null, kind, total_floors: floors ? Number(floors) : null,
       lat: hasBoth ? round6(latN) : null, lng: hasBoth ? round6(lngN) : null,
     };
     const { error } = value.id
@@ -137,6 +138,8 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
           <input id="b-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Toà 89 Cách Mạng Tháng 8" required /></label>
         <label className="field"><span>Địa chỉ</span>
           <input id="b-addr" className="input" value={address} onChange={(e) => setAddress(e.target.value)} /></label>
+        <label className="field"><span>Ghi chú toà (hiện ở danh sách phòng trống cho CTV và khách)</span>
+          <input id="b-pubnote" className="input" maxLength={200} placeholder="VD: Gần chợ, có thang máy, ưu đãi tháng 11" value={pubNote} onChange={(e) => setPubNote(e.target.value)} /></label>
         <div className="field">
           <span>Vị trí trên bản đồ</span>
           <div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}>
