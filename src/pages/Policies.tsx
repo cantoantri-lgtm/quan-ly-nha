@@ -2,21 +2,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { ddmmyyyy } from "../lib/dates";
-import { naturalCompare, parseMoney, vnd } from "../lib/money";
+import { naturalCompare, parseMoney } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
+import { PolicyView, hasData, type Fee, type Policy, type Term } from "../components/PolicyView";
 import "../policy.css";
-
-export type Fee = { label: string; amount: number; unit: string };
-export type Term = { months: number; pct: number };
-type Policy = {
-  building_id: string; code: string; name: string; address: string | null;
-  fees: Fee[]; amenities: string[]; furniture: string[]; deposit_lines: string[]; commission_terms: Term[];
-  forfeit_min: number | null; forfeit_pct: number | null; note: string | null; updated_at: string | null;
-};
-
-const hasData = (p: Policy) => p.fees.length > 0 || p.amenities.length > 0 || p.furniture.length > 0 || p.deposit_lines.length > 0 || p.commission_terms.length > 0 || p.forfeit_pct != null;
-const pctText = (n: number) => String(n).replace(".", ",");
 
 /** Dịch vụ và chính sách theo từng toà. Mọi vai trò (kể cả Cộng tác viên) xem; chỉ Quản lý sửa (RLS ở CSDL). */
 export default function Policies() {
@@ -70,85 +59,6 @@ export default function Policies() {
         <PolicySheet p={current} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); toast("Đã lưu chính sách toà."); load(); }} />
       ) : null}
     </>
-  );
-}
-
-function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManager: boolean; guest: boolean; onEdit: () => void }) {
-  if (!hasData(p)) {
-    return (
-      <Empty title={`${p.code} chưa có chính sách`}>
-        {isManager ? <button className="btn" onClick={onEdit}>Nhập chính sách cho toà này</button> : "Quản lý sẽ cập nhật dịch vụ và chính sách cho toà này."}
-      </Empty>
-    );
-  }
-  return (
-    <div className="stack pl">
-      <section className="card pl-head">
-        <h2>{p.name}</h2>
-        <p className="muted small">{p.code}{p.address ? ` · ${p.address}` : ""}</p>
-      </section>
-
-      {p.fees.length ? (
-        <section className="card pl-sec">
-          <h3>Phí dịch vụ</h3>
-          <dl className="pl-fees">
-            {p.fees.map((f, i) => (
-              <div key={i}><dt>{f.label}</dt><dd className="num">{vnd(f.amount)}{f.unit ? `/${f.unit}` : ""}</dd></div>
-            ))}
-          </dl>
-        </section>
-      ) : null}
-
-      {p.amenities.length ? (
-        <section className="card pl-sec">
-          <h3>Tiện ích</h3>
-          <ul className="pl-chips-list">{p.amenities.map((a, i) => <li key={i}>{a}</li>)}</ul>
-        </section>
-      ) : null}
-
-      {p.furniture.length ? (
-        <section className="card pl-sec">
-          <h3>Danh mục nội thất</h3>
-          <ul className="pl-chips-list">{p.furniture.map((a, i) => <li key={i}>{a}</li>)}</ul>
-        </section>
-      ) : null}
-
-      {guest ? null : p.deposit_lines.length ? (
-        <section className="card pl-sec">
-          <h3>Ký hợp đồng <span className="pl-tag">Chỉ Sale và CTV</span></h3>
-          <ul className="pl-lines">{p.deposit_lines.map((a, i) => <li key={i}>{a}</li>)}</ul>
-        </section>
-      ) : null}
-
-      {guest ? null : p.commission_terms.length || p.forfeit_pct != null ? (
-        <section className="card pl-sec pl-comm">
-          <h3>Hoa hồng Cộng tác viên <span className="pl-tag">Chỉ Sale và CTV</span></h3>
-          {p.commission_terms.length ? (
-            <>
-              <p className="muted small" style={{ margin: 0 }}>Hợp đồng thành công, tính trên tiền thuê tháng đầu:</p>
-              <div className="pl-terms">
-                {p.commission_terms.slice().sort((a, b) => a.months - b.months).map((t, i) => (
-                  <div key={i} className="pl-term"><span className="muted small">Hợp đồng {t.months} tháng</span><b className="num">{pctText(t.pct)}%</b></div>
-                ))}
-              </div>
-            </>
-          ) : null}
-          {p.forfeit_pct != null ? (
-            <div className="pl-forfeit">
-              <b>Khách bỏ cọc</b>
-              <p className="small" style={{ margin: 0 }}>
-                {p.forfeit_min != null && p.forfeit_min > 0
-                  ? <>Tiền cọc công ty giữ lại dưới <b className="num">{vnd(p.forfeit_min)}</b>: <b>không chi</b> hoa hồng. Từ <b className="num">{vnd(p.forfeit_min)}</b> trở lên: hoa hồng <b className="num">{pctText(p.forfeit_pct)}%</b> số tiền cọc đó.</>
-                  : <>Hoa hồng <b className="num">{pctText(p.forfeit_pct)}%</b> số tiền cọc công ty giữ lại.</>}
-              </p>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      {!guest && p.note ? <section className="card pl-sec"><h3>Ghi chú</h3><p className="small" style={{ margin: 0, whiteSpace: "pre-line" }}>{p.note}</p></section> : null}
-      {p.updated_at ? <p className="muted small" style={{ margin: 0 }}>Cập nhật {ddmmyyyy(p.updated_at)}.{guest ? "" : " Mức hoa hồng cuối cùng do Quản lý xác nhận."}</p> : null}
-    </div>
   );
 }
 

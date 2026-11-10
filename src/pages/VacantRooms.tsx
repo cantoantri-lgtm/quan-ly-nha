@@ -4,7 +4,8 @@ import { supabase } from "../lib/supabase";
 import { r2Config } from "../lib/files";
 import { furnitureList } from "../lib/roomTypes";
 import { naturalCompare, vnd } from "../lib/money";
-import { TopBar } from "../components/ui";
+import { Sheet, TopBar } from "../components/ui";
+import { PolicyPanel } from "../components/PolicyView";
 import "../roomtype.css";
 
 type Vacant = {
@@ -24,6 +25,7 @@ export default function VacantRooms() {
   const [rows, setRows] = useState<Vacant[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [base, setBase] = useState<string | null>(null);
+  const [pol, setPol] = useState<Bld | null>(null);   // toà đang xem chính sách trong cửa sổ nhỏ
 
   useEffect(() => {
     supabase.rpc("vacant_rooms").then(({ data, error }) => {
@@ -78,12 +80,13 @@ export default function VacantRooms() {
             {shown.map((b) => (
               <section key={b.id} className="vr-bld">
                 <h2 className="vr-bh">{b.code} · {b.name} <span className="vr-cnt num">{b.count} phòng trống</span></h2>
+                <button type="button" className="btn secondary sm vr-pol" onClick={() => setPol(b)}>Xem dịch vụ &amp; chính sách toà</button>
                 {b.groups.map((g) => {
                   const r0 = g.rooms[0];
                   const img = photo(r0);
                   const items = furnitureList(r0.furniture);
                   return (
-                    <article key={g.key} className="rtc vr-type">
+                    <article key={g.key} className="rtc vr-type vr-click" role="button" tabIndex={0} aria-label={`Xem chính sách toà ${b.code}`} onClick={() => setPol(b)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPol(b); } }}>
                       {img ? <img className="rtc-hero" src={img} alt={`Ảnh loại phòng ${g.name}`} loading="lazy" decoding="async" onError={(e) => { e.currentTarget.style.display = "none"; }} /> : null}
                       <div className="rtc-body">
                         <div className="rtc-head">
@@ -107,6 +110,9 @@ export default function VacantRooms() {
           </>
         ) : null}
       </main>
+      <Sheet open={!!pol} onClose={() => setPol(null)} title={pol ? `Chính sách · ${pol.code}` : "Chính sách"}>
+        {pol ? <PolicyPanel buildingId={pol.id} /> : null}
+      </Sheet>
     </>
   );
 }

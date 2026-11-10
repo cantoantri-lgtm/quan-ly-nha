@@ -11,6 +11,7 @@ import { BuildingSheet } from "./Buildings";
 import FileGallery from "../components/FileGallery";
 import { uploadFile } from "../lib/files";
 import RoomTypeCard from "../components/RoomTypeCard";
+import { PolicyPanel } from "../components/PolicyView";
 import RoomTypesSheet from "../components/RoomTypesSheet";
 import { groupColorKey, type RoomType } from "../lib/roomTypes";
 import "../rooms.css";
@@ -39,6 +40,7 @@ export default function BuildingDetail() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [types, setTypes] = useState<RoomType[]>([]);
   const [typesOpen, setTypesOpen] = useState(false);
+  const [polOpen, setPolOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"" | RoomStatus>("");
   const [groupFilter, setGroupFilter] = useState<string>("");   // mã nhóm phòng đang lọc ("" = tất cả)
@@ -156,8 +158,14 @@ export default function BuildingDetail() {
           <Link className="btn secondary sm" to={`/toa/${building.id}/khach`}>Khách thuê</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hop-dong`}>Hợp đồng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hoa-don`}>Thu tiền phòng</Link>
-          <Link className="btn secondary sm" to={`/chinh-sach?toa=${building.id}`}>Dịch vụ &amp; chính sách</Link>
+          <button type="button" className="btn secondary sm" aria-expanded={polOpen} onClick={() => setPolOpen(!polOpen)}>{polOpen ? "Ẩn dịch vụ & chính sách" : "Dịch vụ & chính sách"}</button>
         </div>
+        {polOpen ? (
+          <section className="card stack">
+            <PolicyPanel buildingId={building.id} onEdit={isManager ? () => nav(`/chinh-sach?toa=${building.id}`) : undefined} />
+            {isManager ? <Link className="btn ghost sm" to={`/chinh-sach?toa=${building.id}`}>Sửa chính sách toà</Link> : null}
+          </section>
+        ) : null}
 
         {canManage ? (
           <div className="row">
