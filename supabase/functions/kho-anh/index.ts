@@ -25,8 +25,8 @@ const host = `${R2.account}.r2.cloudflarestorage.com`;
 const TYPES: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp", pdf: "application/pdf" };
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 // <thư mục>/<mã chủ>/<uuid>[_t].<đuôi>  — _t là ảnh nhỏ (chỉ .jpg)
-const PATH_RE = new RegExp(`^(cccd|hop-dong|anh-phong|de-nghi)/${UUID}/${UUID}(_t)?\\.(jpg|png|webp|pdf)$`);
-const isPublic = (p: string) => p.startsWith("anh-phong/");
+const PATH_RE = new RegExp(`^(cccd|hop-dong|anh-phong|anh-toa|de-nghi)/${UUID}/${UUID}(_t)?\\.(jpg|png|webp|pdf)$`);
+const isPublic = (p: string) => p.startsWith("anh-phong/") || p.startsWith("anh-toa/");
 const bucketOf = (p: string) => (isPublic(p) ? R2.pub : R2.priv);
 const sign = (method: "GET" | "PUT" | "DELETE", path: string, expires: number, signedHeaders?: Record<string, string>) =>
   presign({

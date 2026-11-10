@@ -10,6 +10,7 @@ import { KIND_LABEL } from "../lib/labels";
 import { naturalCompare } from "../lib/money";
 import { DEFAULT_CENTER, currentPosition, fmtLatLng, googleDirections, googlePlace, parseLatLng, round6, type LatLng } from "../lib/geo";
 import { Empty, TopBar } from "../components/ui";
+import { r2Config, signedUrls } from "../lib/files";
 
 setWorkerUrl(workerUrl);
 
@@ -20,6 +21,8 @@ const STYLE_URL = () => `https://tiles.openfreemap.org/styles/${darkMode() ? "da
 type Spot = {
   id: string; code: string; name: string; address: string | null; kind: string;
   lat: number | null; lng: number | null; total_rooms: number; vacant_rooms: number; can_open: boolean;
+  /** Ảnh đại diện toà (có thể rỗng) */
+  photo_path: string | null; photo_store: "supabase" | "r2" | null; photo_thumb: boolean | null;
 };
 type Located = Spot & { lat: number; lng: number };
 type Placing = { spot: Spot; pos: LatLng | null };
@@ -54,6 +57,7 @@ export default function MapPage() {
   const [params] = useSearchParams();
   const focusId = params.get("toa");
   const [spots, setSpots] = useState<Spot[]>([]);
+  const [photos, setPhotos] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [mapErr, setMapErr] = useState<string | null>(null);
@@ -76,7 +80,25 @@ export default function MapPage() {
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc("building_map");
     if (error) setErr(friendlyError(error));
-    else { setErr(null); setSpots((data as Spot[]) ?? []); }
+    else {
+      const list = (data as Spot[]) ?? [];
+      setErr(null); setSpots(list); setLoading(false);
+      // Ảnh toà: R2 là địa chỉ công khai (Cộng tác viên cũng xem được); ảnh ở kho Supabase chỉ nhân viên xem được
+      const withPhoto = list.filter((x) => x.photo_path);
+      const urls: Record<string, string> = {};
+      const r2 = withPhoto.filter((x) => x.photo_store === "r2");
+      if (r2.length) {
+        const cfg = await r2Config();
+        if (cfg.publicBase) r2.forEach((x) => { urls[x.id] = `${cfg.publicBase}/${x.photo_thumb ? x.photo_path!.replace(/\.[a-z]+$/, "_t.jpg") : x.photo_path}`; });
+      }
+      const old = withPhoto.filter((x) => x.photo_store !== "r2");
+      if (old.length) {
+        const m = await signedUrls(old.map((x) => x.photo_path!));
+        old.forEach((x) => { if (m[x.photo_path!]) urls[x.id] = m[x.photo_path!]; });
+      }
+      setPhotos(urls);
+      return;
+    }
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -122,6 +144,7 @@ export default function MapPage() {
     const el = document.createElement("div");
     el.className = "map-pop";
     el.innerHTML =
+      (photos[s.id] ? `<img class="mp-photo" src="${esc(photos[s.id])}" alt="Ảnh toà ${esc(s.name)}" loading="lazy" decoding="async">` : "") +
       `<b class="mp-name">${esc(s.name)}</b>` +
       `<span class="mp-sub">${esc(s.code)} · ${esc(KIND_LABEL[s.kind] ?? s.kind)}${s.address ? ` · ${esc(s.address)}` : ""}</span>` +
       `<span class="mp-vacant ${s.vacant_rooms > 0 ? "ok" : "zero"}"><b class="num">${s.vacant_rooms}</b> phòng trống <span class="mp-of">/ ${s.total_rooms} phòng</span></span>`;
@@ -144,7 +167,7 @@ export default function MapPage() {
     if (isManager) btn("btn ghost sm", "Sửa vị trí", () => startPlacing(s));
     el.append(act);
     return el;
-  }, [isManager, nav, startPlacing]);
+  }, [isManager, nav, startPlacing, photos]);
 
   // Vẽ ghim tất cả toà (số trên ghim = số phòng trống)
   useEffect(() => {
@@ -276,6 +299,7 @@ export default function MapPage() {
           <section className="card">
             {list.map((s) => (
               <div key={s.id} className="list-row" role="button" tabIndex={0} onClick={() => focus(s)} onKeyDown={(e) => e.key === "Enter" && focus(s)}>
+                {photos[s.id] ? <img className="list-photo" src={photos[s.id]} alt="" loading="lazy" decoding="async" /> : null}
                 <span className="tag" style={{ fontSize: 13 }}>{s.code}</span>
                 <div className="grow">
                   <div className="name">{s.name}</div>

@@ -1,7 +1,7 @@
 import { supabase } from "./supabase";
 
 export const BUCKET = "kho-tai-lieu";
-export type FileKind = "cccd" | "hop_dong" | "anh_phong" | "anh_loai_phong" | "dinh_kem_de_nghi";
+export type FileKind = "cccd" | "hop_dong" | "anh_phong" | "anh_loai_phong" | "anh_toa" | "dinh_kem_de_nghi";
 
 export type StoredFile = {
   id: string; kind: FileKind; path: string; file_name: string | null; mime_type: string | null; size_bytes: number | null;
@@ -14,7 +14,7 @@ export type StoredFile = {
 };
 
 /** Thư mục gốc trong kho theo loại tệp. Mã chủ = mã toà (hoặc mã đề nghị với đính kèm đề nghị). */
-const FOLDER: Record<FileKind, string> = { cccd: "cccd", hop_dong: "hop-dong", anh_phong: "anh-phong", anh_loai_phong: "anh-phong", dinh_kem_de_nghi: "de-nghi" };
+const FOLDER: Record<FileKind, string> = { cccd: "cccd", hop_dong: "hop-dong", anh_phong: "anh-phong", anh_loai_phong: "anh-phong", anh_toa: "anh-toa", dinh_kem_de_nghi: "de-nghi" };
 
 /** Liên kết của tệp với đối tượng */
 export type FileOwner =
@@ -22,12 +22,13 @@ export type FileOwner =
   | { kind: "hop_dong"; buildingId: string; contractId: string }
   | { kind: "anh_phong"; buildingId: string; roomId: string }
   | { kind: "anh_loai_phong"; buildingId: string; roomTypeId: string }
+  | { kind: "anh_toa"; buildingId: string }
   | { kind: "dinh_kem_de_nghi"; requestId: string };
 
 const ownerFolder = (o: FileOwner) => (o.kind === "dinh_kem_de_nghi" ? o.requestId : o.buildingId);
 const ownerColumn = (o: FileOwner): Record<string, string> =>
   o.kind === "cccd" ? { tenant_id: o.tenantId } : o.kind === "hop_dong" ? { contract_id: o.contractId }
-  : o.kind === "anh_phong" ? { room_id: o.roomId } : o.kind === "anh_loai_phong" ? { room_type_id: o.roomTypeId } : { request_id: o.requestId };
+  : o.kind === "anh_phong" ? { room_id: o.roomId } : o.kind === "anh_loai_phong" ? { room_type_id: o.roomTypeId } : o.kind === "anh_toa" ? { building_id: o.buildingId } : { request_id: o.requestId };
 
 export const MAX_BYTES = 10 * 1024 * 1024;
 const THUMB_EDGE = 480;
@@ -152,7 +153,7 @@ export async function uploadFile(owner: FileOwner, raw: File, extra: { label?: s
   return uploadSupabase(owner, raw, file, extra);
 }
 
-export async function listFiles(kind: FileKind, column: "tenant_id" | "contract_id" | "room_id" | "room_type_id" | "request_id", id: string): Promise<StoredFile[]> {
+export async function listFiles(kind: FileKind, column: "building_id" | "tenant_id" | "contract_id" | "room_id" | "room_type_id" | "request_id", id: string): Promise<StoredFile[]> {
   const { data } = await supabase.from("files").select("*").eq("kind", kind).eq(column, id).order("created_at");
   return (data as StoredFile[]) ?? [];
 }
@@ -168,7 +169,7 @@ export async function signedUrls(paths: string[]): Promise<Record<string, string
 
 /**
  * Link xem cho một nhóm tệp, khoá theo mã tệp.
- *  - Ảnh phòng trên R2: địa chỉ công khai (qua mạng Cloudflare, không cần gọi máy chủ).
+ *  - Ảnh phòng / ảnh toà trên R2: địa chỉ công khai (qua mạng Cloudflare, không cần gọi máy chủ).
  *  - Tệp riêng tư trên R2: link ký tạm 10 phút, ký cả nhóm trong MỘT lần gọi.
  *  - Tệp cũ ở Supabase: link ký tạm như trước.
  * size "thumb" dùng ảnh nhỏ nếu có (danh sách), "full" dùng ảnh gốc (xem to).
@@ -188,7 +189,7 @@ export async function fileUrls(files: StoredFile[], size: "thumb" | "full"): Pro
       const toSign: { f: StoredFile; key: string }[] = [];
       for (const f of r2) {
         const key = size === "thumb" && f.thumb ? thumbPath(f.path) : f.path;
-        if (key.startsWith("anh-phong/") && cfg.publicBase) out[f.id] = `${cfg.publicBase}/${key}`;
+        if ((key.startsWith("anh-phong/") || key.startsWith("anh-toa/")) && cfg.publicBase) out[f.id] = `${cfg.publicBase}/${key}`;
         else toSign.push({ f, key });
       }
       for (let i = 0; i < toSign.length; i += 100) {

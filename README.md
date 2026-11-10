@@ -73,6 +73,7 @@ supabase/
   015_tk_ngan_hang_toa.sql  bảng building_bank_accounts: tài khoản nhận tiền riêng từng toà (QR tiền thuê + cọc trong hợp đồng)
   016_hoa_don_gtgt.sql      tenants.id_address, vat_daily_report(ngày) cho Quản lý/Kế toán, cron 21:00 báo danh sách xuất hoá đơn GTGT; trang /hoa-don-gtgt + tải Excel
   017_ctv_khong_doi_mat_khau.sql   trigger ctv_pw_guard: Cộng tác viên không tự đổi mật khẩu; quản lý đặt lại qua Edge Function (mở khoá 60 giây)
+  018a_anh_toa_gia_tri.sql, 018_anh_toa.sql   ảnh đại diện toà nhà (kind anh_toa, thư mục anh-toa/ công khai trên R2); building_map() trả thêm photo_path/photo_store/photo_thumb
   thu_nghiem/                seed.sql / cleanup.sql: tài khoản + toà thử nghiệm (không phải migration)
   functions/quan-ly-tai-khoan    cấp / khoá tài khoản, đổi SĐT, cấp lại mật khẩu (dùng service role)
   functions/phan-tich-giao-viec  ghi âm / tin nhắn → danh sách việc (Gemini)
