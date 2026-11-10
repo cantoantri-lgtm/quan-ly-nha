@@ -198,3 +198,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - Khung: logo góc trái (bấm = Trang chủ), menu Ứng dụng, chuông, chế độ sáng/tối (`src/shell.css`).
 - Route: `/` Trang chủ (Chờ bạn duyệt, Bàn làm việc, Lịch), `/viec` Công việc, `/van-phong` hub, `/van-phong/ds/:kind` danh sách dạng bảng.
 - Logo: `public/logo-neo-nestly.svg` / `.png`.
+- `020_mau_nhom_phong.sql`: màu nhóm phòng (room_types.color); trạng thái đỏ = đang cho thuê.

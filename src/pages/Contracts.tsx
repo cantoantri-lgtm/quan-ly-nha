@@ -122,7 +122,7 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
     }).select("id").single();
     setBusy(false);
     if (error) { setErr(/contracts_one_active/.test(error.message) ? "Phòng này đang có hợp đồng hiệu lực." : friendlyError(error)); return; }
-    toast("Đã lập hợp đồng. Phòng chuyển sang \"Đang ở\".");
+    toast("Đã lập hợp đồng. Phòng chuyển sang \"Đang cho thuê\".");
     onSaved(data.id);
   }
 

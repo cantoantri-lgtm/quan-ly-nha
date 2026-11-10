@@ -12,7 +12,7 @@ import FileGallery from "../components/FileGallery";
 import { uploadFile } from "../lib/files";
 import RoomTypeCard from "../components/RoomTypeCard";
 import RoomTypesSheet from "../components/RoomTypesSheet";
-import type { RoomType } from "../lib/roomTypes";
+import { groupColorKey, type RoomType } from "../lib/roomTypes";
 import "../rooms.css";
 
 export type RoomStatus = "trong" | "dang_o" | "dang_sua" | "giu_cho";
@@ -21,7 +21,7 @@ export type Room = {
   rent_mode: "thang" | "dem"; list_price: number | null; max_occupants: number | null; status: RoomStatus; note: string | null;
   room_type_id: string | null; furniture?: string | null;
 };
-const ROOM_STATUS: Record<RoomStatus, string> = { trong: "Trống", dang_o: "Đang ở", dang_sua: "Đang sửa", giu_cho: "Giữ chỗ" };
+const ROOM_STATUS: Record<RoomStatus, string> = { trong: "Trống", dang_o: "Đang cho thuê", dang_sua: "Đang sửa", giu_cho: "Giữ chỗ" };
 const MODE: Record<string, string> = { thang: "Theo tháng", dem: "Theo đêm" };
 
 /** Đoán tầng từ mã phòng: 305 → 3, 1204 → 12, A305 → 3 */
@@ -41,6 +41,7 @@ export default function BuildingDetail() {
   const [typesOpen, setTypesOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"" | RoomStatus>("");
+  const [groupFilter, setGroupFilter] = useState<string>("");   // mã nhóm phòng đang lọc ("" = tất cả)
   const [editing, setEditing] = useState<Partial<Room> | null>(null);
   const [bulk, setBulk] = useState(false);
   const [paste, setPaste] = useState(false);
@@ -97,14 +98,20 @@ export default function BuildingDetail() {
   }, [rooms]);
 
   const floors = useMemo(() => {
-    const shown = rooms.filter((r) => !filter || r.status === filter);
+    const shown = rooms.filter((r) => (!filter || r.status === filter) && (!groupFilter || r.room_type_id === groupFilter));
     const m = new Map<string, Room[]>();
     shown.forEach((r) => {
       const k = r.floor == null ? "Khác" : r.floor === 0 ? "Trệt" : `Tầng ${r.floor}`;
       m.set(k, [...(m.get(k) ?? []), r]);
     });
     return [...m.entries()];
-  }, [rooms, filter]);
+  }, [rooms, filter, groupFilter]);
+  // Màu nhóm phòng: theo khoá lưu ở loại phòng; loại chưa chọn màu thì không tô
+  const colorOf = useMemo(() => {
+    const m: Record<string, string | null> = {};
+    types.forEach((t) => { m[t.id] = groupColorKey(t); });
+    return m;
+  }, [types]);
 
   if (!building) return (<><TopBar title="Toà nhà" back /><main className="main"><Empty title="Không tìm thấy toà này">Có thể bạn chưa được gán vào toà này.</Empty></main></>);
 
@@ -134,7 +141,7 @@ export default function BuildingDetail() {
 
         <section className="room-stats">
           <div className="stat"><b className="num">{rooms.length}</b><span>phòng</span></div>
-          <div className="stat st-dang_o"><b className="num">{stats.c.dang_o}</b><span>đang ở</span></div>
+          <div className="stat st-dang_o"><b className="num">{stats.c.dang_o}</b><span>cho thuê</span></div>
           <div className="stat st-trong"><b className="num">{stats.c.trong}</b><span>trống</span></div>
           <div className="stat st-dang_sua"><b className="num">{stats.c.dang_sua + stats.c.giu_cho}</b><span>đang sửa, giữ</span></div>
         </section>
@@ -163,7 +170,7 @@ export default function BuildingDetail() {
 
         {rooms.length ? (
           <div className="chips" role="group" aria-label="Lọc phòng">
-            {([["", "Tất cả", rooms.length], ["trong", "Trống", stats.c.trong], ["dang_o", "Đang ở", stats.c.dang_o], ["dang_sua", "Đang sửa", stats.c.dang_sua], ["giu_cho", "Giữ chỗ", stats.c.giu_cho]] as ["" | RoomStatus, string, number][])
+            {([["", "Tất cả", rooms.length], ["trong", "Trống", stats.c.trong], ["dang_o", "Đang cho thuê", stats.c.dang_o], ["dang_sua", "Đang sửa", stats.c.dang_sua], ["giu_cho", "Giữ chỗ", stats.c.giu_cho]] as ["" | RoomStatus, string, number][])
               .map(([k, l, n]) => <button key={k} className="chip" aria-pressed={filter === k} onClick={() => setFilter(k)}>{l}<span className="n">{n}</span></button>)}
           </div>
         ) : null}
@@ -181,17 +188,30 @@ export default function BuildingDetail() {
             </div>
             <div className="room-grid">
               {list.map((r) => (
-                <button key={r.id} className={`room st-${r.status}${picked.has(r.id) ? " picked" : ""}`} aria-pressed={selecting ? picked.has(r.id) : undefined}
+                <button key={r.id} className={`room st-${r.status}${r.room_type_id && colorOf[r.room_type_id] ? ` gc-${colorOf[r.room_type_id]}` : ""}${picked.has(r.id) ? " picked" : ""}`} aria-pressed={selecting ? picked.has(r.id) : undefined}
                   onClick={() => (selecting ? togglePick([r.id]) : setEditing(r))} aria-label={`Phòng ${r.code}, ${ROOM_STATUS[r.status]}`}>
                   <span className="rc">{r.code}</span>
                   <span className="rp num">{vndShort(r.list_price)}{r.rent_mode === "dem" ? "/đêm" : ""}</span>
-                  <span className="rs">{r.room_type || ROOM_STATUS[r.status]}</span>
+                  <span className="rs">{r.room_type || "Chưa phân loại"}</span>
+                  <span className="rst">{r.status === "dang_o" ? "Đang thuê" : ROOM_STATUS[r.status]}</span>
                 </button>
               ))}
             </div>
           </section>
         ))}
+        {types.length ? (
+          <div className="group-legend" role="group" aria-label="Lọc theo nhóm phòng">
+            <span className="small muted">Nhóm phòng (màu nền)</span>
+            {types.map((t) => (
+              <button key={t.id} type="button" className={`chip gl${colorOf[t.id] ? ` gc-${colorOf[t.id]}` : ""}`} aria-pressed={groupFilter === t.id}
+                onClick={() => setGroupFilter(groupFilter === t.id ? "" : t.id)}>
+                <i className="gsw" />{t.name}<span className="n">{roomCounts[t.id] ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="legend small">
+          <span className="muted">Tình trạng (viền trái):</span>
           {(Object.keys(ROOM_STATUS) as RoomStatus[]).map((s) => <span key={s}><i className={`dot st-${s}`} />{ROOM_STATUS[s]}</span>)}
         </div>
         {selecting ? <div style={{ height: 76 }} aria-hidden="true" /> : null}
@@ -287,7 +307,7 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
       .then(({ data }) => setHasContract(!!data?.length));
   }, [isNew, room.id]);
 
-  // Chọn "Đang ở" cho phòng thuê tháng chưa có hợp đồng → phải nhập khách, CCCD, hợp đồng
+  // Chọn "Đang cho thuê" cho phòng thuê tháng chưa có hợp đồng → phải nhập khách, CCCD, hợp đồng
   // Phòng công ty cho nhân viên ở: ghi chú bắt đầu bằng HOME thì không cần khách và hợp đồng
   const isHome = /^home\b/i.test(note.trim());
   const needTenant = status === "dang_o" && mode === "thang" && hasContract === false && canManage && !isNew && !isHome;
@@ -321,7 +341,7 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
       rentN = r; depN = d;
     }
     setBusy(true);
-    // Khi cần lập hợp đồng: lưu phòng trước với trạng thái cũ, hợp đồng sẽ tự chuyển phòng sang "Đang ở"
+    // Khi cần lập hợp đồng: lưu phòng trước với trạng thái cũ, hợp đồng sẽ tự chuyển phòng sang "Đang cho thuê"
     const saveStatus = needTenant ? (room.status === "dang_o" ? "dang_o" : (room.status ?? "trong")) : status;
     const row = canManage
       ? { building_id: building.id, code: code.trim().toUpperCase(), floor: floor ? Number(floor) : guessFloor(code),
@@ -417,12 +437,12 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
             ))}
           </div>
           {isNew && status === "dang_o" ? <small className="muted">Lưu phòng trước, rồi mở lại phòng để nhập khách đang ở, CCCD và hợp đồng.</small> : null}
-          {!canManage && status === "dang_o" && room.status !== "dang_o" ? <small style={{ color: "var(--danger)" }}>Chỉ Quản lý hoặc Giám sát toà lập hợp đồng để chuyển phòng sang "Đang ở".</small> : null}
+          {!canManage && status === "dang_o" && room.status !== "dang_o" ? <small style={{ color: "var(--danger)" }}>Chỉ Quản lý hoặc Giám sát toà lập hợp đồng để chuyển phòng sang "Đang cho thuê".</small> : null}
         </div>
         {needTenant ? (
           <section className="fg" aria-label="Khách đang ở">
             <b>Khách đang ở và hợp đồng</b>
-            <p className="muted small" style={{ margin: 0 }}>Phòng "Đang ở" cần có khách đứng tên, số CCCD và hợp đồng. Ảnh CCCD hai mặt và file hợp đồng là bắt buộc.</p>
+            <p className="muted small" style={{ margin: 0 }}>Phòng "Đang cho thuê" cần có khách đứng tên, số CCCD và hợp đồng. Ảnh CCCD hai mặt và file hợp đồng là bắt buộc.</p>
             <label className="field"><span>Họ tên khách *</span><input id="r-tname" className="input" value={tName} onChange={(e) => setTName(e.target.value)} /></label>
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: "1 1 150px" }}><span>Số điện thoại</span><input id="r-tphone" className="input" inputMode="tel" value={tPhone} onChange={(e) => setTPhone(e.target.value)} /></label>

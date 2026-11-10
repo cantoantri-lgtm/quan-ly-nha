@@ -6,9 +6,9 @@
 .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px; display: grid; gap: 1px; text-align: center; }
 .stat b { font-size: 20px; line-height: 1.2; }
 .stat span { font-size: 12px; color: var(--muted); }
-.stat.st-dang_o b { color: var(--s-doing); }
+.stat.st-dang_o b { color: var(--s-block); }
 .stat.st-trong b { color: var(--s-done); }
-.stat.st-dang_sua b { color: var(--today); }
+.stat.st-dang_sua b { color: var(--s-todo); }
 .floor { display: grid; gap: 8px; }
 .floor-label { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; font-size: 14px; margin-top: 6px; }
 .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
@@ -20,19 +20,25 @@
 .room .rp { font-size: 13px; font-weight: 600; }
 .room .rs { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .room.st-trong { border-left-color: var(--s-done); }
-.room.st-dang_o { border-left-color: var(--s-doing); background: var(--s-doing-bg); }
-.room.st-dang_sua { border-left-color: var(--s-block); background: var(--s-block-bg); }
+.room.st-dang_o { border-left-color: var(--s-block); background: var(--s-block-bg); }
+.room.st-dang_sua { border-left-color: var(--s-todo); background: var(--s-todo-bg); }
 .room.st-giu_cho { border-left-color: var(--today); background: var(--today-bg); }
+/* Nhóm phòng: màu nền theo nhóm; viền trái vẫn là tình trạng */
+.room[class*="gc-"] { background: var(--gc-bg); }
+.room .rst { font-size: 11px; font-weight: 700; color: var(--muted); }
+.room.st-trong .rst { color: var(--s-done); }
+.room.st-dang_o .rst { color: var(--s-block); }
+.room.st-giu_cho .rst { color: var(--today); }
 .room:hover { border-color: var(--brand); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); padding: 4px 2px; }
 .legend .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
-.dot.st-trong { background: var(--s-done); } .dot.st-dang_o { background: var(--s-doing); }
-.dot.st-dang_sua { background: var(--s-block); } .dot.st-giu_cho { background: var(--today); }
+.dot.st-trong { background: var(--s-done); } .dot.st-dang_o { background: var(--s-block); }
+.dot.st-dang_sua { background: var(--s-todo); } .dot.st-giu_cho { background: var(--today); }
 .seg-room { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .seg-room button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 4px; font-size: 13.5px; font-weight: 600; cursor: pointer; color: var(--muted); }
 .seg-room button[aria-pressed="true"].st-trong { background: var(--s-done-bg); color: var(--s-done); border-color: var(--s-done); }
-.seg-room button[aria-pressed="true"].st-dang_o { background: var(--s-doing-bg); color: var(--s-doing); border-color: var(--s-doing); }
-.seg-room button[aria-pressed="true"].st-dang_sua { background: var(--s-block-bg); color: var(--s-block); border-color: var(--s-block); }
+.seg-room button[aria-pressed="true"].st-dang_o { background: var(--s-block-bg); color: var(--s-block); border-color: var(--s-block); }
+.seg-room button[aria-pressed="true"].st-dang_sua { background: var(--s-todo-bg); color: var(--s-todo); border-color: var(--s-todo); }
 .seg-room button[aria-pressed="true"].st-giu_cho { background: var(--today-bg); color: var(--today); border-color: var(--today); }
 .bulk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
 .preview { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; }
@@ -48,3 +54,19 @@
 .floor-label .btn { min-height: 28px; padding: 2px 8px; }
 .danger-zone { border: 1px solid var(--s-block); background: var(--s-block-bg); border-radius: 12px; padding: 12px; display: grid; gap: 10px; }
 .danger-zone p { margin: 0; font-size: 14px; }
+
+/* Màu nhóm phòng */
+.gc-xam_xanh { --gc: var(--gc-xam_xanh); --gc-bg: var(--gc-xam_xanh-bg); }
+.gc-kem { --gc: var(--gc-kem); --gc-bg: var(--gc-kem-bg); }
+.gc-cam { --gc: var(--gc-cam); --gc-bg: var(--gc-cam-bg); }
+.gc-xanh_la { --gc: var(--gc-xanh_la); --gc-bg: var(--gc-xanh_la-bg); }
+.gc-xanh_duong { --gc: var(--gc-xanh_duong); --gc-bg: var(--gc-xanh_duong-bg); }
+.gc-tim { --gc: var(--gc-tim); --gc-bg: var(--gc-tim-bg); }
+.gc-hong { --gc: var(--gc-hong); --gc-bg: var(--gc-hong-bg); }
+.gc-vang { --gc: var(--gc-vang); --gc-bg: var(--gc-vang-bg); }
+.group-legend { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; padding: 4px 2px; }
+.group-legend .gl { background: var(--gc-bg, var(--surface)); }
+.gsw { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 6px; background: var(--gc, var(--line)); border: 1px solid var(--line); vertical-align: -1px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatches button { display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--line); background: var(--gc-bg, var(--surface)); color: var(--ink); border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.swatches button[aria-pressed="true"] { border-color: var(--gc, var(--brand)); }

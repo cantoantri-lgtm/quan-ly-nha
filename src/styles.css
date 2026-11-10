@@ -17,6 +17,14 @@
   --s-block: #B3402F;  --s-block-bg: #F8E4E0;
   --s-done: #2E7A4C;   --s-done-bg: #E1F1E6;
   --late: #B3402F; --today: #A0670E; --today-bg: #F7ECD6; --soon: #2C64A3;
+    --gc-xam_xanh: #6F929C; --gc-xam_xanh-bg: #DDE8EB;
+    --gc-kem: #B8913A; --gc-kem-bg: #FBF1D3;
+    --gc-cam: #D9822B; --gc-cam-bg: #FAE3CB;
+    --gc-xanh_la: #5E9E5A; --gc-xanh_la-bg: #DFF0DA;
+    --gc-xanh_duong: #2F5FC4; --gc-xanh_duong-bg: #DCE6FA;
+    --gc-tim: #8A5BB5; --gc-tim-bg: #EBDFF5;
+    --gc-hong: #C95B8A; --gc-hong-bg: #F8E0EA;
+    --gc-vang: #B89E00; --gc-vang-bg: #FBF5BE;
 
   --radius: 14px;
   --shadow: 0 1px 2px rgba(22, 33, 29, .06), 0 4px 16px rgba(22, 33, 29, .06);
@@ -35,6 +43,14 @@
     --s-todo: #A0ACA7; --s-todo-bg: #232C29; --s-doing: #79ACE6; --s-doing-bg: #182A3E;
     --s-block: #EE8270; --s-block-bg: #3A1F1A; --s-done: #66C391; --s-done-bg: #17321F;
     --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6;
+    --gc-xam_xanh: #8FB4BF; --gc-xam_xanh-bg: #1E2F34;
+    --gc-kem: #E0BC62; --gc-kem-bg: #352C14;
+    --gc-cam: #EE9D4F; --gc-cam-bg: #3A2512;
+    --gc-xanh_la: #7FC27A; --gc-xanh_la-bg: #1B3219;
+    --gc-xanh_duong: #7EA3EE; --gc-xanh_duong-bg: #172743;
+    --gc-tim: #B88BE0; --gc-tim-bg: #2B1E3A;
+    --gc-hong: #EE86AF; --gc-hong-bg: #3B1F2C;
+    --gc-vang: #E3CB3A; --gc-vang-bg: #353010;
     --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 8px 28px rgba(0,0,0,.5); --logo-bg: #EEF1EA;
     color-scheme: dark;
   }
@@ -45,6 +61,14 @@
     --s-todo: #A0ACA7; --s-todo-bg: #232C29; --s-doing: #79ACE6; --s-doing-bg: #182A3E;
     --s-block: #EE8270; --s-block-bg: #3A1F1A; --s-done: #66C391; --s-done-bg: #17321F;
     --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6;
+    --gc-xam_xanh: #8FB4BF; --gc-xam_xanh-bg: #1E2F34;
+    --gc-kem: #E0BC62; --gc-kem-bg: #352C14;
+    --gc-cam: #EE9D4F; --gc-cam-bg: #3A2512;
+    --gc-xanh_la: #7FC27A; --gc-xanh_la-bg: #1B3219;
+    --gc-xanh_duong: #7EA3EE; --gc-xanh_duong-bg: #172743;
+    --gc-tim: #B88BE0; --gc-tim-bg: #2B1E3A;
+    --gc-hong: #EE86AF; --gc-hong-bg: #3B1F2C;
+    --gc-vang: #E3CB3A; --gc-vang-bg: #353010;
     --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 8px 28px rgba(0,0,0,.5); --logo-bg: #EEF1EA;
     color-scheme: dark;
 }

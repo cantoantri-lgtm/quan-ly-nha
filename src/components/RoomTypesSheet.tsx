@@ -2,20 +2,20 @@ import { useMemo, useState, type FormEvent } from "react";
 import { friendlyError, supabase } from "../lib/supabase";
 import { parseMoney, vnd } from "../lib/money";
 import { listFiles, removeFile } from "../lib/files";
-import { furnitureList, type RoomType } from "../lib/roomTypes";
+import { GROUP_COLORS, furnitureList, groupColorKey, type RoomType } from "../lib/roomTypes";
 import type { Building } from "../lib/labels";
 import FileGallery from "./FileGallery";
 import { Sheet } from "./ui";
 import "../roomtype.css";
 
 type Draft = {
-  id: string | null; name: string; area: string; mode: "thang" | "dem"; price: string; max: string; furniture: string; description: string; apply: boolean;
+  id: string | null; name: string; area: string; mode: "thang" | "dem"; price: string; max: string; furniture: string; description: string; color: string; apply: boolean;
 };
 const fmtMoney = (n: number | null) => (n != null ? new Intl.NumberFormat("vi-VN").format(n) : "");
 const toDraft = (t: RoomType | null, building: Building): Draft => t
   ? { id: t.id, name: t.name, area: t.area_m2 != null ? String(t.area_m2).replace(".", ",") : "", mode: t.rent_mode, price: fmtMoney(t.list_price),
-      max: t.max_occupants?.toString() ?? "", furniture: t.furniture ?? "", description: t.description ?? "", apply: true }
-  : { id: null, name: "", area: "", mode: building.kind === "khach_san" ? "dem" : "thang", price: "", max: "", furniture: "", description: "", apply: true };
+      max: t.max_occupants?.toString() ?? "", furniture: t.furniture ?? "", description: t.description ?? "", color: groupColorKey(t) ?? "", apply: true }
+  : { id: null, name: "", area: "", mode: building.kind === "khach_san" ? "dem" : "thang", price: "", max: "", furniture: "", description: "", color: "", apply: true };
 
 /** Danh sách và biểu mẫu loại phòng của một toà (dành cho Quản lý / Giám sát toà) */
 export default function RoomTypesSheet({ open, building, types, roomCounts, onClose, onChanged }: {
@@ -42,7 +42,7 @@ export default function RoomTypesSheet({ open, building, types, roomCounts, onCl
     if (area != null && (!Number.isFinite(area) || area <= 0)) { setErr("Diện tích chưa đúng."); return; }
     const row = {
       building_id: building.id, name, area_m2: area, rent_mode: draft.mode, list_price: price,
-      max_occupants: draft.max ? Number(draft.max) : null, furniture: draft.furniture.trim() || null, description: draft.description.trim() || null,
+      max_occupants: draft.max ? Number(draft.max) : null, furniture: draft.furniture.trim() || null, description: draft.description.trim() || null, color: draft.color || null,
     };
     setBusy(true);
     if (!draft.id) {
@@ -104,6 +104,13 @@ export default function RoomTypesSheet({ open, building, types, roomCounts, onCl
               <input id="rt-price" className="input num" inputMode="decimal" value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} placeholder="VD: 4.500.000 hoặc 4,5tr" />
               {draft.price && parseMoney(draft.price) != null ? <small className="muted">{vnd(parseMoney(draft.price))}</small> : null}</label>
           </div>
+          <div className="field"><span>Màu nhóm phòng</span>
+            <div className="swatches" role="group" aria-label="Màu nhóm phòng">
+              <button type="button" aria-pressed={!draft.color} onClick={() => setDraft({ ...draft, color: "" })}>Không tô</button>
+              {GROUP_COLORS.map((c) => (
+                <button type="button" key={c.key} className={`gc-${c.key}`} aria-pressed={draft.color === c.key} onClick={() => setDraft({ ...draft, color: c.key })}><i className="gsw" />{c.label}</button>
+              ))}
+            </div></div>
           <label className="field"><span>Nội thất (mỗi dòng một món)</span>
             <textarea id="rt-furn" className="input" style={{ minHeight: 90 }} value={draft.furniture} onChange={(e) => setDraft({ ...draft, furniture: e.target.value })} placeholder={"Giường 1m6\nTủ quần áo\nMáy lạnh\nBếp từ"} />
             {furnitureList(draft.furniture).length ? <small className="muted">{furnitureList(draft.furniture).length} món</small> : null}</label>
@@ -137,8 +144,8 @@ export default function RoomTypesSheet({ open, building, types, roomCounts, onCl
             <ul className="rt-list">
               {types.map((t) => (
                 <li key={t.id}>
-                  <button type="button" className="rt-item" onClick={() => { setErr(null); setDraft(toDraft(t, building)); }}>
-                    <span><b>{t.name}</b>
+                  <button type="button" className={`rt-item${groupColorKey(t) ? ` gc-${groupColorKey(t)}` : ""}`} onClick={() => { setErr(null); setDraft(toDraft(t, building)); }}>
+                    <span><b><i className="gsw" />{t.name}</b>
                       <span>{[t.area_m2 != null ? `${String(t.area_m2).replace(".", ",")} m²` : "", t.list_price != null ? `${vnd(t.list_price)}${t.rent_mode === "dem" ? "/đêm" : "/tháng"}` : "Chưa có giá"].filter(Boolean).join(" · ")}</span></span>
                     <span className="rt-count">{roomCounts[t.id] ?? 0} phòng</span>
                   </button>
