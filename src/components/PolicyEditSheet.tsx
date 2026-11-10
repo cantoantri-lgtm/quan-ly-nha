@@ -1,72 +1,15 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { FormEvent, useState } from "react";
 import { friendlyError, supabase } from "../lib/supabase";
-import { useSession } from "../lib/session";
-import { naturalCompare, parseMoney } from "../lib/money";
-import { Empty, Sheet, TopBar } from "../components/ui";
-import { PolicyView, hasData, type Fee, type Policy, type Term } from "../components/PolicyView";
+import { parseMoney } from "../lib/money";
+import { Sheet } from "./ui";
+import type { Fee, Policy, Term } from "./PolicyView";
 import "../policy.css";
-
-/** Dịch vụ và chính sách theo từng toà. Mọi vai trò (kể cả Cộng tác viên) xem; chỉ Quản lý sửa (RLS ở CSDL). */
-export default function Policies() {
-  const { isManager } = useSession();
-  const [sp, setSp] = useSearchParams();
-  const [rows, setRows] = useState<Policy[] | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [guest, setGuest] = useState(false);   // chế độ khách xem: ẩn ký hợp đồng và hoa hồng
-  const { toast } = useSession();
-
-  const load = useCallback(async () => {
-    const { data, error } = await supabase.rpc("building_policies");
-    if (error) { setErr("Không tải được chính sách. Thử lại sau."); return; }
-    setErr(null);
-    setRows(((data as Policy[]) ?? []).slice().sort((a, b) => naturalCompare(a.code, b.code)));
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  const wanted = sp.get("toa");
-  const current = useMemo(() => {
-    if (!rows?.length) return null;
-    return rows.find((r) => r.building_id === wanted) ?? rows.find(hasData) ?? rows[0];
-  }, [rows, wanted]);
-
-  return (
-    <>
-      <TopBar title="Chính sách toà" back
-        action={isManager && current ? <button className="tb-action" onClick={() => setEditing(true)}>Sửa</button> : null} />
-      <main className="main stack">
-        {err ? <div className="error-box" role="alert">{err}</div> : null}
-        {!rows && !err ? <div className="loading">Đang tải…</div> : null}
-        {rows && rows.length > 1 ? (
-          <div className="pl-chips" role="group" aria-label="Chọn toà">
-            {rows.map((r) => (
-              <button key={r.building_id} type="button" className={`chip${current?.building_id === r.building_id ? " on" : ""}`}
-                aria-pressed={current?.building_id === r.building_id} onClick={() => setSp({ toa: r.building_id })}>{r.code}</button>
-            ))}
-          </div>
-        ) : null}
-        {rows && !rows.length ? <Empty title="Chưa có toà nào" /> : null}
-        {current && hasData(current) ? (
-          <label className="pl-guest">
-            <input type="checkbox" checked={guest} onChange={(e) => setGuest(e.target.checked)} />
-            <span><b>Chế độ khách xem</b><small className="muted"> Ẩn phần ký hợp đồng và hoa hồng, dùng khi đưa màn hình cho khách.</small></span>
-          </label>
-        ) : null}
-        {current ? <PolicyView p={current} isManager={isManager} guest={guest} onEdit={() => setEditing(true)} /> : null}
-      </main>
-      {editing && current ? (
-        <PolicySheet p={current} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); toast("Đã lưu chính sách toà."); load(); }} />
-      ) : null}
-    </>
-  );
-}
 
 type FeeRow = { label: string; amount: string; unit: string };
 type TermRow = { months: string; pct: string };
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
-function PolicySheet({ p, onClose, onSaved }: { p: Policy; onClose: () => void; onSaved: () => void }) {
+export default function PolicyEditSheet({ p, onClose, onSaved }: { p: Policy; onClose: () => void; onSaved: () => void }) {
   const [fees, setFees] = useState<FeeRow[]>(p.fees.map((f) => ({ label: f.label, amount: new Intl.NumberFormat("vi-VN").format(f.amount), unit: f.unit })));
   const [amenities, setAmenities] = useState(p.amenities.join("\n"));
   const [furn, setFurn] = useState(p.furniture.join("\n"));

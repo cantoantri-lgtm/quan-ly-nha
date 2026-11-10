@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { ddmmyyyy } from "../lib/dates";
 import { vnd } from "../lib/money";
 import { Empty } from "./ui";
+import PolicyEditSheet from "./PolicyEditSheet";
 import "../policy.css";
 
 export type Fee = { label: string; amount: number; unit: string };
@@ -97,10 +98,12 @@ export function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManag
 }
 
 
-/** Chính sách một toà, tự tải; dùng trong trang toà và cửa sổ nhỏ ở Phòng trống. Có công tắc Khách xem. */
-export function PolicyPanel({ buildingId, onEdit }: { buildingId: string; onEdit?: () => void }) {
+/** Chính sách một toà, tự tải; dùng trong trang toà và cửa sổ nhỏ ở Phòng trống. Có công tắc Khách xem. canEdit (Quản lý): nút Sửa ngay tại đây. */
+export function PolicyPanel({ buildingId, canEdit = false }: { buildingId: string; canEdit?: boolean }) {
   const [p, setP] = useState<Policy | null | undefined>(undefined);
   const [guest, setGuest] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     let off = false;
     supabase.rpc("building_policies").then(({ data, error }) => {
@@ -108,18 +111,22 @@ export function PolicyPanel({ buildingId, onEdit }: { buildingId: string; onEdit
       setP(error ? null : ((data as Policy[]) ?? []).find((r) => r.building_id === buildingId) ?? null);
     });
     return () => { off = true; };
-  }, [buildingId]);
+  }, [buildingId, tick]);
   if (p === undefined) return <div className="loading">Đang tải…</div>;
   if (p === null) return <p className="muted small">Không tải được chính sách. Thử lại sau.</p>;
   return (
     <div className="stack">
       {hasData(p) ? (
-        <label className="pl-guest">
-          <input type="checkbox" checked={guest} onChange={(e) => setGuest(e.target.checked)} />
-          <span><b>Chế độ khách xem</b><small className="muted"> Ẩn phần ký hợp đồng và hoa hồng, dùng khi đưa màn hình cho khách.</small></span>
-        </label>
+        <div className="pl-tools">
+          <label className="pl-guest">
+            <input type="checkbox" checked={guest} onChange={(e) => setGuest(e.target.checked)} />
+            <span><b>Chế độ khách xem</b><small className="muted"> Ẩn phần ký hợp đồng và hoa hồng, dùng khi đưa màn hình cho khách.</small></span>
+          </label>
+          {canEdit ? <button type="button" className="btn secondary sm" onClick={() => setEditing(true)}>Sửa chính sách</button> : null}
+        </div>
       ) : null}
-      <PolicyView p={p} isManager={!!onEdit} guest={guest} onEdit={onEdit ?? (() => {})} />
+      <PolicyView p={p} isManager={canEdit} guest={guest} onEdit={() => setEditing(true)} />
+      {editing ? <PolicyEditSheet p={p} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setTick((n) => n + 1); }} /> : null}
     </div>
   );
 }

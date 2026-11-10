@@ -162,8 +162,7 @@ export default function BuildingDetail() {
         </div>
         {polOpen ? (
           <section className="card stack">
-            <PolicyPanel buildingId={building.id} onEdit={isManager ? () => nav(`/chinh-sach?toa=${building.id}`) : undefined} />
-            {isManager ? <Link className="btn ghost sm" to={`/chinh-sach?toa=${building.id}`}>Sửa chính sách toà</Link> : null}
+            <PolicyPanel buildingId={building.id} canEdit={isManager} />
           </section>
         ) : null}
 
