@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
           email: `${phone}@${EMAIL_DOMAIN}`,
           password,
           email_confirm: true,
-          user_metadata: { full_name, phone, must_change_password: true },
+          user_metadata: { full_name, phone, must_change_password: role !== "cong_tac_vien" },
           app_metadata: { role, provisioned: true },
         });
         if (error) throw error;
@@ -80,10 +80,19 @@ Deno.serve(async (req) => {
         if (password.length < 6) return json({ error: "Mật khẩu tạm cần ít nhất 6 ký tự" }, 400);
         const { data: u, error: e0 } = await admin.auth.admin.getUserById(id);
         if (e0) throw e0;
+        // Cộng tác viên không tự đổi mật khẩu (trigger ctv_pw_guard): quản lý đặt lại thì mở khoá 60 giây
+        const { data: target } = await admin.from("profiles").select("role").eq("id", id).maybeSingle();
+        const isCtv = target?.role === "cong_tac_vien";
+        if (isCtv) {
+          const { error: eu } = await admin.from("profiles")
+            .update({ pw_unlock_until: new Date(Date.now() + 60_000).toISOString() }).eq("id", id);
+          if (eu) throw eu;
+        }
         const { error } = await admin.auth.admin.updateUserById(id, {
           password,
-          user_metadata: { ...(u.user.user_metadata ?? {}), must_change_password: true },
+          user_metadata: { ...(u.user.user_metadata ?? {}), must_change_password: !isCtv },
         });
+        if (isCtv) await admin.from("profiles").update({ pw_unlock_until: null }).eq("id", id);
         if (error) throw error;
         return json({ ok: true });
       }

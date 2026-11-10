@@ -78,7 +78,7 @@ export default function App() {
       </div>
     );
   }
-  if (session.user.user_metadata?.must_change_password) return <><ChangePassword forced /><Toast /></>;
+  if (!isCollaborator && session.user.user_metadata?.must_change_password) return <><ChangePassword forced /><Toast /></>;
 
   // Cộng tác viên: chỉ bản đồ, phòng trống, tài khoản
   if (isCollaborator) {

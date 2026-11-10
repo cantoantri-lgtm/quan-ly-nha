@@ -34,8 +34,14 @@ export default function Account() {
             </section>
           </>
         ) : null}
-        <div className="section-title">Đổi mật khẩu</div>
-        <ChangePassword />
+        {isCollaborator ? (
+          <p className="muted small" style={{ margin: 0 }}>Tài khoản Cộng tác viên do quản lý cấp, không tự đổi mật khẩu. Cần đổi mật khẩu thì liên hệ quản lý.</p>
+        ) : (
+          <>
+            <div className="section-title">Đổi mật khẩu</div>
+            <ChangePassword />
+          </>
+        )}
         <button className="btn secondary block" style={{ marginTop: 16 }} onClick={() => supabase.auth.signOut()}>Đăng xuất</button>
         <p className="muted small" style={{ textAlign: "center" }}>Neo Nestly · phiên bản 0.1</p>
       </main>
