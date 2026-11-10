@@ -199,3 +199,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - Route: `/` Trang chủ (Chờ bạn duyệt, Bàn làm việc, Lịch), `/viec` Công việc, `/van-phong` hub, `/van-phong/ds/:kind` danh sách dạng bảng.
 - Logo: `public/logo-neo-nestly.svg` / `.png`.
 - `020_mau_nhom_phong.sql`: màu nhóm phòng (room_types.color); trạng thái đỏ = đang cho thuê.
+- `021_gia_658_cmt8.sql`: giá niêm yết và 2 nhóm phòng (Studio cửa sổ / ban công) của 658 CMT8.
