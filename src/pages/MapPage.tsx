@@ -299,7 +299,7 @@ export default function MapPage() {
           <section className="card">
             {list.map((s) => (
               <div key={s.id} className="list-row" role="button" tabIndex={0} onClick={() => focus(s)} onKeyDown={(e) => e.key === "Enter" && focus(s)}>
-                {photos[s.id] ? <img className="list-photo" src={photos[s.id]} alt="" loading="lazy" decoding="async" /> : null}
+                {photos[s.id] ? <img className="list-photo" src={photos[s.id]} alt="" loading="lazy" decoding="async" /> : Object.keys(photos).length ? <span className="list-photo" aria-hidden="true" /> : null}
                 <span className="tag" style={{ fontSize: 13 }}>{s.code}</span>
                 <div className="grow">
                   <div className="name">{s.name}</div>

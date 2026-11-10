@@ -129,10 +129,8 @@ export default function BuildingDetail() {
           {isManager ? <button className="btn ghost sm" onClick={() => setEditBuilding(true)}>Sửa toà</button> : null}
         </section>
 
-        <section className="card">
-          <FileGallery owner={{ kind: "anh_toa", buildingId: building.id }} title="Ảnh toà nhà" pdf={false} cover
-            hint={'Ảnh có nhãn "Đại diện" hiện trên bản đồ cho cả nhân viên và cộng tác viên.'} canUpload={canManage} canDelete={canManage} />
-        </section>
+        <FileGallery owner={{ kind: "anh_toa", buildingId: building.id }} title="Ảnh toà nhà" pdf={false} cover
+          hint={'Ảnh có nhãn "Đại diện" hiện trên bản đồ cho cả nhân viên và cộng tác viên.'} canUpload={canManage} canDelete={canManage} />
 
         <section className="room-stats">
           <div className="stat"><b className="num">{rooms.length}</b><span>phòng</span></div>
