@@ -202,3 +202,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - `021_gia_658_cmt8.sql`: giá niêm yết và 2 nhóm phòng (Studio cửa sổ / ban công) của 658 CMT8.
 - `022_noi_that_toa.sql`: danh mục nội thất của toà trong chính sách; giao diện có chế độ "Khách xem" ẩn ký hợp đồng và hoa hồng.
 - `023_ghi_chu_toa.sql`: buildings.public_note (ghi chú toà hiện ở Phòng trống); vacant_rooms() trả thêm building_note.
+- 024_gia_658_cap_nhat.sql: cập nhật giá G01, 201 của 658 CMT8 theo sơ đồ mới.
