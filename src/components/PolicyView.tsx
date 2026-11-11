@@ -1,3 +1,4 @@
+import { useSession } from "../lib/session";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { ddmmyyyy } from "../lib/dates";
@@ -101,7 +102,9 @@ export function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManag
 /** Chính sách một toà, tự tải; dùng trong trang toà và cửa sổ nhỏ ở Phòng trống. Có công tắc Khách xem. canEdit (Quản lý): nút Sửa ngay tại đây. */
 export function PolicyPanel({ buildingId, canEdit = false }: { buildingId: string; canEdit?: boolean }) {
   const [p, setP] = useState<Policy | null | undefined>(undefined);
-  const [guest, setGuest] = useState(false);
+  const { isCustomer } = useSession();
+  const [guestToggle, setGuest] = useState(false);
+  const guest = isCustomer || guestToggle; // khách hàng luôn ở chế độ khách (máy chủ cũng đã bỏ hoa hồng)
   const [editing, setEditing] = useState(false);
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -116,10 +119,10 @@ export function PolicyPanel({ buildingId, canEdit = false }: { buildingId: strin
   if (p === null) return <p className="muted small">Không tải được chính sách. Thử lại sau.</p>;
   return (
     <div className="stack">
-      {hasData(p) ? (
+      {hasData(p) && !isCustomer ? (
         <div className="pl-tools">
           <label className="pl-guest">
-            <input type="checkbox" checked={guest} onChange={(e) => setGuest(e.target.checked)} />
+            <input type="checkbox" checked={guestToggle} onChange={(e) => setGuest(e.target.checked)} />
             <span><b>Chế độ khách xem</b><small className="muted"> Ẩn phần ký hợp đồng và hoa hồng, dùng khi đưa màn hình cho khách.</small></span>
           </label>
           {canEdit ? <button type="button" className="btn secondary sm" onClick={() => setEditing(true)}>Sửa chính sách</button> : null}

@@ -20,6 +20,7 @@ Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện �
 | Hợp đồng | Lập hợp đồng gắn phòng và khách (phòng tự chuyển "Đang ở"), cách ký giấy hay điện tử, tải ảnh/PDF hợp đồng đã ký, thu và hoàn cọc, kết thúc hợp đồng. |
 | Thu tiền phòng | Hoá đơn tháng theo toà, mã QR chuyển khoản (VietQR) đúng số tiền và nội dung, link thanh toán gửi khách `/thanh-toan/<mã>`, tự đánh dấu "Đã thu" khi tiền về qua SePay, hoặc đánh dấu tay. |
 | Kho ảnh | Ảnh phòng, CCCD, hợp đồng, chứng từ đính kèm đề nghị thanh toán. Tệp mới nằm ở Cloudflare R2 (tải thẳng từ trình duyệt bằng link tạm do Edge Function `kho-anh` ký, kèm ảnh nhỏ cho danh sách nhanh; ảnh phòng xem qua địa chỉ công khai, các tệp riêng tư xem bằng link tạm 10 phút). Tệp cũ ở bucket riêng tư `kho-tai-lieu` của Supabase vẫn xem được (cột `files.store`). Chưa cấu hình R2 thì app tự dùng kho Supabase. Ảnh được thu nhỏ trước khi tải. |
+| Khách hàng | Tài khoản khách (ID = SĐT, mỗi CCCD một tài khoản) do Quản lý / Giám sát / Sale tạo ở `/khach-hang`. Khách xem phòng trống, giá, phí, dịch vụ, nội thất (không thấy hoa hồng, ký hợp đồng, ghi chú nội bộ) và gửi phản ánh `/phan-anh`: công ty trả lời theo luồng tin nhắn, chỉ khách kết thúc, hoặc tự kết thúc sau 3 ngày kể từ lần công ty trả lời. Sale chỉ xử lý khách do mình tạo. |
 | Quản trị | Cấp tài khoản, cấp lại mật khẩu, khoá tài khoản, gán toà, nhập số ngày phép năm. |
 | Thông báo | Trong app, thời gian thực. |
 
@@ -203,4 +204,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - `022_noi_that_toa.sql`: danh mục nội thất của toà trong chính sách; giao diện có chế độ "Khách xem" ẩn ký hợp đồng và hoa hồng.
 - `023_ghi_chu_toa.sql`: buildings.public_note (ghi chú toà hiện ở Phòng trống); vacant_rooms() trả thêm building_note.
 - 024_gia_658_cap_nhat.sql: cập nhật giá G01, 201 của 658 CMT8 theo sơ đồ mới.
-- 025a_khach_hang_gia_tri.sql, 025_khach_hang.sql: vai trò khach_hang (CCCD duy nhất, ẩn hoa hồng ngay ở CSDL), phản ánh khách ↔ công ty (tự kết thúc sau 3 ngày). 025 chưa chạy trên Supabase, đang chờ xác nhận.
+- 025a_khach_hang_gia_tri.sql, 025_khach_hang.sql: vai trò khach_hang (CCCD duy nhất, ẩn hoa hồng ngay ở CSDL), phản ánh khách ↔ công ty (tự kết thúc sau 3 ngày). Đã chạy. Edge Function quan-ly-tai-khoan thêm create_customer / reset_customer_password (Quản lý, Giám sát, Sale tạo khách).

@@ -29,6 +29,8 @@ import PayPage from "./pages/PayPage";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 import VacantRooms from "./pages/VacantRooms";
 import VatDaily from "./pages/VatDaily";
+import Feedback, { FeedbackThread } from "./pages/Feedback";
+import Customers from "./pages/Customers";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
 const MapPage = lazy(() => import("./pages/MapPage"));
@@ -61,7 +63,7 @@ function ManagerOnly() {
 }
 
 export default function App() {
-  const { session, profile, loading, isCollaborator } = useSession();
+  const { session, profile, loading, isCollaborator, isCustomer } = useSession();
 
   // Trang thanh toán cho khách thuê: công khai, không cần đăng nhập
   if (window.location.pathname.startsWith("/thanh-toan/")) return <Routes><Route path="/thanh-toan/:code" element={<PayPage />} /></Routes>;
@@ -79,6 +81,23 @@ export default function App() {
     );
   }
   if (!isCollaborator && session.user.user_metadata?.must_change_password) return <><ChangePassword forced /><Toast /></>;
+
+  // Khách hàng: phòng trống, bản đồ, phản ánh, thông báo, tài khoản
+  if (isCustomer) {
+    return (
+      <Routes>
+        <Route element={<Shell />}>
+          <Route path="phong-trong" element={<VacantRooms />} />
+          <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
+          <Route path="phan-anh" element={<Feedback />} />
+          <Route path="phan-anh/:id" element={<FeedbackThread />} />
+          <Route path="thong-bao" element={<Notifications />} />
+          <Route path="tai-khoan" element={<Account />} />
+          <Route path="*" element={<Navigate to="/phong-trong" replace />} />
+        </Route>
+      </Routes>
+    );
+  }
 
   // Cộng tác viên: chỉ bản đồ, phòng trống, tài khoản
   if (isCollaborator) {
@@ -122,6 +141,8 @@ export default function App() {
         <Route element={<MoneyOnly />}>
           <Route path="hoa-don-gtgt" element={<VatDaily />} />
         </Route>
+        <Route path="khach-hang" element={<Customers />} />
+        <Route path="phan-anh/:id" element={<FeedbackThread />} />
         <Route path="thong-bao" element={<Notifications />} />
         <Route path="tai-khoan" element={<Account />} />
         <Route path="quan-tri" element={<ManagerOnly />}>

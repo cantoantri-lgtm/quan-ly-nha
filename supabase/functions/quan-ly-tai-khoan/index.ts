@@ -18,7 +18,8 @@ const normPhone = (p: string) => {
   else if (s.startsWith("84") && s.length === 11) s = "0" + s.slice(2);
   return s;
 };
-const ROLES = ["quan_ly", "giam_sat", "nhan_vien", "cong_tac_vien"];
+const ROLES = ["quan_ly", "giam_sat", "nhan_vien", "cong_tac_vien"]; // khach_hang chỉ tạo qua create_customer
+const normCccd = (c: string) => String(c ?? "").replace(/\D/g, "");
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -32,10 +33,16 @@ Deno.serve(async (req) => {
   const { data: who } = await admin.auth.getUser(token);
   if (!who?.user) return json({ error: "Phiên đăng nhập đã hết, vui lòng đăng nhập lại" }, 401);
   const { data: me } = await admin.from("profiles").select("role,is_active").eq("id", who.user.id).single();
-  if (!me || me.role !== "quan_ly" || !me.is_active) return json({ error: "Chỉ quản lý được quản lý tài khoản" }, 403);
+  if (!me || !me.is_active) return json({ error: "Tài khoản không hoạt động" }, 403);
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Dữ liệu gửi lên không hợp lệ" }, 400); }
+
+  // Tài khoản khách hàng: Quản lý, Giám sát và Sale (nhân viên) được tạo; các hành động khác chỉ Quản lý
+  const STAFF = ["quan_ly", "giam_sat", "nhan_vien"];
+  if (body.action === "create_customer" || body.action === "reset_customer_password") {
+    if (!STAFF.includes(me.role)) return json({ error: "Không có quyền tạo tài khoản khách hàng" }, 403);
+  } else if (me.role !== "quan_ly") return json({ error: "Chỉ quản lý được quản lý tài khoản" }, 403);
 
   try {
     switch (body.action) {
@@ -72,6 +79,55 @@ Deno.serve(async (req) => {
           if (e2) throw e2;
         }
         return json({ id: data.user.id });
+      }
+
+      case "create_customer": {
+        const phone = normPhone(String(body.phone));
+        const full_name = String(body.full_name ?? "").trim();
+        const cccd = normCccd(String(body.cccd));
+        const password = String(body.password ?? "");
+        if (!/^0\d{9}$/.test(phone)) return json({ error: "Số điện thoại phải có 10 số, bắt đầu bằng 0" }, 400);
+        if (!full_name) return json({ error: "Thiếu họ tên khách" }, 400);
+        if (!/^\d{12}$/.test(cccd)) return json({ error: "CCCD phải đủ 12 số" }, 400);
+        if (password.length < 6) return json({ error: "Mật khẩu tạm cần ít nhất 6 ký tự" }, 400);
+
+        const { data: dupC } = await admin.from("customer_profiles").select("id").eq("cccd", cccd).maybeSingle();
+        if (dupC) return json({ error: "CCCD này đã đăng ký tài khoản khách hàng. Mỗi CCCD chỉ đăng ký một lần" }, 409);
+        const { data: dupP } = await admin.from("profiles").select("id").eq("phone", phone).maybeSingle();
+        if (dupP) return json({ error: "Số điện thoại này đã có tài khoản" }, 409);
+
+        const { data, error } = await admin.auth.admin.createUser({
+          email: `${phone}@${EMAIL_DOMAIN}`, password, email_confirm: true,
+          user_metadata: { full_name, phone, must_change_password: true },
+          app_metadata: { role: "khach_hang", provisioned: true },
+        });
+        if (error) throw error;
+        const { error: e1 } = await admin.from("profiles")
+          .upsert({ id: data.user.id, full_name, phone, role: "khach_hang", is_active: true });
+        const { error: e2 } = e1 ? { error: e1 } : await admin.from("customer_profiles")
+          .insert({ id: data.user.id, cccd, created_by: who.user.id });
+        if (e2) {
+          await admin.auth.admin.deleteUser(data.user.id); // hoàn tác, không để lại tài khoản dở dang
+          if ((e2 as { code?: string }).code === "23505") return json({ error: "CCCD này đã đăng ký tài khoản khách hàng. Mỗi CCCD chỉ đăng ký một lần" }, 409);
+          throw e2;
+        }
+        return json({ id: data.user.id });
+      }
+
+      case "reset_customer_password": {
+        const id = String(body.user_id);
+        const password = String(body.password ?? "");
+        if (password.length < 6) return json({ error: "Mật khẩu tạm cần ít nhất 6 ký tự" }, 400);
+        const { data: c } = await admin.from("customer_profiles").select("created_by").eq("id", id).maybeSingle();
+        if (!c) return json({ error: "Không phải tài khoản khách hàng" }, 400);
+        if (me.role === "nhan_vien" && c.created_by !== who.user.id) return json({ error: "Chỉ người tạo tài khoản hoặc quản lý được cấp lại mật khẩu" }, 403);
+        const { data: u, error: e0 } = await admin.auth.admin.getUserById(id);
+        if (e0) throw e0;
+        const { error } = await admin.auth.admin.updateUserById(id, {
+          password, user_metadata: { ...(u.user.user_metadata ?? {}), must_change_password: true },
+        });
+        if (error) throw error;
+        return json({ ok: true });
       }
 
       case "reset_password": {

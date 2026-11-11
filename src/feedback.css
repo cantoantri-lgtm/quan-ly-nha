@@ -1,0 +1,15 @@
+/* Phản ánh khách hàng: danh sách và luồng tin nhắn */
+.fb-row .sub { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fb-st { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.fb-st.cho_cong_ty { background: var(--today-bg); color: var(--today); }
+.fb-st.cho_khach { background: var(--s-done-bg); color: var(--s-done); }
+.fb-st.dong { background: var(--s-todo-bg); color: var(--s-todo); }
+.fb-chat { display: grid; gap: 8px; }
+.fb-msg { max-width: 86%; padding: 9px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-msg small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+.fb-msg.khach { justify-self: end; background: var(--brand-soft); }
+.fb-msg.cong_ty { justify-self: start; }
+.fb-msg.he_thong { justify-self: center; max-width: 100%; background: transparent; border-style: dashed; color: var(--muted); font-size: 13px; text-align: center; }
+.fb-note { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); font-size: 13.5px; }
+.fb-reply { display: grid; gap: 8px; }
+.fb-reply textarea { min-height: 84px; resize: vertical; }

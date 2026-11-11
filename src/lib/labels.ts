@@ -1,4 +1,4 @@
-export type Role = "quan_ly" | "giam_sat" | "nhan_vien" | "cong_tac_vien";
+export type Role = "quan_ly" | "giam_sat" | "nhan_vien" | "cong_tac_vien" | "khach_hang";
 export type TaskStatus = "chua_lam" | "dang_lam" | "vuong" | "xong";
 export type Priority = "thap" | "binh_thuong" | "cao" | "gap";
 
@@ -7,8 +7,9 @@ export const ROLE_LABEL: Record<Role, string> = {
   giam_sat: "Giám sát",
   nhan_vien: "Nhân viên",
   cong_tac_vien: "Cộng tác viên",
+  khach_hang: "Khách hàng",
 };
-export const ROLE_RANK: Record<Role, number> = { quan_ly: 3, giam_sat: 2, nhan_vien: 1, cong_tac_vien: 0 };
+export const ROLE_RANK: Record<Role, number> = { quan_ly: 3, giam_sat: 2, nhan_vien: 1, cong_tac_vien: 0, khach_hang: 0 };
 
 export const STATUS_LABEL: Record<TaskStatus, string> = {
   chua_lam: "Chưa làm",

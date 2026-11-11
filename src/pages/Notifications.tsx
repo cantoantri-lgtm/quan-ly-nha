@@ -32,6 +32,7 @@ export default function Notifications() {
     }
     if (n.entity_type === "task" && n.entity_id) nav(`/viec/${n.entity_id}`);
     else if (n.entity_type === "request" && n.entity_id) nav(`/van-phong/${n.entity_id}`);
+    else if (n.entity_type === "feedback" && n.entity_id) nav(`/phan-anh/${n.entity_id}`);
     else if (n.entity_type === "vat_day") nav("/hoa-don-gtgt");
     else load();
   }

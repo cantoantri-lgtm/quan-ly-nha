@@ -24,6 +24,8 @@ type Ctx = {
   isSupervisor: boolean;
   /** Cộng tác viên: chỉ xem bản đồ + phòng trống */
   isCollaborator: boolean;
+  /** Khách hàng: xem phòng trống (không hoa hồng) và gửi phản ánh */
+  isCustomer: boolean;
   /** Dòng của tôi trong cơ cấu tổ chức (nếu đã được gán) */
   myStaff: Staff | null;
   /** Có thể đứng trong chuỗi duyệt: Leader, Trưởng phòng trở lên, hoặc giữ nhiệm vụ Nhân sự/Kế toán/Giám đốc */
@@ -71,7 +73,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMyStaff((st.data as Staff) ?? null);
     setProfile((p.data as Profile) ?? null);
     setBuildings((b.data as Building[]) ?? []);
-    setPeople((ppl.data as Profile[]) ?? []);
+    setPeople(((ppl.data as Profile[]) ?? []).filter((x) => x.role !== "khach_hang")); // khách hàng có trang riêng
     setMyBuildingIds(((mem.data as { building_id: string }[]) ?? []).map((m) => m.building_id));
   }, []);
 
@@ -118,12 +120,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => { supabase.removeChannel(ch); window.removeEventListener("focus", onFocus); };
   }, [session?.user?.id, profile?.is_active, refreshUnread, toast]);
 
-  const people = useMemo(() => allPeople.filter((x) => x.role !== "cong_tac_vien"), [allPeople]);
+  const people = useMemo(() => allPeople.filter((x) => x.role !== "cong_tac_vien" && x.role !== "khach_hang"), [allPeople]);
   const value = useMemo<Ctx>(() => ({
     session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg,
     isManager: profile?.role === "quan_ly",
     isSupervisor: profile?.role === "giam_sat",
     isCollaborator: profile?.role === "cong_tac_vien",
+    isCustomer: profile?.role === "khach_hang",
     myStaff,
     isApprover: !!myStaff && (myStaff.is_leader || !!myStaff.duty || (myStaff.level ?? 0) >= 3),
     isAccountant: myStaff?.duty === "ke_toan",

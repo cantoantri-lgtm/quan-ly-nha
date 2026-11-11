@@ -151,7 +151,7 @@ const isDark = () => (document.documentElement.dataset.theme ?? (matchMedia("(pr
 
 /** Thanh trên toàn app: logo (bấm về trang chủ), tên công ty, nút Apps, thông báo, chế độ tối, tài khoản */
 export function AppHeader() {
-  const { profile, unread, pendingApprovals, isManager, isApprover, isCollaborator, isAccountant } = useSession();
+  const { profile, unread, pendingApprovals, isManager, isApprover, isCollaborator, isCustomer, isAccountant } = useSession();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(isDark());
   const loc = useLocation();
@@ -163,7 +163,12 @@ export function AppHeader() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = isCollaborator ? [
+  const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = isCustomer ? [
+    { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+    { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
+    { to: "/phan-anh", label: "Phản ánh", icon: Icon.help, n: unread },
+    { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
+  ] : isCollaborator ? [
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
@@ -172,6 +177,7 @@ export function AppHeader() {
     { to: "/van-phong", label: "Văn phòng số", icon: Icon.office, n: pendingApprovals },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+    { to: "/khach-hang", label: "Khách hàng", icon: Icon.user },
     ...(isManager ? [
       { to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
       { to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user },
@@ -194,13 +200,13 @@ export function AppHeader() {
 
   return (
     <header className="apphead">
-      <Link to={isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Neo Nestly"><img src="/logo-neo-nestly.svg" alt="Neo Nestly" /></Link>
+      <Link to={isCustomer ? "/phong-trong" : isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Neo Nestly"><img src="/logo-neo-nestly.svg" alt="Neo Nestly" /></Link>
       <div className="ah-co"><b>NEO NESTLY</b><small>Serviced Apartment &amp; Residence</small></div>
       <div className="ah-tools">
         <button type="button" className="ah-btn apps" aria-expanded={open} aria-haspopup="true" aria-label="Chức năng" onClick={() => setOpen((o) => !o)}>
           {Icon.grid}<span className="ah-tip">Apps</span>
         </button>
-        {isCollaborator ? null : <Link to="/" className="ah-btn" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>}
+        {isCollaborator || isCustomer ? null : <Link to="/" className="ah-btn" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>}
         {isCollaborator ? null : <Link to="/thong-bao" className="ah-btn" aria-label="Thông báo">
           {Icon.bell}{unread > 0 ? <span className="ah-badge num">{unread > 99 ? "99+" : unread}</span> : null}<span className="ah-tip">Thông báo</span>
         </Link>}
@@ -243,7 +249,21 @@ export function TopBar({ title, back, action }: { title: string; back?: boolean 
 }
 
 export function BottomNav() {
-  const { unread, isManager, pendingApprovals, isCollaborator } = useSession();
+  const { unread, isManager, pendingApprovals, isCollaborator, isCustomer } = useSession();
+  if (isCustomer) {
+    return (
+      <nav className="bottomnav" aria-label="Điều hướng chính">
+        <div className="inner">
+          <NavLink to="/phong-trong">{Icon.building}<span>Phòng trống</span></NavLink>
+          <NavLink to="/phan-anh">
+            {Icon.help}<span>Phản ánh</span>
+            {unread > 0 ? <span className="badge num">{unread > 99 ? "99+" : unread}</span> : null}
+          </NavLink>
+          <NavLink to="/tai-khoan">{Icon.user}<span>Tài khoản</span></NavLink>
+        </div>
+      </nav>
+    );
+  }
   if (isCollaborator) {
     return (
       <nav className="bottomnav" aria-label="Điều hướng chính">
