@@ -203,3 +203,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - `022_noi_that_toa.sql`: danh mục nội thất của toà trong chính sách; giao diện có chế độ "Khách xem" ẩn ký hợp đồng và hoa hồng.
 - `023_ghi_chu_toa.sql`: buildings.public_note (ghi chú toà hiện ở Phòng trống); vacant_rooms() trả thêm building_note.
 - 024_gia_658_cap_nhat.sql: cập nhật giá G01, 201 của 658 CMT8 theo sơ đồ mới.
+- 025a_khach_hang_gia_tri.sql, 025_khach_hang.sql: vai trò khach_hang (CCCD duy nhất, ẩn hoa hồng ngay ở CSDL), phản ánh khách ↔ công ty (tự kết thúc sau 3 ngày). 025 chưa chạy trên Supabase, đang chờ xác nhận.
