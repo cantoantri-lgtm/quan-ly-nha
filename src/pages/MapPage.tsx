@@ -52,8 +52,7 @@ function vietnameseLabels(map: MLMap) {
 }
 
 export default function MapPage() {
-  const { isManager, isCollaborator, isCustomer, reloadBase, toast } = useSession();
-  const mapOnly = isCollaborator || isCustomer; // CTV và khách: bản đồ đầy màn hình, không hiện bảng danh sách
+  const { isManager, reloadBase, toast } = useSession();
   const nav = useNavigate();
   const [params] = useSearchParams();
   const focusId = params.get("toa");
@@ -279,11 +278,11 @@ export default function MapPage() {
           <button className="chip" aria-pressed={onlyVacant} onClick={() => setOnlyVacant(!onlyVacant)}>Chỉ toà còn trống</button>
         </div>
 
-        <div className={`map-box${placing ? " placing" : ""}${mapErr ? " failed" : ""}${mapOnly ? " full" : ""}`}>
+        <div className={`map-box${placing ? " placing" : ""}${mapErr ? " failed" : ""}`}>
           <div ref={box} className="map-canvas" role="region" aria-label="Bản đồ các toà nhà" />
           {mapErr ? (
             <div className="map-msg" role="alert"><b>Không hiện được bản đồ</b><span>{mapErr}</span>
-              {mapOnly ? null : <span className="muted">Bấm vào toà bên dưới để mở trên Google Maps.</span>}</div>
+              <span className="muted">Bấm vào toà bên dưới để mở trên Google Maps.</span></div>
           ) : !mapReady ? <div className="map-msg"><span className="muted">Đang tải bản đồ…</span></div> : null}
         </div>
 
@@ -294,7 +293,7 @@ export default function MapPage() {
           </p>
         ) : null}
 
-        {mapOnly ? (loading ? <div className="loading">Đang tải…</div> : spots.length === 0 ? <Empty title="Chưa có toà nhà nào" /> : null) : loading ? <div className="loading">Đang tải…</div> : spots.length === 0 ? (
+        {loading ? <div className="loading">Đang tải…</div> : spots.length === 0 ? (
           <Empty title="Chưa có toà nhà nào" />
         ) : (
           <section className="card">
@@ -319,7 +318,7 @@ export default function MapPage() {
         {isManager && missing > 0 && located.length > 0 ? (
           <p className="muted small" style={{ margin: 0 }}>{missing} toà chưa có vị trí — bấm vào toà để đặt.</p>
         ) : null}
-        <p className="muted small" style={{ margin: 0 }}>Số trên ghim là số phòng trống. Bấm ghim để xem ảnh toà, phòng trống và chỉ đường.</p>
+        <p className="muted small" style={{ margin: 0 }}>Số trên ghim là số phòng trống. Bấm ghim để xem tên toà và chỉ đường bằng Google Maps.</p>
         {placing ? <div style={{ height: 190 }} aria-hidden="true" /> : null}
       </main>
 
