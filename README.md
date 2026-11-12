@@ -212,3 +212,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - 030_gia_139d_theo_doanh_thu.sql: giá 139D theo bảng doanh thu (sheet DT NDC), thay cho 029.
 - 031_139d_24_phong.sql: 139D còn 24 phòng (xoá A201, B203, B205 đang trống).
 - 032_anh_toa_cho_ctv_khach.sql: CTV và khách hàng đọc được ảnh toà / ảnh phòng (sửa lỗi bản đồ không hiện ảnh toà cho CTV).
+- 033: khách thanh toán (customer_bills, TPBank 5342501983, khách báo đã chuyển → nhân sự xác nhận; trang /thanh-toan-cua-toi và /thu-tien-khach)

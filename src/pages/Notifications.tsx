@@ -8,7 +8,7 @@ import { Empty, TopBar } from "../components/ui";
 type N = { id: string; type: string; title: string; body: string | null; entity_type: string | null; entity_id: string | null; read_at: string | null; created_at: string };
 
 export default function Notifications() {
-  const { refreshUnread } = useSession();
+  const { refreshUnread, isCustomer } = useSession();
   const [items, setItems] = useState<N[]>([]);
   const [loading, setLoading] = useState(true);
   const nav = useNavigate();
@@ -33,6 +33,7 @@ export default function Notifications() {
     if (n.entity_type === "task" && n.entity_id) nav(`/viec/${n.entity_id}`);
     else if (n.entity_type === "request" && n.entity_id) nav(`/van-phong/${n.entity_id}`);
     else if (n.entity_type === "feedback" && n.entity_id) nav(`/phan-anh/${n.entity_id}`);
+    else if (n.entity_type === "bill") nav(isCustomer ? "/thanh-toan-cua-toi" : "/thu-tien-khach");
     else if (n.entity_type === "vat_day") nav("/hoa-don-gtgt");
     else load();
   }

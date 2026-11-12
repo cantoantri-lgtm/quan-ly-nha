@@ -166,6 +166,7 @@ export function AppHeader() {
   const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = isCustomer ? [
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
+    { to: "/thanh-toan-cua-toi", label: "Thanh toán", icon: Icon.money },
     { to: "/phan-anh", label: "Phản ánh", icon: Icon.help, n: unread },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
   ] : isCollaborator ? [
@@ -179,6 +180,7 @@ export function AppHeader() {
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/khach-hang", label: "Khách hàng", icon: Icon.user },
+    { to: "/thu-tien-khach", label: "Thu tiền khách", icon: Icon.money },
     { to: "/phan-anh", label: "Phản ánh", icon: Icon.help },
     ...(isManager ? [
       { to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
@@ -257,6 +259,7 @@ export function BottomNav() {
       <nav className="bottomnav" aria-label="Điều hướng chính">
         <div className="inner">
           <NavLink to="/phong-trong">{Icon.building}<span>Phòng trống</span></NavLink>
+          <NavLink to="/thanh-toan-cua-toi">{Icon.money}<span>Thanh toán</span></NavLink>
           <NavLink to="/phan-anh">
             {Icon.help}<span>Phản ánh</span>
             {unread > 0 ? <span className="badge num">{unread > 99 ? "99+" : unread}</span> : null}
