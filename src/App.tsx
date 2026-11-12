@@ -106,6 +106,9 @@ export default function App() {
         <Route element={<Shell />}>
           <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
           <Route path="phong-trong" element={<VacantRooms />} />
+          <Route path="phan-anh" element={<Feedback />} />
+          <Route path="phan-anh/:id" element={<FeedbackThread />} />
+          <Route path="thong-bao" element={<Notifications />} />
           <Route path="tai-khoan" element={<Account />} />
           <Route path="*" element={<Navigate to="/ban-do" replace />} />
         </Route>

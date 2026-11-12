@@ -171,6 +171,7 @@ export function AppHeader() {
   ] : isCollaborator ? [
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+    { to: "/phan-anh", label: "Phản ánh", icon: Icon.help, n: unread },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
   ] : [
     { to: "/viec", label: "Công việc", icon: Icon.tasks },
@@ -208,9 +209,9 @@ export function AppHeader() {
           {Icon.grid}<span className="ah-tip">Apps</span>
         </button>
         {isCollaborator || isCustomer ? null : <Link to="/" className="ah-btn" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>}
-        {isCollaborator ? null : <Link to="/thong-bao" className="ah-btn" aria-label="Thông báo">
+        <Link to="/thong-bao" className="ah-btn" aria-label="Thông báo">
           {Icon.bell}{unread > 0 ? <span className="ah-badge num">{unread > 99 ? "99+" : unread}</span> : null}<span className="ah-tip">Thông báo</span>
-        </Link>}
+        </Link>
         <button type="button" className="ah-btn" aria-label={dark ? "Chế độ sáng" : "Chế độ tối"} onClick={toggleTheme}>
           {dark ? Icon.sun : Icon.moon}<span className="ah-tip">{dark ? "Chế độ sáng" : "Chế độ tối"}</span>
         </button>
@@ -271,6 +272,10 @@ export function BottomNav() {
         <div className="inner">
           <NavLink to="/ban-do">{Icon.map}<span>Bản đồ</span></NavLink>
           <NavLink to="/phong-trong">{Icon.building}<span>Phòng trống</span></NavLink>
+          <NavLink to="/phan-anh">
+            {Icon.help}<span>Phản ánh</span>
+            {unread > 0 ? <span className="badge num">{unread > 99 ? "99+" : unread}</span> : null}
+          </NavLink>
           <NavLink to="/tai-khoan">{Icon.user}<span>Tài khoản</span></NavLink>
         </div>
       </nav>

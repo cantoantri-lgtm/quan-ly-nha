@@ -209,3 +209,51 @@ export async function removeFile(f: StoredFile): Promise<void> {
   if (f.store === "r2") await r2Delete([f.path, ...(f.thumb ? [thumbPath(f.path)] : [])]);
   else await supabase.storage.from(BUCKET).remove([f.path]);
 }
+
+// ---------- Ảnh đính kèm phản ánh (khách hàng / CTV / nhân sự) ----------
+export type FeedbackAttachment = {
+  id: string; thread_id: string; message_id: string; path: string; file_name: string | null; mime_type: string | null;
+  store: "supabase" | "r2"; thumb: boolean;
+};
+export const MAX_FEEDBACK_IMAGES = 4;
+
+/** Tải một ảnh lên kho (R2, dự phòng Supabase) cho phản ánh rồi gắn vào tin nhắn. Quyền do Postgres quyết định. */
+export async function attachFeedbackImage(threadId: string, messageId: string, raw: File): Promise<void> {
+  if (!raw.type.startsWith("image/")) throw new Error("Chỉ đính kèm ảnh.");
+  const file = await prepareFile(raw);
+  if (file.size > MAX_BYTES) throw new Error("Ảnh lớn hơn 10 MB.");
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `phan-anh/${threadId}/${crypto.randomUUID()}.${ext}`;
+  let store: "r2" | "supabase" = "supabase";
+  let thumbOk = false;
+  const cfg = await r2Config();
+  if (cfg.enabled) {
+    try {
+      const thumb = await makeThumb(file);
+      const items = [{ path, contentType: file.type }, ...(thumb ? [{ path: thumbPath(path), contentType: "image/jpeg" }] : [])];
+      const { urls } = await r2Call<{ urls: Record<string, { url: string; headers: Record<string, string> }> }>({ action: "put", items });
+      await Promise.all(items.map(async (it) => {
+        const u = urls[it.path];
+        const res = await fetch(u.url, { method: "PUT", headers: u.headers, body: it.path === path ? file : thumb! });
+        if (!res.ok) throw new Error(`R2 từ chối tải lên (${res.status})`);
+      }));
+      store = "r2"; thumbOk = !!thumb;
+    } catch (e) {
+      if (e instanceof Error && /quyền/.test(e.message)) throw e;
+      console.warn("Tải ảnh phản ánh lên R2 lỗi, dùng kho Supabase:", e);
+    }
+  }
+  if (store === "supabase") {
+    const up = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+    if (up.error) throw new Error(/row-level security|not authorized|policy/i.test(up.error.message) ? "Bạn không có quyền tải ảnh này lên." : up.error.message);
+  }
+  const { error } = await supabase.rpc("feedback_attach", {
+    p_message: messageId, p_path: path, p_name: raw.name, p_mime: file.type, p_size: file.size, p_store: store, p_thumb: thumbOk,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Link xem ảnh đính kèm, khoá theo mã đính kèm */
+export function attachmentUrls(list: FeedbackAttachment[], size: "thumb" | "full"): Promise<Record<string, string>> {
+  return fileUrls(list.map((a) => ({ id: a.id, path: a.path, store: a.store, thumb: a.thumb } as StoredFile)), size);
+}
