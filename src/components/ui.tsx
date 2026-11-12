@@ -178,6 +178,7 @@ export function AppHeader() {
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/khach-hang", label: "Khách hàng", icon: Icon.user },
+    { to: "/phan-anh", label: "Phản ánh", icon: Icon.help },
     ...(isManager ? [
       { to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
       { to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user },

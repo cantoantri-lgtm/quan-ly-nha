@@ -29,7 +29,7 @@ import PayPage from "./pages/PayPage";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 import VacantRooms from "./pages/VacantRooms";
 import VatDaily from "./pages/VatDaily";
-import Feedback, { FeedbackThread } from "./pages/Feedback";
+import Feedback, { FeedbackInbox, FeedbackThread } from "./pages/Feedback";
 import Customers from "./pages/Customers";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
@@ -142,6 +142,7 @@ export default function App() {
           <Route path="hoa-don-gtgt" element={<VatDaily />} />
         </Route>
         <Route path="khach-hang" element={<Customers />} />
+        <Route path="phan-anh" element={<FeedbackInbox />} />
         <Route path="phan-anh/:id" element={<FeedbackThread />} />
         <Route path="thong-bao" element={<Notifications />} />
         <Route path="tai-khoan" element={<Account />} />

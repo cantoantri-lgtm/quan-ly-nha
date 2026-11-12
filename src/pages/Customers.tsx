@@ -16,7 +16,7 @@ const credText = (name: string, phone: string, pw: string) =>
 export default function Customers() {
   const { toast, isManager } = useSession();
   const nav = useNavigate();
-  const [tab, setTab] = useState<"khach" | "phan_anh">("khach");
+  const tab = "khach" as "khach" | "phan_anh";
   const [custs, setCusts] = useState<Cust[] | null>(null);
   const [threads, setThreads] = useState<Thread[] | null>(null);
   const [q, setQ] = useState("");
@@ -55,10 +55,7 @@ export default function Customers() {
     <>
       <TopBar title="Khách hàng" action={<button className="btn sm" onClick={() => setCreating(true)}>+ Tạo tài khoản</button>} />
       <main className="main stack">
-        <div className="chips">
-          <button className="chip" aria-pressed={tab === "khach"} onClick={() => setTab("khach")}>Tài khoản<span className="n">{custs?.length ?? 0}</span></button>
-          <button className="chip" aria-pressed={tab === "phan_anh"} onClick={() => setTab("phan_anh")}>Phản ánh<span className="n">{openCount}</span></button>
-        </div>
+        <button className="btn secondary block" onClick={() => nav("/phan-anh")}>Xem phản ánh của khách{openCount ? ` (${openCount} chờ công ty)` : ""}</button>
         {tab === "khach" ? (
           <>
             <input className="input" placeholder="Tìm tên hoặc số điện thoại" value={q} onChange={(e) => setQ(e.target.value)} />

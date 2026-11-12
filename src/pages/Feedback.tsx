@@ -10,10 +10,12 @@ export type Thread = {
   id: string; customer_id: string; subject: string; status: "cho_cong_ty" | "cho_khach" | "dong";
   closed_reason: "khach_ket_thuc" | "tu_dong" | null; last_company_reply_at: string | null;
   created_at: string; updated_at: string;
+  building_id: string | null; building_code: string | null; building_name: string | null; room_code: string | null;
   customer?: { full_name: string; phone: string | null } | null;
 };
 type Msg = { id: string; sender: "khach" | "cong_ty" | "he_thong"; body: string; created_at: string; author?: { full_name: string } | null };
 
+export const fbPlace = (t: Thread) => [t.building_code, t.room_code ? "P." + t.room_code : "Khu vực chung"].filter(Boolean).join(" · ");
 export const FB_STATUS: Record<string, string> = { cho_cong_ty: "Chờ công ty", cho_khach: "Chờ khách", dong: "Đã kết thúc" };
 
 const AUTO_MS = 3 * 24 * 3600 * 1000;
@@ -54,7 +56,7 @@ export default function Feedback() {
               <div key={t.id} className="list-row fb-row" onClick={() => nav(`/phan-anh/${t.id}`)}>
                 <div className="grow">
                   <div className="name">{t.subject}</div>
-                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> {timeAgo(t.updated_at)}</div>
+                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> {fbPlace(t)} · {timeAgo(t.updated_at)}</div>
                 </div>›
               </div>
             ))}
@@ -66,16 +68,34 @@ export default function Feedback() {
   );
 }
 
+type Bld = { id: string; code: string; name: string };
+type RoomOpt = { id: string; code: string; floor: number | null };
+
 function NewSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (id: string) => void }) {
+  const [blds, setBlds] = useState<Bld[]>([]);
+  const [rooms, setRooms] = useState<RoomOpt[]>([]);
+  const [bld, setBld] = useState("");
+  const [room, setRoom] = useState("");   // "" = chưa chọn, "chung" = khu vực chung
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (open) { setSubject(""); setBody(""); setErr(null); } }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    setBld(""); setRoom(""); setRooms([]); setSubject(""); setBody(""); setErr(null);
+    supabase.rpc("building_map").then(({ data }) => setBlds(((data as Bld[]) ?? []).map((b) => ({ id: b.id, code: b.code, name: b.name }))));
+  }, [open]);
+  useEffect(() => {
+    setRoom(""); setRooms([]);
+    if (!bld) return;
+    supabase.rpc("feedback_rooms", { p_building: bld }).then(({ data }) => setRooms((data as RoomOpt[]) ?? []));
+  }, [bld]);
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!bld) { setErr("Chọn toà nhà."); return; }
+    if (!room) { setErr("Chọn phòng, hoặc \"Khu vực chung\" nếu không thuộc phòng nào."); return; }
     setBusy(true); setErr(null);
-    const { data, error } = await supabase.rpc("feedback_create", { p_subject: subject, p_body: body });
+    const { data, error } = await supabase.rpc("feedback_create", { p_building: bld, p_room: room === "chung" ? null : room, p_subject: subject, p_body: body });
     setBusy(false);
     if (error) { setErr(error.message); return; }
     onDone(data as string);
@@ -83,6 +103,17 @@ function NewSheet({ open, onClose, onDone }: { open: boolean; onClose: () => voi
   return (
     <Sheet open={open} onClose={onClose} title="Gửi phản ánh">
       <form className="stack" onSubmit={submit}>
+        <label className="field"><span>Toà nhà *</span>
+          <select className="input" value={bld} onChange={(e) => setBld(e.target.value)} required>
+            <option value="">— Chọn toà —</option>
+            {blds.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
+          </select></label>
+        <label className="field"><span>Phòng *</span>
+          <select className="input" value={room} onChange={(e) => setRoom(e.target.value)} disabled={!bld} required>
+            <option value="">— Chọn phòng —</option>
+            <option value="chung">Khu vực chung (không thuộc phòng nào)</option>
+            {rooms.map((r) => <option key={r.id} value={r.id}>{r.floor != null ? `Tầng ${r.floor} · ` : ""}{r.code}</option>)}
+          </select></label>
         <label className="field"><span>Tiêu đề *</span>
           <input className="input" maxLength={120} value={subject} onChange={(e) => setSubject(e.target.value)} required /></label>
         <label className="field"><span>Nội dung *</span>
@@ -101,6 +132,7 @@ export function FeedbackThread() {
   const [t, setT] = useState<Thread | null | undefined>(undefined);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
+  const [sales, setSales] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -109,6 +141,7 @@ export function FeedbackThread() {
       supabase.from("feedback_messages").select("id,sender,body,created_at").eq("thread_id", id!).order("created_at"),
     ]);
     setT((a.data as Thread | null) ?? null);
+    supabase.rpc("feedback_sales", { p_thread: id }).then(({ data }) => setSales((data as string[]) ?? []));
     setMsgs((b.data as Msg[]) ?? []);
   }, [id]);
   useEffect(() => { load(); }, [load]);
@@ -142,12 +175,13 @@ export function FeedbackThread() {
   const auto = autoCloseText(t);
   return (
     <>
-      <TopBar title={t.subject} back={isCustomer ? "/phan-anh" : "/khach-hang"} />
+      <TopBar title={t.subject} back="/phan-anh" />
       <main className="main stack">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span>
           {!isCustomer && t.customer ? <span className="muted small">{t.customer.full_name} · {t.customer.phone}</span> : null}
         </div>
+        <p className="fb-note"><b>{fbPlace(t)}</b>{t.building_name ? ` — ${t.building_name}` : ""}<br />Sale phụ trách: {sales.length ? sales.join(", ") : "chưa có (Quản lý sẽ xử lý)"}</p>
         {auto && isCustomer ? <p className="fb-note">Nếu bạn không phản hồi, phản ánh sẽ tự kết thúc lúc {auto}.</p> : null}
         {auto && !isCustomer ? <p className="fb-note">Chờ khách phản hồi. Không có phản hồi thì tự kết thúc lúc {auto}. Công ty không đóng thay khách.</p> : null}
         <div className="fb-chat">
@@ -168,6 +202,58 @@ export function FeedbackThread() {
           </form>
         ) : (
           <p className="fb-note">{t.closed_reason === "tu_dong" ? "Phản ánh đã tự kết thúc sau 3 ngày không có phản hồi." : "Khách đã kết thúc phản ánh."}</p>
+        )}
+      </main>
+    </>
+  );
+}
+
+/** Hộp phản ánh của nhân sự (Quản lý, Giám sát: tất cả; Sale: toà mình và khách mình tạo) */
+export function FeedbackInbox() {
+  const nav = useNavigate();
+  const [items, setItems] = useState<Thread[] | null>(null);
+  const [st, setSt] = useState<"" | Thread["status"]>("cho_cong_ty");
+  const [bld, setBld] = useState("");
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("feedback_threads").select("*, customer:profiles!customer_id(full_name,phone)").order("updated_at", { ascending: false }).limit(300);
+    setItems((data as Thread[]) ?? []);
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const h = () => load();
+    window.addEventListener("neo:notification", h);
+    return () => window.removeEventListener("neo:notification", h);
+  }, [load]);
+  const blds = Array.from(new Set((items ?? []).map((t) => t.building_code).filter(Boolean))) as string[];
+  const shown = (items ?? []).filter((t) => (!st || t.status === st) && (!bld || t.building_code === bld));
+  const cnt = (s: Thread["status"]) => (items ?? []).filter((t) => t.status === s).length;
+  return (
+    <>
+      <TopBar title="Phản ánh khách hàng" />
+      <main className="main stack">
+        <div className="chips">
+          {(["cho_cong_ty", "cho_khach", "dong"] as const).map((k) => (
+            <button key={k} className="chip" aria-pressed={st === k} onClick={() => setSt(k)}>{FB_STATUS[k]}<span className="n">{cnt(k)}</span></button>
+          ))}
+          <button className="chip" aria-pressed={st === ""} onClick={() => setSt("")}>Tất cả</button>
+        </div>
+        {blds.length > 1 ? (
+          <select className="input" value={bld} onChange={(e) => setBld(e.target.value)}>
+            <option value="">Tất cả toà</option>
+            {blds.map((b) => <option key={b} value={b}>{b}</option>)}
+          </select>
+        ) : null}
+        {items === null ? <div className="loading">Đang tải…</div> : shown.length === 0 ? <Empty title="Không có phản ánh" /> : (
+          <section className="card">
+            {shown.map((t) => (
+              <div key={t.id} className="list-row fb-row" onClick={() => nav(`/phan-anh/${t.id}`)}>
+                <div className="grow">
+                  <div className="name">{t.subject}</div>
+                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> {fbPlace(t)} · {t.customer?.full_name} · {timeAgo(t.updated_at)}</div>
+                </div>›
+              </div>
+            ))}
+          </section>
         )}
       </main>
     </>
