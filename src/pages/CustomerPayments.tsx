@@ -21,6 +21,28 @@ const STATUS: Record<Status, string> = { chua_thanh_toan: "Chưa thanh toán", c
 const monthLabel = (p: string | null) => (p ? `T${p.slice(5, 7)}/${p.slice(0, 4)}` : "");
 const dmy = (d: string | null) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "");
 
+/** Nội dung chuyển khoản dễ soát: "<mã KH> CK TRO 123 COC 123 DIEN 123 NUOCDV 123" (chỉ ghi khoản có tiền; ngân hàng giới hạn ~50 ký tự nên có bản rút gọn). Mã KH luôn đứng đầu để hệ thống tự đối soát. */
+export function transferContent(b: Pick<Bill, "kind" | "amount" | "pay_code" | "lines">): string {
+  let tro = 0, coc = 0, dien = 0, nuocdv = 0, khac = 0;
+  if (b.lines?.length) {
+    for (const l of b.lines) {
+      if (l.label.startsWith("Tiền phòng")) tro += l.amount;
+      else if (l.label === "Tiền điện") dien += l.amount;
+      else if (l.label === "Tiền nước" || l.label === "Phí dịch vụ") nuocdv += l.amount;
+      else khac += l.amount;
+    }
+  } else if (b.kind === "tien_phong") tro = b.amount;
+  else if (b.kind === "tien_coc") coc = b.amount;
+  else if (b.kind === "dien") dien = b.amount;
+  else nuocdv = b.amount;
+  const parts: [string, string, number][] = [["TRO", "T", tro], ["COC", "C", coc], ["DIEN", "D", dien], ["NUOCDV", "N", nuocdv], ["KHAC", "K", khac]];
+  const used = parts.filter((x) => x[2] !== 0);
+  const full = [b.pay_code, "CK", ...used.map((x) => `${x[0]} ${x[2]}`)].join(" ");
+  if (full.length <= BANK_NOTE_MAX) return full;
+  return [b.pay_code, "CK", ...used.map((x) => `${x[1]}${x[2]}`)].join(" ");
+}
+export const BANK_NOTE_MAX = 50;
+
 function useBank() {
   const [bank, setBank] = useState<PaySettings | null>(null);
   useEffect(() => { supabase.rpc("customer_pay_info").then(({ data }) => setBank(((data as PaySettings[]) ?? [])[0] ?? null)); }, []);
@@ -97,7 +119,7 @@ export function MyPayments() {
             {sel.note ? <p className="muted small" style={{ margin: 0 }}>{sel.note}</p> : null}
             {sel.status === "chua_thanh_toan" && bank ? (
               <>
-                <PayQR bank={bank} amount={sel.amount} code={sel.pay_code} toast={toast} note="Quét QR bằng app ngân hàng và giữ nguyên nội dung chuyển khoản." />
+                <PayQR bank={bank} amount={sel.amount} code={transferContent(sel)} maxLen={BANK_NOTE_MAX} toast={toast} note="Quét QR bằng app ngân hàng và giữ nguyên nội dung chuyển khoản." />
                 <label className="field"><span>Ghi chú cho công ty (không bắt buộc)</span>
                   <input className="input" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} /></label>
                 <button className="btn block" disabled={busy} onClick={report}>{busy ? "Đang gửi…" : "Tôi đã chuyển khoản"}</button>
@@ -173,7 +195,7 @@ export function StaffPayments() {
                 ))}
               </div>
             ) : null}
-            {sel.status === "chua_thanh_toan" && bank ? <PayQR bank={bank} amount={sel.amount} code={sel.pay_code} toast={toast} note="Đưa mã này cho khách quét nếu khách chưa mở app." /> : null}
+            {sel.status === "chua_thanh_toan" && bank ? <PayQR bank={bank} amount={sel.amount} code={transferContent(sel)} maxLen={BANK_NOTE_MAX} toast={toast} note="Đưa mã này cho khách quét nếu khách chưa mở app." /> : null}
             {sel.reported_note ? <p className="small" style={{ margin: 0 }}>Khách ghi: {sel.reported_note}</p> : null}
             {sel.status === "chua_thanh_toan" || sel.status === "cho_xac_nhan" ? (
               <button className="btn block" onClick={() => act(sel, "xac_nhan")}>Đã nhận tiền</button>) : null}
