@@ -8,15 +8,15 @@ import PayQR from "../components/PayQR";
 import type { PaySettings } from "../lib/vietqr";
 import "../feedback.css";
 
-type Kind = "tien_phong" | "dien" | "nuoc" | "phi_dich_vu" | "tien_coc";
+type Kind = "tien_phong" | "dien" | "nuoc" | "phi_dich_vu" | "tien_coc" | "phieu_thu";
 type Status = "chua_thanh_toan" | "cho_xac_nhan" | "da_thanh_toan" | "huy";
 type Bill = {
   id: string; customer_id: string; kind: Kind; period: string | null; amount: number; due_date: string | null;
   status: Status; pay_code: string; note: string | null; reported_at: string | null; reported_note: string | null;
-  confirmed_at: string | null; created_at: string; building_id: string | null; room_id: string | null;
+  confirmed_at: string | null; created_at: string; lines: { label: string; amount: number; detail?: string }[] | null; building_id: string | null; room_id: string | null;
   customer?: { full_name: string; phone: string | null } | null;
 };
-const KIND: Record<Kind, string> = { tien_phong: "Tiền phòng", dien: "Tiền điện", nuoc: "Tiền nước", phi_dich_vu: "Phí dịch vụ", tien_coc: "Tiền cọc" };
+const KIND: Record<Kind, string> = { tien_phong: "Tiền phòng", dien: "Tiền điện", nuoc: "Tiền nước", phi_dich_vu: "Phí dịch vụ", tien_coc: "Tiền cọc", phieu_thu: "Phiếu thu tháng" };
 const STATUS: Record<Status, string> = { chua_thanh_toan: "Chưa thanh toán", cho_xac_nhan: "Chờ xác nhận", da_thanh_toan: "Đã thanh toán", huy: "Đã huỷ" };
 const monthLabel = (p: string | null) => (p ? `T${p.slice(5, 7)}/${p.slice(0, 4)}` : "");
 const dmy = (d: string | null) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "");
@@ -70,7 +70,7 @@ export function MyPayments() {
   return (
     <>
       <TopBar title="Thanh toán" />
-      <main className="page stack">
+      <main className="main stack">
         {rows === null ? <div className="loading">Đang tải…</div> : rows.length === 0 ? <Empty title="Chưa có khoản nào cần thanh toán." /> : (
           <>
             {open.length ? <h2 className="small muted" style={{ margin: 0 }}>Cần thanh toán</h2> : null}
@@ -84,6 +84,16 @@ export function MyPayments() {
         {sel ? (
           <div className="stack">
             <p style={{ margin: 0 }}><b className="num">{vnd(sel.amount)}</b> · {STATUS[sel.status]}{sel.due_date ? ` · hạn ${dmy(sel.due_date)}` : ""}</p>
+            {sel.lines?.length ? (
+              <div className="card" style={{ padding: 12 }}>
+                {sel.lines.map((l, i) => (
+                  <div key={i} style={{ marginBottom: 6 }}>
+                    <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}><span>{l.label}</span><b className="num">{vnd(l.amount)}</b></div>
+                    {l.detail ? <div className="muted small">{l.detail}</div> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {sel.note ? <p className="muted small" style={{ margin: 0 }}>{sel.note}</p> : null}
             {sel.status === "chua_thanh_toan" && bank ? (
               <>
@@ -133,7 +143,7 @@ export function StaffPayments() {
   return (
     <>
       <TopBar title="Thu tiền khách" action={<button className="btn sm" onClick={() => setCreating(true)}>+ Khoản thu</button>} />
-      <main className="page stack">
+      <main className="main stack">
         <div className="row" style={{ gap: 6 }}>
           {(["cho_xac_nhan", "chua_thanh_toan", "da_thanh_toan", "all"] as const).map((s) => (
             <button key={s} className={"btn sm " + (filter === s ? "" : "secondary")} onClick={() => setFilter(s)}>
@@ -153,6 +163,17 @@ export function StaffPayments() {
             <p style={{ margin: 0 }}><b className="num">{vnd(sel.amount)}</b> · {STATUS[sel.status]}</p>
             <p className="muted small" style={{ margin: 0 }}>Nội dung chuyển khoản: <b>{sel.pay_code}</b>{sel.due_date ? ` · hạn ${dmy(sel.due_date)}` : ""}</p>
             {sel.note ? <p className="muted small" style={{ margin: 0 }}>Ghi chú: {sel.note}</p> : null}
+            {sel.lines?.length ? (
+              <div className="card" style={{ padding: 12 }}>
+                {sel.lines.map((l, i) => (
+                  <div key={i} style={{ marginBottom: 6 }}>
+                    <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}><span>{l.label}</span><b className="num">{vnd(l.amount)}</b></div>
+                    {l.detail ? <div className="muted small">{l.detail}</div> : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {sel.status === "chua_thanh_toan" && bank ? <PayQR bank={bank} amount={sel.amount} code={sel.pay_code} toast={toast} note="Đưa mã này cho khách quét nếu khách chưa mở app." /> : null}
             {sel.reported_note ? <p className="small" style={{ margin: 0 }}>Khách ghi: {sel.reported_note}</p> : null}
             {sel.status === "chua_thanh_toan" || sel.status === "cho_xac_nhan" ? (
               <button className="btn block" onClick={() => act(sel, "xac_nhan")}>Đã nhận tiền</button>) : null}

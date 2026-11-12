@@ -214,3 +214,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - 032_anh_toa_cho_ctv_khach.sql: CTV và khách hàng đọc được ảnh toà / ảnh phòng (sửa lỗi bản đồ không hiện ảnh toà cho CTV).
 - 033: khách thanh toán (customer_bills, TPBank 5342501983, khách báo đã chuyển → nhân sự xác nhận; trang /thanh-toan-cua-toi và /thu-tien-khach)
 - 034: SePay tự đối soát cả khoản thu khách (mã KH+10 hex); sepay-webhook nhận cả 2 tài khoản
+- 035/036: thông tin khách (người ở+CCCD, hợp đồng/cọc/đơn giá, số điện nước có ảnh, phiếu thu tháng); Edge Function doc-dong-ho (Gemini đọc công tơ); kho-anh thêm thư mục dong-ho

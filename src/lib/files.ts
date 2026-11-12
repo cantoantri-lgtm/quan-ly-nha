@@ -257,3 +257,57 @@ export async function attachFeedbackImage(threadId: string, messageId: string, r
 export function attachmentUrls(list: FeedbackAttachment[], size: "thumb" | "full"): Promise<Record<string, string>> {
   return fileUrls(list.map((a) => ({ id: a.id, path: a.path, store: a.store, thumb: a.thumb } as StoredFile)), size);
 }
+
+// ---------- Ảnh đồng hồ điện nước của khách (dong-ho/<mã khách>/...) ----------
+export type MeterPhoto = { path: string; store: "r2" | "supabase"; thumb: boolean; mime: string; base64: string };
+
+/** Thu nhỏ ảnh, tải lên kho (R2, dự phòng Supabase) và trả lại ảnh dạng base64 nhỏ để đọc số tự động. Quyền do Postgres quyết định. */
+export async function uploadMeterPhoto(customerId: string, raw: File): Promise<MeterPhoto> {
+  if (!raw.type.startsWith("image/")) throw new Error("Chỉ nhận ảnh.");
+  const file = await prepareFile(raw);
+  if (file.size > MAX_BYTES) throw new Error("Ảnh lớn hơn 10 MB.");
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `dong-ho/${customerId}/${crypto.randomUUID()}.${ext}`;
+  let store: "r2" | "supabase" = "supabase";
+  let thumbOk = false;
+  const cfg = await r2Config();
+  if (cfg.enabled) {
+    try {
+      const thumb = await makeThumb(file);
+      const items = [{ path, contentType: file.type }, ...(thumb ? [{ path: thumbPath(path), contentType: "image/jpeg" }] : [])];
+      const { urls } = await r2Call<{ urls: Record<string, { url: string; headers: Record<string, string> }> }>({ action: "put", items });
+      await Promise.all(items.map(async (it) => {
+        const u = urls[it.path];
+        const res = await fetch(u.url, { method: "PUT", headers: u.headers, body: it.path === path ? file : thumb! });
+        if (!res.ok) throw new Error(`R2 từ chối tải lên (${res.status})`);
+      }));
+      store = "r2"; thumbOk = !!thumb;
+    } catch (e) {
+      if (e instanceof Error && /quyền/.test(e.message)) throw e;
+      console.warn("Tải ảnh đồng hồ lên R2 lỗi, dùng kho Supabase:", e);
+    }
+  }
+  if (store === "supabase") {
+    const up = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+    if (up.error) throw new Error(/row-level security|not authorized|policy/i.test(up.error.message) ? "Bạn không có quyền tải ảnh này lên." : up.error.message);
+  }
+  // Ảnh nhỏ (cạnh dài 1280px) để gửi đọc số, nhẹ hơn ảnh gốc
+  const small = await renderJpeg(file, 1280, 0.8).catch(() => null);
+  const blob: Blob = small ?? file;
+  const base64: string = await new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).split(",")[1] ?? "");
+    fr.onerror = () => rej(fr.error);
+    fr.readAsDataURL(blob);
+  });
+  return { path, store, thumb: thumbOk, mime: small ? "image/jpeg" : file.type, base64 };
+}
+
+export type MeterReading = {
+  id: string; customer_id: string; kind: "dien" | "nuoc"; reading: number; read_on: string;
+  photo_path: string; photo_store: "r2" | "supabase"; photo_thumb: boolean; source: "khach" | "nhan_vien";
+  ocr_value: number | null; note: string | null; statement_bill_id: string | null; created_at: string;
+};
+export function meterPhotoUrls(list: MeterReading[], size: "thumb" | "full"): Promise<Record<string, string>> {
+  return fileUrls(list.map((m) => ({ id: m.id, path: m.photo_path, store: m.photo_store, thumb: m.photo_thumb } as StoredFile)), size);
+}

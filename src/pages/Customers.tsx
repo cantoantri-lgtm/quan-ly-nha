@@ -128,6 +128,7 @@ export default function Customers() {
         {pwFor ? (
           <div className="stack">
             <p className="muted small" style={{ margin: 0 }}>{pwFor.phone} · CCCD {pwFor.cccd}{isManager ? "" : " (chỉ Quản lý xem đủ số)"}</p>
+            <button className="btn block" onClick={() => nav(`/khach-hang/${pwFor.id}`)}>Xem thông tin, số điện nước, phiếu thu</button>
             <RoomPicker value={room} onChange={setRoom} />
             <button className="btn block" disabled={!room} onClick={() => assign(pwFor)}>Lưu phòng của khách</button>
             <button className="btn secondary block" onClick={() => resetPw(pwFor)}>Cấp lại mật khẩu tạm</button>

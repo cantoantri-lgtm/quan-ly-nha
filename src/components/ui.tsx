@@ -166,6 +166,7 @@ export function AppHeader() {
   const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = isCustomer ? [
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
+    { to: "/thong-tin", label: "Thông tin của tôi", icon: Icon.user },
     { to: "/thanh-toan-cua-toi", label: "Thanh toán", icon: Icon.money },
     { to: "/phan-anh", label: "Phản ánh", icon: Icon.help, n: unread },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
@@ -259,6 +260,7 @@ export function BottomNav() {
       <nav className="bottomnav" aria-label="Điều hướng chính">
         <div className="inner">
           <NavLink to="/phong-trong">{Icon.building}<span>Phòng trống</span></NavLink>
+          <NavLink to="/thong-tin">{Icon.user}<span>Của tôi</span></NavLink>
           <NavLink to="/thanh-toan-cua-toi">{Icon.money}<span>Thanh toán</span></NavLink>
           <NavLink to="/phan-anh">
             {Icon.help}<span>Phản ánh</span>

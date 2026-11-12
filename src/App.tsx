@@ -29,6 +29,7 @@ import PayPage from "./pages/PayPage";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 import VacantRooms from "./pages/VacantRooms";
 import VatDaily from "./pages/VatDaily";
+import CustomerInfo from "./pages/CustomerInfo";
 import { MyPayments, StaffPayments } from "./pages/CustomerPayments";
 import Feedback, { FeedbackInbox, FeedbackThread } from "./pages/Feedback";
 import Customers from "./pages/Customers";
@@ -90,6 +91,7 @@ export default function App() {
         <Route element={<Shell />}>
           <Route path="phong-trong" element={<VacantRooms />} />
           <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
+          <Route path="thong-tin" element={<CustomerInfo />} />
           <Route path="thanh-toan-cua-toi" element={<MyPayments />} />
           <Route path="phan-anh" element={<Feedback />} />
           <Route path="phan-anh/:id" element={<FeedbackThread />} />
@@ -147,6 +149,7 @@ export default function App() {
           <Route path="hoa-don-gtgt" element={<VatDaily />} />
         </Route>
         <Route path="khach-hang" element={<Customers />} />
+        <Route path="khach-hang/:id" element={<CustomerInfo />} />
         <Route path="thu-tien-khach" element={<StaffPayments />} />
         <Route path="phan-anh" element={<FeedbackInbox />} />
         <Route path="phan-anh/:id" element={<FeedbackThread />} />
