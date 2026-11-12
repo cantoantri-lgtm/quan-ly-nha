@@ -60,3 +60,6 @@
 .place-bar .input { min-height: 38px; padding: 7px 10px; }
 .mp-photo { display: block; width: calc(100% + 0px); max-width: 100%; height: 130px; object-fit: cover; border-radius: var(--radius-sm, 10px); background: var(--surface-2, var(--line)); margin-bottom: 2px; }
 .list-photo { width: 44px; height: 44px; object-fit: cover; border-radius: 10px; flex: none; background: var(--line); }
+
+/* CTV / khách: bản đồ chiếm gần hết màn hình (trừ thanh trên, dòng tóm tắt, thanh dưới) */
+.map-box.full:not(.failed) { height: calc(100dvh - 290px); min-height: 360px; }
