@@ -24,10 +24,15 @@ Deno.serve(async (req) => {
 
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
-  // Chỉ nhận giao dịch vào đúng tài khoản công ty đã cài trong app
-  const { data: s } = await db.from("payment_settings").select("account_no").eq("id", 1).maybeSingle();
+  // Chỉ nhận giao dịch vào đúng tài khoản công ty (hoá đơn thuê hoặc tài khoản thu tiền khách) đã cài trong app
+  const norm = (x: string) => x.replace(/\s/g, "");
+  const [{ data: s }, { data: k }] = await Promise.all([
+    db.from("payment_settings").select("account_no").eq("id", 1).maybeSingle(),
+    db.from("customer_pay_account").select("account_no").eq("id", 1).maybeSingle(),
+  ]);
   const acct = String(p.accountNumber ?? "");
-  if (s && acct && s.account_no.replace(/\s/g, "") !== acct.replace(/\s/g, "")) return json({ success: true, ignored: "other account" });
+  const allowed = [s?.account_no, k?.account_no].filter(Boolean).map((x) => norm(String(x)));
+  if (allowed.length && acct && !allowed.includes(norm(acct))) return json({ success: true, ignored: "other account" });
 
   const { data, error } = await db.rpc("apply_bank_transfer", {
     p_provider: "sepay", p_provider_id: txnId, p_account: acct || null, p_amount: amount,
