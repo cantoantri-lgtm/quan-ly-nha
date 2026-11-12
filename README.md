@@ -210,3 +210,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - 028_phan_anh_ctv_anh.sql: CTV gửi phản ánh (không gắn toà/phòng, chỉ Lead Sale trở lên = Quản lý, Giám sát, Leader/L2+ trong sơ đồ công ty đọc và trả lời); ảnh đính kèm phản ánh (bảng feedback_attachments, thư mục phan-anh/ trên kho ảnh, Edge Function kho-anh nhận thêm thư mục này). Có sửa lỗi tiêu đề thông báo khi khách chưa gán phòng.
 - 029_gia_139d_cap_nhat.sql: 139D B204 = 8.000.000 theo sơ đồ 12/11.
 - 030_gia_139d_theo_doanh_thu.sql: giá 139D theo bảng doanh thu (sheet DT NDC), thay cho 029.
+- 031_139d_24_phong.sql: 139D còn 24 phòng (xoá A201, B203, B205 đang trống).
