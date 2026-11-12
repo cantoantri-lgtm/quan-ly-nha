@@ -7,10 +7,36 @@ import { copyText, Empty, Sheet, tempPassword, TopBar } from "../components/ui";
 import { FB_STATUS, type Thread } from "./Feedback";
 import "../feedback.css";
 
-type Cust = { id: string; full_name: string; phone: string | null; cccd: string; is_active: boolean; created_at: string; created_by_name: string | null; open_threads: number };
+type Cust = { id: string; full_name: string; phone: string | null; cccd: string; is_active: boolean; created_at: string; created_by_name: string | null; open_threads: number; building_code: string | null; room_id: string | null; room_code: string | null };
 const APP_URL = typeof window !== "undefined" ? window.location.origin : "";
 const credText = (name: string, phone: string, pw: string) =>
   `Chào ${name}, tài khoản Neo Nestly của bạn:\n• Vào: ${APP_URL}\n• Số điện thoại: ${phone}\n• Mật khẩu tạm: ${pw}\nLần đầu đăng nhập app sẽ yêu cầu đổi mật khẩu. Bạn xem được phòng trống, giá, phí, dịch vụ, nội thất và gửi phản ánh cho công ty.`;
+
+/** Chọn toà + phòng khách đang ở (nhân sự gán; Sale chỉ thấy toà mình được gán). value = id phòng */
+function RoomPicker({ value, onChange }: { value: string; onChange: (roomId: string) => void }) {
+  const { buildings } = useSession();
+  const [bld, setBld] = useState("");
+  const [rooms, setRooms] = useState<{ id: string; code: string; floor: number | null }[]>([]);
+  useEffect(() => {
+    if (!bld) { setRooms([]); return; }
+    supabase.from("rooms").select("id,code,floor").eq("building_id", bld).order("floor").order("code")
+      .then(({ data }) => setRooms((data as typeof rooms) ?? []));
+  }, [bld]);
+  return (
+    <>
+      <label className="field"><span>Toà nhà khách đang ở</span>
+        <select className="input" value={bld} onChange={(e) => { setBld(e.target.value); onChange(""); }}>
+          <option value="">— Chưa gán —</option>
+          {buildings.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
+        </select></label>
+      <label className="field"><span>Phòng</span>
+        <select className="input" value={value} onChange={(e) => onChange(e.target.value)} disabled={!bld}>
+          <option value="">— Chọn phòng —</option>
+          {rooms.map((r) => <option key={r.id} value={r.id}>{r.floor != null ? `Tầng ${r.floor} · ` : ""}{r.code}</option>)}
+        </select></label>
+    </>
+  );
+}
 
 /** Nhân sự: tài khoản khách hàng + hộp phản ánh */
 export default function Customers() {
@@ -23,6 +49,7 @@ export default function Customers() {
   const [creating, setCreating] = useState(false);
   const [cred, setCred] = useState<string | null>(null);
   const [pwFor, setPwFor] = useState<Cust | null>(null);
+  const [room, setRoom] = useState("");
 
   const load = useCallback(async () => {
     const [a, b] = await Promise.all([
@@ -42,6 +69,12 @@ export default function Customers() {
   const openCount = (threads ?? []).filter((t) => t.status === "cho_cong_ty").length;
   const ql = q.trim().toLowerCase();
   const shown = (custs ?? []).filter((c) => !ql || c.full_name.toLowerCase().includes(ql) || (c.phone ?? "").includes(ql));
+
+  async function assign(c: Cust) {
+    const { error } = await supabase.rpc("customer_assign_room", { p_customer: c.id, p_room: room });
+    if (error) { toast(error.message); return; }
+    toast("Đã gán phòng cho khách."); setPwFor(null); load();
+  }
 
   async function resetPw(c: Cust) {
     const pw = tempPassword();
@@ -64,10 +97,10 @@ export default function Customers() {
             ) : (
               <section className="card">
                 {shown.map((c) => (
-                  <div key={c.id} className="list-row" onClick={() => setPwFor(c)}>
+                  <div key={c.id} className="list-row" onClick={() => { setRoom(""); setPwFor(c); }}>
                     <div className="grow">
                       <div className="name">{c.full_name}{c.is_active ? "" : " · Đã khoá"}</div>
-                      <div className="sub">{c.phone} · CCCD {c.cccd}{c.created_by_name ? ` · Tạo bởi ${c.created_by_name}` : ""}{c.open_threads ? ` · ${c.open_threads} phản ánh đang mở` : ""}</div>
+                      <div className="sub">{c.phone} · CCCD {c.cccd} · {c.building_code ? `${c.building_code}${c.room_code ? " · P." + c.room_code : ""}` : "Chưa gán phòng"}{c.created_by_name ? ` · Tạo bởi ${c.created_by_name}` : ""}{c.open_threads ? ` · ${c.open_threads} phản ánh đang mở` : ""}</div>
                     </div>›
                   </div>
                 ))}
@@ -95,6 +128,8 @@ export default function Customers() {
         {pwFor ? (
           <div className="stack">
             <p className="muted small" style={{ margin: 0 }}>{pwFor.phone} · CCCD {pwFor.cccd}{isManager ? "" : " (chỉ Quản lý xem đủ số)"}</p>
+            <RoomPicker value={room} onChange={setRoom} />
+            <button className="btn block" disabled={!room} onClick={() => assign(pwFor)}>Lưu phòng của khách</button>
             <button className="btn secondary block" onClick={() => resetPw(pwFor)}>Cấp lại mật khẩu tạm</button>
           </div>
         ) : null}
@@ -112,13 +147,15 @@ export default function Customers() {
 }
 
 function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (cred: string) => void }) {
+  const { toast } = useSession();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [cccd, setCccd] = useState("");
+  const [room, setRoom] = useState("");
   const [pw, setPw] = useState(tempPassword());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (open) { setName(""); setPhone(""); setCccd(""); setPw(tempPassword()); setErr(null); } }, [open]);
+  useEffect(() => { if (open) { setName(""); setPhone(""); setCccd(""); setRoom(""); setPw(tempPassword()); setErr(null); } }, [open]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -129,7 +166,11 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
     if (c.length !== 12) { setErr("CCCD phải đủ 12 số."); return; }
     setBusy(true);
     try {
-      await callAccountFn({ action: "create_customer", full_name: name.trim(), phone: p, cccd: c, password: pw });
+      const r = await callAccountFn<{ id: string }>({ action: "create_customer", full_name: name.trim(), phone: p, cccd: c, password: pw });
+      if (room) {
+        const { error } = await supabase.rpc("customer_assign_room", { p_customer: r.id, p_room: room });
+        if (error) toast("Đã tạo tài khoản nhưng chưa gán được phòng: " + error.message);
+      }
       onDone(credText(name.trim(), p, pw));
     } catch (ex) { setErr((ex as Error).message); }
     setBusy(false);
@@ -140,6 +181,7 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
         <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></label>
         <label className="field"><span>Số điện thoại (ID đăng nhập) *</span><input className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required /></label>
         <label className="field"><span>Số CCCD (12 số, mỗi CCCD chỉ đăng ký một lần) *</span><input className="input" inputMode="numeric" maxLength={14} value={cccd} onChange={(e) => setCccd(e.target.value)} required /></label>
+        <RoomPicker value={room} onChange={setRoom} />
         <label className="field"><span>Mật khẩu tạm</span>
           <div className="row" style={{ flexWrap: "nowrap" }}>
             <input className="input mono" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} />

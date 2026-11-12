@@ -68,58 +68,43 @@ export default function Feedback() {
   );
 }
 
-type Bld = { id: string; code: string; name: string };
-type RoomOpt = { id: string; code: string; floor: number | null };
+type Place = { building_id: string | null; building_code: string | null; building_name: string | null; room_id: string | null; room_code: string | null };
 
+/** Khách ở phòng nào thì phản ánh đúng toà và phòng đó (do nhân sự gán vào tài khoản), khách không tự chọn */
 function NewSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (id: string) => void }) {
-  const [blds, setBlds] = useState<Bld[]>([]);
-  const [rooms, setRooms] = useState<RoomOpt[]>([]);
-  const [bld, setBld] = useState("");
-  const [room, setRoom] = useState("");   // "" = chưa chọn, "chung" = khu vực chung
+  const [place, setPlace] = useState<Place | null | undefined>(undefined);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     if (!open) return;
-    setBld(""); setRoom(""); setRooms([]); setSubject(""); setBody(""); setErr(null);
-    supabase.rpc("building_map").then(({ data }) => setBlds(((data as Bld[]) ?? []).map((b) => ({ id: b.id, code: b.code, name: b.name }))));
+    setSubject(""); setBody(""); setErr(null); setPlace(undefined);
+    supabase.rpc("customer_my_place").then(({ data }) => setPlace(((data as Place[]) ?? [])[0] ?? null));
   }, [open]);
-  useEffect(() => {
-    setRoom(""); setRooms([]);
-    if (!bld) return;
-    supabase.rpc("feedback_rooms", { p_building: bld }).then(({ data }) => setRooms((data as RoomOpt[]) ?? []));
-  }, [bld]);
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!bld) { setErr("Chọn toà nhà."); return; }
-    if (!room) { setErr("Chọn phòng, hoặc \"Khu vực chung\" nếu không thuộc phòng nào."); return; }
     setBusy(true); setErr(null);
-    const { data, error } = await supabase.rpc("feedback_create", { p_building: bld, p_room: room === "chung" ? null : room, p_subject: subject, p_body: body });
+    const { data, error } = await supabase.rpc("feedback_create", { p_subject: subject, p_body: body });
     setBusy(false);
     if (error) { setErr(error.message); return; }
     onDone(data as string);
   }
+  const has = !!place?.building_id;
   return (
     <Sheet open={open} onClose={onClose} title="Gửi phản ánh">
       <form className="stack" onSubmit={submit}>
-        <label className="field"><span>Toà nhà *</span>
-          <select className="input" value={bld} onChange={(e) => setBld(e.target.value)} required>
-            <option value="">— Chọn toà —</option>
-            {blds.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
-          </select></label>
-        <label className="field"><span>Phòng *</span>
-          <select className="input" value={room} onChange={(e) => setRoom(e.target.value)} disabled={!bld} required>
-            <option value="">— Chọn phòng —</option>
-            <option value="chung">Khu vực chung (không thuộc phòng nào)</option>
-            {rooms.map((r) => <option key={r.id} value={r.id}>{r.floor != null ? `Tầng ${r.floor} · ` : ""}{r.code}</option>)}
-          </select></label>
+        {place === undefined ? <div className="loading">Đang tải…</div> : has ? (
+          <p className="fb-note">Phản ánh cho: <b>{place!.building_code}{place!.room_code ? ` · Phòng ${place!.room_code}` : ""}</b>{place!.building_name ? ` — ${place!.building_name}` : ""}</p>
+        ) : (
+          <div className="error-box" role="alert">Tài khoản của bạn chưa được gán toà nhà và phòng. Vui lòng liên hệ nhân viên Neo Nestly để được cập nhật.</div>
+        )}
         <label className="field"><span>Tiêu đề *</span>
-          <input className="input" maxLength={120} value={subject} onChange={(e) => setSubject(e.target.value)} required /></label>
+          <input className="input" maxLength={120} value={subject} onChange={(e) => setSubject(e.target.value)} required disabled={!has} /></label>
         <label className="field"><span>Nội dung *</span>
-          <textarea className="input" rows={5} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} required /></label>
+          <textarea className="input" rows={5} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} required disabled={!has} /></label>
         {err ? <div className="error-box" role="alert">{err}</div> : null}
-        <button className="btn block" disabled={busy}>{busy ? "Đang gửi…" : "Gửi"}</button>
+        <button className="btn block" disabled={busy || !has}>{busy ? "Đang gửi…" : "Gửi"}</button>
       </form>
     </Sheet>
   );

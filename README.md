@@ -206,3 +206,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - 024_gia_658_cap_nhat.sql: cập nhật giá G01, 201 của 658 CMT8 theo sơ đồ mới.
 - 025a_khach_hang_gia_tri.sql, 025_khach_hang.sql: vai trò khach_hang (CCCD duy nhất, ẩn hoa hồng ngay ở CSDL), phản ánh khách ↔ công ty (tự kết thúc sau 3 ngày). Đã chạy. Edge Function quan-ly-tai-khoan thêm create_customer / reset_customer_password (Quản lý, Giám sát, Sale tạo khách).
 - 026_phan_anh_theo_phong.sql: phản ánh gắn toà + phòng (khách chọn), Sale phụ trách = nhân viên được gán toà + người tạo tài khoản khách; hộp phản ánh /phan-anh cho nhân sự.
+- 027_khach_o_phong.sql: khách được gán toà + phòng (customer_profiles.building_id/room_id, nhân sự gán qua customer_assign_room); khách gửi phản ánh tự động đúng toà/phòng của mình, không tự chọn.
