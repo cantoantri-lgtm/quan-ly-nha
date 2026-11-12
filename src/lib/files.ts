@@ -65,6 +65,50 @@ async function makeThumb(file: File): Promise<Blob | null> {
 
 const thumbPath = (path: string) => path.replace(/\.[a-z]+$/, "_t.jpg");
 
+// ---------- Đóng dấu ngày giờ + vị trí lên ảnh chụp ----------
+export type Geo = { lat: number; lng: number; accuracy: number } | null;
+
+/** Lấy vị trí hiện tại (cần người dùng cho phép); null nếu không lấy được */
+export function getGeo(timeoutMs = 10000): Promise<Geo> {
+  return new Promise((res) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) { res(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (p) => res({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: Math.round(p.coords.accuracy) }),
+      () => res(null),
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30000 },
+    );
+  });
+}
+
+const stampTime = (d: Date) => d.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+/** Vẽ dải chữ "ngày giờ · vị trí" ở đáy ảnh và trả JPEG (cạnh dài tối đa 1800px). Dấu nằm trong chính ảnh nên không bỏ đi được. */
+export async function stampPhoto(raw: File, geo: Geo, at: Date = new Date()): Promise<File> {
+  const bmp = await createImageBitmap(raw, { imageOrientation: "from-image" });
+  const scale = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
+  const fs = Math.max(14, Math.round(w / 38));
+  const lines = [
+    stampTime(at) + " (GMT+7)",
+    geo ? `Vị trí: ${geo.lat.toFixed(6)}, ${geo.lng.toFixed(6)} (±${geo.accuracy} m)` : "Vị trí: không lấy được",
+  ];
+  const pad = Math.round(fs * 0.5), boxH = lines.length * fs * 1.25 + pad * 2;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(0, h - boxH, w, boxH);
+  ctx.fillStyle = "#fff";
+  ctx.font = `600 ${fs}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.textBaseline = "top";
+  lines.forEach((t, i) => ctx.fillText(t, pad, h - boxH + pad + i * fs * 1.25, w - pad * 2));
+  const blob: Blob | null = await new Promise((r) => canvas.toBlob(r, "image/jpeg", 0.85));
+  if (!blob) throw new Error("Không xử lý được ảnh.");
+  return new File([blob], raw.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+}
+
 // ---------- Cloudflare R2 (qua Edge Function kho-anh) ----------
 type R2Config = { enabled: boolean; publicBase: string | null };
 let r2cache: R2Config | null = null;
@@ -220,7 +264,7 @@ export const MAX_FEEDBACK_IMAGES = 4;
 /** Tải một ảnh lên kho (R2, dự phòng Supabase) cho phản ánh rồi gắn vào tin nhắn. Quyền do Postgres quyết định. */
 export async function attachFeedbackImage(threadId: string, messageId: string, raw: File): Promise<void> {
   if (!raw.type.startsWith("image/")) throw new Error("Chỉ đính kèm ảnh.");
-  const file = await prepareFile(raw);
+  const file = await stampPhoto(raw, await getGeo());
   if (file.size > MAX_BYTES) throw new Error("Ảnh lớn hơn 10 MB.");
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `phan-anh/${threadId}/${crypto.randomUUID()}.${ext}`;
@@ -259,14 +303,17 @@ export function attachmentUrls(list: FeedbackAttachment[], size: "thumb" | "full
 }
 
 // ---------- Ảnh đồng hồ điện nước của khách (dong-ho/<mã khách>/...) ----------
-export type MeterPhoto = { path: string; store: "r2" | "supabase"; thumb: boolean; mime: string; base64: string };
+export type MeterPhoto = { path: string; store: "r2" | "supabase"; thumb: boolean; mime: string; base64: string; geo: Geo; takenAt: string };
 
 /** Thu nhỏ ảnh, tải lên kho (R2, dự phòng Supabase) và trả lại ảnh dạng base64 nhỏ để đọc số tự động. Quyền do Postgres quyết định. */
 export async function uploadMeterPhoto(customerId: string, raw: File): Promise<MeterPhoto> {
   if (!raw.type.startsWith("image/")) throw new Error("Chỉ nhận ảnh.");
-  const file = await prepareFile(raw);
+  const geo = await getGeo();
+  if (!geo) throw new Error("Không lấy được vị trí. Hãy cho phép định vị (GPS) cho trang web rồi chụp lại.");
+  const takenAt = new Date();
+  const file = await stampPhoto(raw, geo, takenAt);
   if (file.size > MAX_BYTES) throw new Error("Ảnh lớn hơn 10 MB.");
-  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const ext = "jpg";
   const path = `dong-ho/${customerId}/${crypto.randomUUID()}.${ext}`;
   let store: "r2" | "supabase" = "supabase";
   let thumbOk = false;
@@ -300,14 +347,16 @@ export async function uploadMeterPhoto(customerId: string, raw: File): Promise<M
     fr.onerror = () => rej(fr.error);
     fr.readAsDataURL(blob);
   });
-  return { path, store, thumb: thumbOk, mime: small ? "image/jpeg" : file.type, base64 };
+  return { path, store, thumb: thumbOk, mime: small ? "image/jpeg" : file.type, base64, geo, takenAt: takenAt.toISOString() };
 }
 
 export type MeterReading = {
   id: string; customer_id: string; kind: "dien" | "nuoc"; reading: number; read_on: string;
   photo_path: string; photo_store: "r2" | "supabase"; photo_thumb: boolean; source: "khach" | "nhan_vien";
   ocr_value: number | null; note: string | null; statement_bill_id: string | null; created_at: string;
+  lat: number | null; lng: number | null; geo_accuracy: number | null; taken_at: string | null;
 };
 export function meterPhotoUrls(list: MeterReading[], size: "thumb" | "full"): Promise<Record<string, string>> {
-  return fileUrls(list.map((m) => ({ id: m.id, path: m.photo_path, store: m.photo_store, thumb: m.photo_thumb } as StoredFile)), size);
+  // Dữ liệu mẫu không có ảnh thật (đường dẫn không nằm trong dong-ho/)
+  return fileUrls(list.filter((m) => m.photo_path.startsWith("dong-ho/")).map((m) => ({ id: m.id, path: m.photo_path, store: m.photo_store, thumb: m.photo_thumb } as StoredFile)), size);
 }

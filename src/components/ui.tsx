@@ -166,8 +166,7 @@ export function AppHeader() {
   const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = isCustomer ? [
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
-    { to: "/thong-tin", label: "Thông tin của tôi", icon: Icon.user },
-    { to: "/thanh-toan-cua-toi", label: "Thanh toán", icon: Icon.money },
+    { to: "/thong-tin", label: "Thông tin", icon: Icon.user },
     { to: "/phan-anh", label: "Phản ánh", icon: Icon.help, n: unread },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
   ] : isCollaborator ? [
@@ -205,13 +204,13 @@ export function AppHeader() {
 
   return (
     <header className="apphead">
-      <Link to={isCustomer ? "/phong-trong" : isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Neo Nestly"><img src="/logo-neo-nestly.svg" alt="Neo Nestly" /></Link>
+      <Link to={isCustomer ? "/thong-tin" : isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Neo Nestly"><img src="/logo-neo-nestly.svg" alt="Neo Nestly" /></Link>
       <div className="ah-co"><b>NEO NESTLY</b><small>Serviced Apartment &amp; Residence</small></div>
       <div className="ah-tools">
         <button type="button" className="ah-btn apps" aria-expanded={open} aria-haspopup="true" aria-label="Chức năng" onClick={() => setOpen((o) => !o)}>
           {Icon.grid}<span className="ah-tip">Apps</span>
         </button>
-        {isCollaborator || isCustomer ? null : <Link to="/" className="ah-btn" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>}
+        {isCollaborator ? null : <Link to={isCustomer ? "/thong-tin" : "/"} className="ah-btn" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>}
         <Link to="/thong-bao" className="ah-btn" aria-label="Thông báo">
           {Icon.bell}{unread > 0 ? <span className="ah-badge num">{unread > 99 ? "99+" : unread}</span> : null}<span className="ah-tip">Thông báo</span>
         </Link>
@@ -260,8 +259,7 @@ export function BottomNav() {
       <nav className="bottomnav" aria-label="Điều hướng chính">
         <div className="inner">
           <NavLink to="/phong-trong">{Icon.building}<span>Phòng trống</span></NavLink>
-          <NavLink to="/thong-tin">{Icon.user}<span>Của tôi</span></NavLink>
-          <NavLink to="/thanh-toan-cua-toi">{Icon.money}<span>Thanh toán</span></NavLink>
+          <NavLink to="/thong-tin">{Icon.user}<span>Thông tin</span></NavLink>
           <NavLink to="/phan-anh">
             {Icon.help}<span>Phản ánh</span>
             {unread > 0 ? <span className="badge num">{unread > 99 ? "99+" : unread}</span> : null}

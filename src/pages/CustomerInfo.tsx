@@ -81,7 +81,7 @@ export default function CustomerInfo() {
 
   return (
     <>
-      <TopBar title={staff ? ov.customer.full_name : "Thông tin của tôi"} back={staff ? "/khach-hang" : false} />
+      <TopBar title={staff ? ov.customer.full_name : "Thông tin"} back={staff ? "/khach-hang" : false} />
       <main className="main stack">
         <section className="card" style={{ padding: 14 }}>
           <h2 className="small muted" style={{ margin: "0 0 6px" }}>Phòng đang ở</h2>
@@ -146,7 +146,9 @@ export default function CustomerInfo() {
                     <div key={t} style={{ flex: 1, minWidth: 0 }}>
                       <div className="muted small">{t} · {dmy(r.read_on).slice(0, 5)}</div>
                       <div><b className="num">{num(r.reading)}</b></div>
-                      {urls[r.id] ? <a href={urls[r.id]} target="_blank" rel="noreferrer"><img src={urls[r.id]} alt={`Ảnh đồng hồ ${t}`} style={{ width: "100%", maxHeight: 110, objectFit: "cover", borderRadius: 8, marginTop: 4 }} /></a> : null}
+                      {urls[r.id] ? <a href={urls[r.id]} target="_blank" rel="noreferrer"><img src={urls[r.id]} alt={`Ảnh đồng hồ ${t}`} style={{ width: "100%", maxHeight: 110, objectFit: "cover", borderRadius: 8, marginTop: 4 }} /></a>
+                        : <div className="muted small">{r.photo_path.startsWith("dong-ho/") ? "Đang tải ảnh…" : "Dữ liệu mẫu, chưa có ảnh"}</div>}
+                      {r.lat != null && r.lng != null ? <a className="small" href={`https://www.google.com/maps?q=${r.lat},${r.lng}`} target="_blank" rel="noreferrer">Xem vị trí chụp</a> : null}
                     </div>
                   ))}
                 </div>
@@ -203,7 +205,7 @@ function MeterSheet({ open, onClose, customerId, staff, kind, setKind, last, onD
 
   async function pick(f: File | undefined) {
     if (!f) return;
-    setBusy(true); setMsg("Đang tải ảnh lên…"); setOcr(null);
+    setBusy(true); setMsg("Đang lấy vị trí và tải ảnh lên…"); setOcr(null);
     try {
       const p = await uploadMeterPhoto(customerId, f);
       setPhoto(p);
@@ -225,6 +227,7 @@ function MeterSheet({ open, onClose, customerId, staff, kind, setKind, last, onD
     setBusy(true);
     const { error } = await supabase.rpc("meter_add", {
       p_customer: customerId, p_kind: kind, p_reading: v, p_path: photo.path, p_store: photo.store, p_thumb: photo.thumb, p_ocr: ocr, p_note: null,
+      p_lat: photo.geo?.lat ?? null, p_lng: photo.geo?.lng ?? null, p_accuracy: photo.geo?.accuracy ?? null, p_taken_at: photo.takenAt,
     });
     setBusy(false);
     if (error) { toast(error.message); return; }

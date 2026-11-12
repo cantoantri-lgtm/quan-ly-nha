@@ -69,7 +69,7 @@ export function MyPayments() {
   const done = (rows ?? []).filter((b) => b.status === "da_thanh_toan");
   return (
     <>
-      <TopBar title="Thanh toán" />
+      <TopBar title="Thanh toán" back="/thong-tin" />
       <main className="main stack">
         {rows === null ? <div className="loading">Đang tải…</div> : rows.length === 0 ? <Empty title="Chưa có khoản nào cần thanh toán." /> : (
           <>

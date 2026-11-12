@@ -97,7 +97,7 @@ export default function App() {
           <Route path="phan-anh/:id" element={<FeedbackThread />} />
           <Route path="thong-bao" element={<Notifications />} />
           <Route path="tai-khoan" element={<Account />} />
-          <Route path="*" element={<Navigate to="/phong-trong" replace />} />
+          <Route path="*" element={<Navigate to="/thong-tin" replace />} />
         </Route>
       </Routes>
     );
