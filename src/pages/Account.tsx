@@ -43,7 +43,7 @@ export default function Account() {
           </>
         )}
         <button className="btn secondary block" style={{ marginTop: 16 }} onClick={() => supabase.auth.signOut()}>Đăng xuất</button>
-        <p className="muted small" style={{ textAlign: "center" }}>Neo Nestly · phiên bản 0.1</p>
+        <p className="muted small" style={{ textAlign: "center" }}>Next Living · thuộc Next Vision · phiên bản 0.1</p>
       </main>
     </>
   );

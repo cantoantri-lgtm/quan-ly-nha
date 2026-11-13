@@ -1,4 +1,4 @@
-# Neo Nestly
+# Next Living (Next Vision)
 
 Web app nội bộ để giao việc, quản lý toà nhà cho thuê và làm thủ tục văn phòng (nghỉ phép, công tác, thanh toán…).
 Quy mô thiết kế: khoảng 10 toà, 500 phòng, 50 nhân sự. Giao diện ưu tiên điện thoại.
@@ -198,7 +198,7 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 ## Giao diện (v mới)
 - Khung: logo góc trái (bấm = Trang chủ), menu Ứng dụng, chuông, chế độ sáng/tối (`src/shell.css`).
 - Route: `/` Trang chủ (Chờ bạn duyệt, Bàn làm việc, Lịch), `/viec` Công việc, `/van-phong` hub, `/van-phong/ds/:kind` danh sách dạng bảng.
-- Logo: `public/logo-neo-nestly.svg` / `.png`.
+- Logo: `public/logo-next-living.svg` (đăng nhập), `public/logo-next-living-ngang.svg` (thanh tiêu đề), `public/logo-next-vision.svg` (bản in chứng từ), biểu tượng app `public/favicon.svg`, `icon-180/192/512.png`. Tên miền email đăng nhập `neonestly.app` giữ nguyên để không mất tài khoản.
 - `020_mau_nhom_phong.sql`: màu nhóm phòng (room_types.color); trạng thái đỏ = đang cho thuê.
 - `021_gia_658_cmt8.sql`: giá niêm yết và 2 nhóm phòng (Studio cửa sổ / ban công) của 658 CMT8.
 - `022_noi_that_toa.sql`: danh mục nội thất của toà trong chính sách; giao diện có chế độ "Khách xem" ẩn ký hợp đồng và hoa hồng.

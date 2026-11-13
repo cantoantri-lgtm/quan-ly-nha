@@ -204,8 +204,8 @@ export function AppHeader() {
 
   return (
     <header className="apphead">
-      <Link to={isCustomer ? "/thong-tin" : isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Neo Nestly"><img src="/logo-neo-nestly.svg" alt="Neo Nestly" /></Link>
-      <div className="ah-co"><b>NEO NESTLY</b><small>Serviced Apartment &amp; Residence</small></div>
+      <Link to={isCustomer ? "/thong-tin" : isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Next Living"><img src="/logo-next-living-ngang.svg" alt="Next Living" /></Link>
+      <div className="ah-co"><b>NEXT LIVING</b><small>Thuộc Next Vision</small></div>
       <div className="ah-tools">
         <button type="button" className="ah-btn apps" aria-expanded={open} aria-haspopup="true" aria-label="Chức năng" onClick={() => setOpen((o) => !o)}>
           {Icon.grid}<span className="ah-tip">Apps</span>
