@@ -10,7 +10,7 @@ import "../feedback.css";
 type Cust = { id: string; full_name: string; phone: string | null; cccd: string; is_active: boolean; created_at: string; created_by_name: string | null; open_threads: number; building_code: string | null; room_id: string | null; room_code: string | null };
 const APP_URL = typeof window !== "undefined" ? window.location.origin : "";
 const credText = (name: string, phone: string, pw: string) =>
-  `Chào ${name}, tài khoản Neo Nestly của bạn:\n• Vào: ${APP_URL}\n• Số điện thoại: ${phone}\n• Mật khẩu tạm: ${pw}\nLần đầu đăng nhập app sẽ yêu cầu đổi mật khẩu. Bạn xem được phòng trống, giá, phí, dịch vụ, nội thất và gửi phản ánh cho công ty.`;
+  `Chào ${name}, tài khoản Next Living của bạn:\n• Vào: ${APP_URL}\n• Số điện thoại: ${phone}\n• Mật khẩu tạm: ${pw}\nLần đầu đăng nhập app sẽ yêu cầu đổi mật khẩu. Bạn xem được phòng trống, giá, phí, dịch vụ, nội thất và gửi phản ánh cho công ty.`;
 
 /** Chọn toà + phòng khách đang ở (nhân sự gán; Sale chỉ thấy toà mình được gán). value = id phòng */
 function RoomPicker({ value, onChange }: { value: string; onChange: (roomId: string) => void }) {

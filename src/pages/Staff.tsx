@@ -8,7 +8,7 @@ type Member = { building_id: string; user_id: string };
 const APP_URL = typeof window !== "undefined" ? window.location.origin : "";
 
 function credText(name: string, phone: string, pw: string) {
-  return `Chào ${name}, tài khoản Neo Nestly của bạn:\n• Vào: ${APP_URL}\n• Số điện thoại: ${phone}\n• Mật khẩu tạm: ${pw}\nLần đầu đăng nhập app sẽ yêu cầu đổi mật khẩu.`;
+  return `Chào ${name}, tài khoản Next Living của bạn:\n• Vào: ${APP_URL}\n• Số điện thoại: ${phone}\n• Mật khẩu tạm: ${pw}\nLần đầu đăng nhập app sẽ yêu cầu đổi mật khẩu.`;
 }
 
 export default function Staff() {

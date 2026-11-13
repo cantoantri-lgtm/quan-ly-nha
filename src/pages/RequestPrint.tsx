@@ -63,9 +63,9 @@ export default function RequestPrint() {
       <main className="main main-wide">
         <article className="print-doc">
           <header className="pd-head">
-            <img className="pd-logo" src="/logo-neo-nestly.svg" alt="Neo Nestly" />
+            <img className="pd-logo" src="/logo-next-vision.svg" alt="Next Vision" />
             <div className="pd-title">
-              <div className="pd-brand">NEO NESTLY</div>
+              <div className="pd-brand">NEXT VISION</div>
               <h1>{kindLabel(r).toUpperCase()}</h1>
               {r.doc_no ? <div className="pd-no">Số chứng từ: <b>{r.doc_no}</b>{r.doc_date ? ` · ${ddmmyyyy(r.doc_date)}` : ""}</div> : null}
               <div className="pd-status">{statusLabel(r)}</div>

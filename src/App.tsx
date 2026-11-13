@@ -70,7 +70,7 @@ export default function App() {
 
   // Trang thanh toán cho khách thuê: công khai, không cần đăng nhập
   if (window.location.pathname.startsWith("/thanh-toan/")) return <Routes><Route path="/thanh-toan/:code" element={<PayPage />} /></Routes>;
-  if (loading) return <div className="loading">Đang mở Neo Nestly…</div>;
+  if (loading) return <div className="loading">Đang mở Next Living…</div>;
   if (!session) return <Login />;
   if (!profile || !profile.is_active) {
     return (

@@ -26,7 +26,7 @@ export default function Login() {
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
         <div className="brand-logo">
-          <img src="/logo-neo-nestly.svg" alt="Neo Nestly · Serviced Apartment & Residence" />
+          <img src="/logo-next-living.svg" alt="Next Living – thuộc Next Vision" />
           <div className="bs">Giao việc & quản lý nhà cho thuê</div>
         </div>
         <label className="field">

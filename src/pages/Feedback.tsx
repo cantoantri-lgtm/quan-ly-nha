@@ -84,7 +84,7 @@ export default function Feedback() {
     <>
       <TopBar title="Phản ánh" action={<button className="btn sm" onClick={() => setCreating(true)}>+ Gửi phản ánh</button>} />
       <main className="main stack">
-        <p className="fb-note">{isCollaborator ? "Gửi phản ánh cho Lead Sale trở lên. Chỉ Lead Sale trở lên mới đọc và trả lời được." : "Gửi góp ý hoặc sự cố cho Neo Nestly."} Câu trả lời hiện tại đây. Khi đã ổn, bạn bấm "Kết thúc"; nếu đã được trả lời mà sau 3 ngày bạn chưa phản hồi thì phản ánh tự kết thúc.</p>
+        <p className="fb-note">{isCollaborator ? "Gửi phản ánh cho Lead Sale trở lên. Chỉ Lead Sale trở lên mới đọc và trả lời được." : "Gửi góp ý hoặc sự cố cho Next Living."} Câu trả lời hiện tại đây. Khi đã ổn, bạn bấm "Kết thúc"; nếu đã được trả lời mà sau 3 ngày bạn chưa phản hồi thì phản ánh tự kết thúc.</p>
         {items === null ? <div className="loading">Đang tải…</div> : items.length === 0 ? (
           <Empty title="Chưa có phản ánh nào">Bấm "Gửi phản ánh" để liên hệ công ty.</Empty>
         ) : (
@@ -142,7 +142,7 @@ function NewSheet({ open, onClose, onDone }: { open: boolean; onClose: () => voi
         ) : place === undefined ? <div className="loading">Đang tải…</div> : has ? (
           <p className="fb-note">Phản ánh cho: <b>{place!.building_code}{place!.room_code ? ` · Phòng ${place!.room_code}` : ""}</b>{place!.building_name ? ` — ${place!.building_name}` : ""}</p>
         ) : (
-          <div className="error-box" role="alert">Tài khoản của bạn chưa được gán toà nhà và phòng. Vui lòng liên hệ nhân viên Neo Nestly để được cập nhật.</div>
+          <div className="error-box" role="alert">Tài khoản của bạn chưa được gán toà nhà và phòng. Vui lòng liên hệ nhân viên Next Living để được cập nhật.</div>
         )}
         <label className="field"><span>Tiêu đề *</span>
           <input className="input" maxLength={120} value={subject} onChange={(e) => setSubject(e.target.value)} required disabled={!has} /></label>
@@ -244,7 +244,7 @@ export function FeedbackThread() {
                   ))}
                 </div>
               ) : null}
-              <small>{m.sender === "khach" ? (isRequester ? "Bạn" : t.kind === "ctv" ? "CTV" : "Khách") : m.sender === "cong_ty" ? "Neo Nestly" : ""} {timeAgo(m.created_at)}</small>
+              <small>{m.sender === "khach" ? (isRequester ? "Bạn" : t.kind === "ctv" ? "CTV" : "Khách") : m.sender === "cong_ty" ? "Next Living" : ""} {timeAgo(m.created_at)}</small>
             </div>
           ))}
         </div>
