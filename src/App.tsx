@@ -17,6 +17,7 @@ import Buildings from "./pages/Buildings";
 import VoiceTask from "./pages/VoiceTask";
 import BuildingDetail from "./pages/BuildingDetail";
 import BuildingMeters from "./pages/BuildingMeters";
+import Reports from "./pages/Reports";
 import Office from "./pages/Office";
 import RequestForm from "./pages/RequestForm";
 import RequestDetail from "./pages/RequestDetail";
@@ -58,6 +59,11 @@ function AssignerOnly() {
 function MoneyOnly() {
   const { isManager, isAccountant } = useSession();
   return isManager || isAccountant ? <Outlet /> : <Navigate to="/" replace />;
+}
+
+function LeadOnly() {
+  const { isLeadUp } = useSession();
+  return isLeadUp ? <Outlet /> : <Navigate to="/" replace />;
 }
 
 function ManagerOnly() {
@@ -147,6 +153,9 @@ export default function App() {
         <Route path="van-phong/:id/sua" element={<RequestForm />} />
         <Route path="van-phong/:id/in" element={<RequestPrint />} />
         <Route path="to-chuc" element={<Org />} />
+        <Route element={<LeadOnly />}>
+          <Route path="bao-cao" element={<Reports />} />
+        </Route>
         <Route element={<MoneyOnly />}>
           <Route path="hoa-don-gtgt" element={<VatDaily />} />
         </Route>

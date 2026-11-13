@@ -30,6 +30,8 @@ type Ctx = {
   myStaff: Staff | null;
   /** Có thể đứng trong chuỗi duyệt: Leader, Trưởng phòng trở lên, hoặc giữ nhiệm vụ Nhân sự/Kế toán/Giám đốc */
   isApprover: boolean;
+  /** Lead Sale trở lên: Quản lý, Giám sát, hoặc Leader / cấp L2+ trong sơ đồ công ty. Xem được báo cáo */
+  isLeadUp: boolean;
   isAccountant: boolean;
 };
 
@@ -129,6 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     isCustomer: profile?.role === "khach_hang",
     myStaff,
     isApprover: !!myStaff && (myStaff.is_leader || !!myStaff.duty || (myStaff.level ?? 0) >= 3),
+    isLeadUp: profile?.role === "quan_ly" || profile?.role === "giam_sat" || (!!myStaff && profile?.role === "nhan_vien" && (myStaff.is_leader || (myStaff.level ?? 0) >= 2)),
     isAccountant: myStaff?.duty === "ke_toan",
   }), [session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff]);
 
