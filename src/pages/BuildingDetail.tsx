@@ -158,6 +158,7 @@ export default function BuildingDetail() {
           <Link className="btn secondary sm" to={`/toa/${building.id}/khach`}>Khách thuê</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hop-dong`}>Hợp đồng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hoa-don`}>Thu tiền phòng</Link>
+          <Link className="btn secondary sm" to={`/toa/${building.id}/dien-nuoc`}>Điện nước toà</Link>
           <button type="button" className="btn secondary sm" aria-expanded={polOpen} onClick={() => setPolOpen(!polOpen)}>{polOpen ? "Ẩn dịch vụ & chính sách" : "Dịch vụ & chính sách"}</button>
         </div>
         {polOpen ? (

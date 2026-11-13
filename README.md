@@ -216,3 +216,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - 034: SePay tự đối soát cả khoản thu khách (mã KH+10 hex); sepay-webhook nhận cả 2 tài khoản
 - 035/036: thông tin khách (người ở+CCCD, hợp đồng/cọc/đơn giá, số điện nước có ảnh, phiếu thu tháng); Edge Function doc-dong-ho (Gemini đọc công tơ); kho-anh thêm thư mục dong-ho
 - 037: ảnh đồng hồ kèm GPS+giờ (meter_add thêm lat/lng); ảnh chụp đóng dấu ngày giờ + vị trí; thu_nghiem/khach_hang_du_lieu.sql = dữ liệu mẫu khách 0900000004
+- `038_dien_nuoc_toa.sql`: số điện/nước tổng của toà mỗi tháng (`building_meter_readings`, RPC `building_meter_save`, ảnh `dong-ho/<mã toà>/` có GPS); nhắc 08:30 các ngày 1, 5, 10 (`notify_building_meters`). Giao diện `/toa/:id/dien-nuoc`.
