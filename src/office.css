@@ -148,3 +148,7 @@
 .ap-chip.skip { opacity: .55; border-style: dashed; }
 .dn-total-words { display: grid; gap: 2px; min-width: 0; }
 .dn-total-words small { color: var(--muted); font-size: 12.5px; }
+
+/* Bước cuối DNTT: khung UNC nổi bật khi đang chờ chi, dịu lại khi đã kết thúc */
+.rq-unc > .fg { border: 2px solid var(--brand); background: var(--brand-soft); }
+.rq-unc.done > .fg { border: 1px solid var(--s-done); background: var(--s-done-bg); }

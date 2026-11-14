@@ -218,3 +218,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - 037: ảnh đồng hồ kèm GPS+giờ (meter_add thêm lat/lng); ảnh chụp đóng dấu ngày giờ + vị trí; thu_nghiem/khach_hang_du_lieu.sql = dữ liệu mẫu khách 0900000004
 - `038_dien_nuoc_toa.sql`: số điện/nước tổng của toà mỗi tháng (`building_meter_readings`, RPC `building_meter_save`, ảnh `dong-ho/<mã toà>/` có GPS); nhắc 08:30 các ngày 1, 5, 10 (`notify_building_meters`). Giao diện `/toa/:id/dien-nuoc`.
 - `039_bao_cao.sql`, `040_sua_lap_day.sql`: chi phí theo toà (`building_expenses`), tiền thuê nhà (`building_rents`), báo cáo thu chi/lấp đầy/phản ánh/lợi nhuận (`report_*`). Giao diện `/bao-cao` (Lead Sale trở lên xem; lợi nhuận, chi phí, thuê nhà chỉ Quản lý).
+- `041_dntt_unc.sql`: bước cuối DNTT — Quản lý/Kế toán đính kèm UNC (tệp đề nghị label `unc`) rồi bấm Kết thúc (`mark_paid`, DNTT bắt buộc có UNC; UNC khoá sau khi kết thúc). Kế toán xem được đề nghị tiền đã duyệt/hoàn tất.

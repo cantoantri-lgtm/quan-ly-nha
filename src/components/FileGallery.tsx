@@ -10,11 +10,16 @@ const COLUMN: Record<FileOwner["kind"], Column> = { cccd: "tenant_id", hop_dong:
 const ownerId = (o: FileOwner) => (o.kind === "cccd" ? o.tenantId : o.kind === "hop_dong" ? o.contractId : o.kind === "anh_phong" ? o.roomId : o.kind === "anh_loai_phong" ? o.roomTypeId : o.kind === "anh_toa" ? o.buildingId : o.requestId);
 
 /** Kho ảnh/tệp gắn với một đối tượng (khách, hợp đồng, phòng, đề nghị). Danh sách hiện ảnh nhỏ cho nhanh, bấm vào mới tải ảnh to. Tệp riêng tư mở bằng link tạm. */
-export default function FileGallery({ owner, title, hint, canUpload, canDelete, slots, cover, pdf = true, onChange }: {
+export default function FileGallery({ owner, title, hint, canUpload, canDelete, slots, cover, pdf = true, onChange, onlyLabel, hideLabel, onCount }: {
   owner: FileOwner; title: string; hint?: string; canUpload: boolean; canDelete: boolean;
   slots?: { label: string; text: string }[];   // VD CCCD: mặt trước / mặt sau
   cover?: boolean;                             // cho phép chọn ảnh đại diện (phòng)
   pdf?: boolean; onChange?: () => void;
+  /** Chỉ hiện và tải lên tệp có nhãn này (VD "unc") */
+  onlyLabel?: string;
+  /** Ẩn các tệp có nhãn này (VD kho chứng từ chung ẩn UNC) */
+  hideLabel?: string;
+  onCount?: (n: number) => void;
 }) {
   const { toast } = useSession();
   const [files, setFiles] = useState<StoredFile[]>([]);
@@ -28,10 +33,11 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
   const id = ownerId(owner);
 
   const load = useCallback(async () => {
-    const list = await listFiles(owner.kind, COLUMN[owner.kind], id);
-    setFiles(list);
+    const all = await listFiles(owner.kind, COLUMN[owner.kind], id);
+    const list = all.filter((f) => (onlyLabel ? f.label === onlyLabel : f.label !== hideLabel || !hideLabel));
+    setFiles(list); onCount?.(list.length);
     setUrls(await fileUrls(list.filter((f) => f.mime_type?.startsWith("image/")), "thumb"));
-  }, [owner.kind, id]);
+  }, [owner.kind, id, onlyLabel, hideLabel]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [load]);
 
   // Mở xem to: lúc đó mới lấy ảnh gốc (danh sách chỉ tải ảnh nhỏ)
@@ -46,7 +52,7 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
     if (!picked.length) return;
     setBusy(true);
     let ok = 0, lastErr = "";
-    const label = pendingLabel.current;
+    const label = pendingLabel.current ?? onlyLabel;
     const one = async (f: File) => {
       try {
         // Khe CCCD chỉ giữ một ảnh: ảnh mới thay ảnh cũ
