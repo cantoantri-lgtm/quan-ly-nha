@@ -4,7 +4,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { ddmmyyyy, todayVN } from "../lib/dates";
 import { vnd } from "../lib/money";
-import { DUTY_LABEL, EDIT_LOCK_TIP, FLOW_TEXT, KINDS, deleteRequest, isEditableStatus, isFinished, kindLabel, moneyCur, statusLabel, summary, vnDate,
+import { DUTY_LABEL, EDIT_LOCK_TIP, FLOW_TEXT, KINDS, PAUSED_TIP, usePausedKinds, deleteRequest, isEditableStatus, isFinished, kindLabel, moneyCur, statusLabel, summary, vnDate,
   type LoaLine, type Req, type ReqKind, type ReqLine, type ReqStep } from "../lib/office";
 import { Icon, Sheet } from "../components/ui";
 import { Pager, usePaging } from "../components/Pager";
@@ -32,6 +32,8 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   const loa = kind === "loa";
   const noun = loa ? "tờ trình" : "đề nghị";
   const newUrl = loa ? "/van-phong/loa/moi" : `/van-phong/moi/${kind}`;
+  const { paused } = usePausedKinds();
+  const closed = paused.has(kind) && !isManager;   // tạm ngưng với nhân viên
   const editUrl = (r: Req) => (loa ? `/van-phong/loa/${r.id}/sua` : `/van-phong/${r.id}/sua`);
 
   const thisMonth = todayVN().slice(0, 7);
@@ -90,10 +92,10 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   }, [load]);
   // Phím tắt F2: thêm mới
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "F2") { e.preventDefault(); nav(newUrl); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "F2" && !closed) { e.preventDefault(); nav(newUrl); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [nav, newUrl]);
+  }, [nav, newUrl, closed]);
 
   const name = (id: string | null) => people.find((p) => p.id === id)?.full_name ?? "—";
 
@@ -206,12 +208,14 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
           <button className="btn secondary sm">Tìm</button>
         </form>
         <div className="toolbar">
-          <Link to={newUrl} className="btn sm" title={`Thêm ${noun} mới (F2)`}>+ Thêm (F2)</Link>
+          {closed ? <button type="button" className="btn sm" disabled title={PAUSED_TIP}>+ Thêm · tạm ngưng</button>
+            : <Link to={newUrl} className="btn sm" title={`Thêm ${noun} mới (F2)`}>+ Thêm (F2)</Link>}
           <button type="button" className="ico-btn" title="In danh sách" aria-label="In danh sách" onClick={() => window.print()}>{Icon.print}</button>
           <button type="button" className="ico-btn" title="Xuất CSV" aria-label="Xuất CSV" disabled={!shown.length} onClick={exportCsv}>{Icon.download}</button>
           <span className="tl-title">{label}</span>
         </div>
 
+        {closed ? <div className="ok-box" style={{ margin: 12 }}>{label} đang tạm ngưng với nhân viên. Bạn vẫn xem được đề nghị đã gửi; lập mới khi Quản lý mở lại.</div> : null}
         {err ? <div className="error-box" style={{ margin: 12 }}>{err}</div> : null}
         {loading ? <div className="dt-empty">Đang tải…</div> : shown.length === 0 ? (
           <div className="dt-empty"><b>Không có {noun} nào</b><br />Đổi tháng / bộ lọc hoặc bấm “+ Thêm” để lập {noun} mới.</div>

@@ -3,6 +3,7 @@ import { ddmm, ddmmyyyy } from "./dates";
 import { vnd } from "./money";
 import { supabase } from "./supabase";
 import { listFiles, removeFile } from "./files";
+import { useCallback, useEffect, useState } from "react";
 
 export type ReqKind = "nghi_phep" | "ra_ngoai" | "cong_tac" | "loa" | "thanh_toan" | "tam_ung";
 export type ReqStatus = "nhap" | "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy" | "hoan_tat" | "tra_lai";
@@ -219,3 +220,18 @@ export type LoaBrief = { id: string; doc_no: string | null; subject: string; amo
 export type LoaLinked = { id: string; kind: ReqKind; doc_no: string | null; requester_name: string | null; amount: number | null; status: ReqStatus; created_at: string; can_open: boolean };
 /** Ngân sách LOA còn lại sau các đề nghị đã duyệt và đang chờ duyệt */
 export const loaLeft = (l: { amount: number | null; used: number; pending: number }) => Number(l.amount ?? 0) - Number(l.used) - Number(l.pending);
+
+// ---------- Tạm ngưng loại đề nghị với nhân viên (khớp request_kind_settings / tg_requests_pause) ----------
+/** Các loại đề nghị đang tạm ngưng với nhân viên. Quản lý vẫn lập được. */
+export function usePausedKinds() {
+  const [paused, setPaused] = useState<Set<ReqKind>>(new Set());
+  const [loaded, setLoaded] = useState(false);
+  const reload = useCallback(async () => {
+    const { data } = await supabase.from("request_kind_settings").select("kind,staff_enabled");
+    setPaused(new Set(((data ?? []) as { kind: ReqKind; staff_enabled: boolean }[]).filter((x) => !x.staff_enabled).map((x) => x.kind)));
+    setLoaded(true);
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+  return { paused, loaded, reload };
+}
+export const PAUSED_TIP = "Chức năng này đang tạm ngưng với nhân viên. Liên hệ Quản lý.";

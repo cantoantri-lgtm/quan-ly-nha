@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { timeAgo, todayVN } from "../lib/dates";
-import { KINDS, fmtDays, kindLabel, statusLabel, summary, type Req, type ReqKind } from "../lib/office";
+import { KINDS, fmtDays, kindLabel, statusLabel, summary, usePausedKinds, type Req, type ReqKind } from "../lib/office";
+import { friendlyError } from "../lib/supabase";
 import { Icon } from "../components/ui";
 import "../office.css";
 import "../table.css";
@@ -84,7 +85,17 @@ export function LeaveBalance({ userId, quota, compact }: { userId: string; quota
 
 /** Văn phòng số: trang các chức năng phụ. Mỗi ô mở danh sách của loại đề nghị đó. */
 export default function Office() {
-  const { profile, isManager, isApprover } = useSession();
+  const { profile, isManager, isApprover, toast } = useSession();
+  const { paused, loaded, reload } = usePausedKinds();
+  const [saving, setSaving] = useState<ReqKind | null>(null);
+  async function setOpen(k: ReqKind, open: boolean) {
+    setSaving(k);
+    const { error } = await supabase.rpc("request_kind_set", { p_kind: k, p_enabled: open });
+    setSaving(null);
+    if (error) { toast(friendlyError(error)); return; }
+    await reload();
+    toast(open ? "Đã mở lại cho nhân viên." : "Đã tạm ngưng với nhân viên.");
+  }
   const [waiting, setWaiting] = useState<Partial<Record<ReqKind, number>>>({});
   const [fix, setFix] = useState<Partial<Record<ReqKind, number>>>({});
 
@@ -115,12 +126,13 @@ export default function Office() {
         </div>
         <div className="kind-grid" style={{ padding: 16 }}>
           {KINDS.map((k) => (
-            <Link key={k.kind} to={`/van-phong/ds/${k.kind}`} className={`kind-tile k-${k.kind}`}>
+            <Link key={k.kind} to={`/van-phong/ds/${k.kind}`} className={`kind-tile k-${k.kind}${paused.has(k.kind) && !isManager ? " paused" : ""}`}>
               <span className="rq-ico">{KIND_ICON[k.kind]}</span>
               <span className="kt-label">{k.label}</span>
               <span className="kt-hint">
                 {waiting[k.kind] ? <b style={{ color: "var(--danger)" }}>{waiting[k.kind]} chờ bạn duyệt · </b> : null}
                 {fix[k.kind] ? <b style={{ color: "var(--today)" }}>{fix[k.kind]} {k.kind === "loa" ? "nháp / cần sửa" : "cần sửa"} · </b> : null}
+                {paused.has(k.kind) ? <b style={{ color: "var(--muted)" }}>{isManager ? "Đang ngưng với nhân viên · " : "Tạm ngưng · "}</b> : null}
                 {k.hint}
               </span>
             </Link>
@@ -134,6 +146,20 @@ export default function Office() {
           ) : null}
         </div>
       </section>
+      {isManager && loaded ? (
+        <section className="pg-card">
+          <div className="pg-head"><div className="grow"><h2>Chức năng với nhân viên</h2><p>Tắt để tạm ngưng: nhân viên không lập mới, không gửi lại được. Quản lý vẫn dùng bình thường; đề nghị đã gửi vẫn duyệt, chi tiền như cũ.</p></div></div>
+          <div className="stack" style={{ padding: "4px 16px 16px", gap: 4 }}>
+            {KINDS.map((k) => (
+              <label key={k.kind} className="loa-switch" style={{ justifyContent: "space-between", width: "100%" }}>
+                <span>{k.label}<small className="muted" style={{ display: "block", fontWeight: 400 }}>{paused.has(k.kind) ? "Đang tạm ngưng với nhân viên" : "Nhân viên đang dùng được"}</small></span>
+                <input type="checkbox" role="switch" checked={!paused.has(k.kind)} disabled={saving === k.kind}
+                  onChange={(e) => setOpen(k.kind, e.target.checked)} aria-label={`${k.label}: mở cho nhân viên`} />
+              </label>
+            ))}
+          </div>
+        </section>
+      ) : null}
       {profile ? <LeaveBalance userId={profile.id} quota={profile.annual_leave_days == null ? null : Number(profile.annual_leave_days)} /> : null}
     </main>
   );

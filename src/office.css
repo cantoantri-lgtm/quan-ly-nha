@@ -197,3 +197,5 @@
 .loa-nums .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 .loa-nums .dot.used { background: var(--s-done); }
 .loa-nums .dot.pend { background: var(--today); }
+
+.kind-tile.paused { opacity: .6; }

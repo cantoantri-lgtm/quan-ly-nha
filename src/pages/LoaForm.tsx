@@ -4,7 +4,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { ddmmyyyy, todayVN } from "../lib/dates";
 import { parseMoney, vndWords } from "../lib/money";
-import { LOA_BUDGET, LOA_CATEGORY, LOA_DOC_TYPE, LOA_PAY, LOA_SBU, LOA_TAX, moneyCur, statusLabel,
+import { PAUSED_TIP, usePausedKinds, LOA_BUDGET, LOA_CATEGORY, LOA_DOC_TYPE, LOA_PAY, LOA_SBU, LOA_TAX, moneyCur, statusLabel,
   type LoaDept, type LoaDetails, type LoaLine, type LoaMember, type Req } from "../lib/office";
 import { MAX_BYTES, uploadFile } from "../lib/files";
 import { Sheet, TopBar } from "../components/ui";
@@ -43,7 +43,8 @@ function Switch({ id, checked, onChange, children }: { id: string; checked: bool
 export default function LoaForm() {
   const { id } = useParams();
   const editing = !!id;
-  const { profile, people, buildings, toast, refreshUnread } = useSession();
+  const { profile, people, buildings, toast, refreshUnread, isManager } = useSession();
+  const { paused, loaded: pauseLoaded } = usePausedKinds();
   const nav = useNavigate();
   const loc = useLocation();
 
@@ -246,7 +247,11 @@ export default function LoaForm() {
     toast(`Đã sao chép nội dung từ ${src.doc_no ?? "bản nháp"}. Kiểm tra lại ngày, số tiền và tệp đính kèm.`);
   }
 
-  if (!loaded) return (<><TopBar title="Tờ trình (LOA)" back /><div className="loading">Đang tải…</div></>);
+  if (!loaded || !pauseLoaded) return (<><TopBar title="Tờ trình (LOA)" back /><div className="loading">Đang tải…</div></>);
+  if (paused.has("loa") && !isManager) return (
+    <><TopBar title="Tờ trình (LOA)" back="/van-phong/ds/loa" /><main className="main stack"><div className="ok-box">{PAUSED_TIP}</div>
+      <Link className="btn secondary block" to="/van-phong/ds/loa">Về danh sách</Link></main></>
+  );
 
   const status = req?.status ?? "nhap";
   const kw = copyText.trim().toLowerCase();

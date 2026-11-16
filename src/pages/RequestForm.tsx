@@ -4,7 +4,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { daysBetween, ddmmyyyy, todayVN, workDays } from "../lib/dates";
 import { parseMoney, vnd, vndWords } from "../lib/money";
-import { KINDS, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, isEditableStatus, loaLeft, type LoaPick, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
+import { KINDS, PAUSED_TIP, usePausedKinds, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, isEditableStatus, loaLeft, type LoaPick, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
 import { uploadFile } from "../lib/files";
 import DnttEditor, { advFromRow, calcLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
 import { TopBar } from "../components/ui";
@@ -36,7 +36,7 @@ function MoneyInput({ id, value, onChange, label, required }: { id: string; valu
 export default function RequestForm() {
   const { kind: kindParam, id } = useParams();
   const editing = !!id;
-  const { profile, buildings, people, toast, refreshUnread } = useSession();
+  const { profile, buildings, people, toast, refreshUnread, isManager } = useSession();
   const nav = useNavigate();
   const [kind, setKind] = useState<ReqKind>((kindParam as ReqKind) || "nghi_phep");
   const today = todayVN();
@@ -76,6 +76,7 @@ export default function RequestForm() {
   const [links, setLinks] = useState<LinkDraft[]>([]);
 
   const balance = useLeaveBalance(profile?.id);
+  const { paused, loaded: pauseLoaded } = usePausedKinds();
 
   useEffect(() => {
     if (!id) return;
@@ -223,7 +224,11 @@ export default function RequestForm() {
   }
 
   if (kindParam === "loa") return <Navigate to="/van-phong/loa/moi" replace />;
-  if (!loaded) return (<><TopBar title="Sửa đề nghị" back /><div className="loading">Đang tải…</div></>);
+  if (!loaded || !pauseLoaded) return (<><TopBar title={editing ? "Sửa đề nghị" : "Đề nghị"} back /><div className="loading">Đang tải…</div></>);
+  if (paused.has(kind) && !isManager) return (
+    <><TopBar title={meta.label} back /><main className="main stack"><div className="ok-box">{PAUSED_TIP}</div>
+      <Link className="btn secondary block" to={`/van-phong/ds/${kind}`}>Về danh sách</Link></main></>
+  );
 
   const bankReq = isPay && payMethod === "chuyen_khoan";
   const total = isPay ? (hasLines ? tot.net : parseMoney(amount)) : parseMoney(amount);
