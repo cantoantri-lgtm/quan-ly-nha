@@ -27,3 +27,8 @@
 .tag.flag-quen { background: var(--s-done-bg); color: var(--s-done); border-color: var(--s-done); }
 .tag.st-ok { background: var(--s-done-bg); color: var(--s-done); border-color: var(--s-done); }
 .tag.st-late { background: var(--s-block-bg); color: var(--late); border-color: var(--late); }
+
+/* Loại tài liệu (đính kèm tờ trình LOA) */
+.fg-add { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.fg-doc-type { min-height: 34px; padding: 4px 8px; font-size: 13.5px; width: auto; max-width: 190px; }
+.fg-badge.fg-type { background: var(--surface); color: var(--ink); border: 1px solid var(--line); max-width: calc(100% - 8px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

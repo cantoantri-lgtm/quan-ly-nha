@@ -4,11 +4,12 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { clock, daysBetween, todayVN } from "../lib/dates";
 import { parseMoney, vnd, vndWords } from "../lib/money";
-import { EDIT_LOCK_TIP, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, deleteRequest, fmtDays, fullDate, hhmm, isEditableStatus, kindLabel, statusLabel, summary, type Req, type ReqStep } from "../lib/office";
+import { EDIT_LOCK_TIP, LEAVE_SPAN, LEAVE_TYPE, LOA_DOC_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, deleteRequest, fmtDays, fullDate, hhmm, isEditableStatus, kindLabel, statusLabel, summary, type LoaDetails, type Req, type ReqStep } from "../lib/office";
 import { Empty, Icon, Sheet, TopBar } from "../components/ui";
 import DecideSheet, { type DecideMode } from "../components/DecideSheet";
 import FileGallery from "../components/FileGallery";
 import DnttView from "../components/DnttView";
+import LoaView, { LoaBudget } from "../components/LoaView";
 import { ApprovalSteps } from "../components/ApprovalChain";
 import { KIND_ICON, LeaveBalance } from "./Office";
 import "../office.css";
@@ -30,6 +31,8 @@ export default function RequestDetail() {
   const [aNote, setANote] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [uncCount, setUncCount] = useState(0);
+  const [loa, setLoa] = useState<LoaDetails | null>(null);   // chỉ có khi đây là tờ trình (LOA)
+  const [loaCanEdit, setLoaCanEdit] = useState(false);       // người lập hoặc người cùng soạn, khi còn sửa được
 
   const load = useCallback(async () => {
     const [{ data }, st] = await Promise.all([
@@ -37,6 +40,13 @@ export default function RequestDetail() {
       supabase.from("request_steps").select("*").eq("request_id", id!).order("step_no"),
     ]);
     if (!data) { setNotFound(true); return; }
+    if ((data as Req).kind === "loa") {
+      const [d, can] = await Promise.all([
+        supabase.from("loa_details").select("*").eq("request_id", id!).maybeSingle(),
+        supabase.rpc("loa_can_edit", { p_loa: id! }),
+      ]);
+      setLoa((d.data as LoaDetails | null) ?? null); setLoaCanEdit(!!can.data);
+    } else { setLoa(null); setLoaCanEdit(false); }
     setR(data as Req);
     setSteps((st.data ?? []) as ReqStep[]);
   }, [id]);
@@ -59,15 +69,22 @@ export default function RequestDetail() {
   const requester = people.find((p) => p.id === r.requester_id);
   const mine = r.requester_id === profile.id;
   const isMoney = r.kind === "thanh_toan" || r.kind === "tam_ung";
+  const isLoa = r.kind === "loa";
+  const noun = isLoa ? "tờ trình" : "đề nghị";
+  const Noun = isLoa ? "Tờ trình" : "Đề nghị";
   const today = todayVN();
   const curStep = r.status === "cho_duyet" ? steps.find((x) => x.status === "cho") : undefined;
   const canDecide = !!curStep && !mine && (curStep.approver_id === profile.id || (curStep.approver_id === null && isManager));
   const editable = isEditableStatus(r.status);                       // không đang trong quá trình duyệt
-  const canEdit = mine && editable;
+  const canEdit = isLoa ? loaCanEdit : mine && editable;
   const canDelete = (mine || isManager) && editable;
+  const editUrl = isLoa ? `/van-phong/loa/${r.id}/sua` : `/van-phong/${r.id}/sua`;
+  // Tệp tờ trình: sửa được tới khi duyệt xong (khớp storage_path_ok)
+  const loaFiles = isLoa && r.status !== "da_duyet" && (mine || loaCanEdit || (isManager && r.status !== "nhap"));
+  const sentAt = loa?.submitted_at ?? r.created_at;
   const listUrl = `/van-phong/ds/${r.kind}`;
   const canPay = isMoney && r.status === "da_duyet" && (isManager || isAccountant);
-  const canCancel = mine && (r.status === "cho_duyet" || (r.status === "da_duyet" && !isMoney && r.start_date > today));
+  const canCancel = mine && (r.status === "cho_duyet" || (r.status === "da_duyet" && !isMoney && !isLoa && r.start_date > today));
   const canReport = mine && r.kind === "cong_tac" && (r.status === "da_duyet" || r.status === "hoan_tat");
   const building = buildings.find((b) => b.id === r.building_id);
 
@@ -114,7 +131,7 @@ export default function RequestDetail() {
   return (
     <>
       <TopBar title={kindLabel(r)} back={listUrl} />
-      <main className={`main stack${isMoney ? " main-wide" : ""}`}>
+      <main className={`main stack${isMoney || isLoa ? " main-wide" : ""}`}>
         <section className={`card rq-head k-${r.kind}`}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <span className="rq-ico" aria-hidden="true">{KIND_ICON[r.kind]}</span>
@@ -122,16 +139,22 @@ export default function RequestDetail() {
           </div>
           <h2 className="num">{isMoney ? vnd(r.amount) : summary(r)}</h2>
           {isMoney && r.amount ? <p className="muted" style={{ margin: 0, fontSize: 13 }}>{vndWords(r.amount)}</p> : null}
-          <p className="muted" style={{ margin: 0 }}>{requester?.full_name ?? "—"} · gửi {clock(r.created_at)}</p>
+          {isLoa ? <p style={{ margin: 0, fontWeight: 600 }}>{r.doc_no ? `${r.doc_no} · ` : ""}{r.reason}</p> : null}
+          <p className="muted" style={{ margin: 0 }}>{requester?.full_name ?? "—"} · {isLoa ? (loa?.submitted_at ? `trình ${clock(loa.submitted_at)}` : `lập ${clock(r.created_at)}`) : `gửi ${clock(r.created_at)}`}</p>
         </section>
+
+        {r.status === "nhap" ? (
+          <div className="ok-box"><b>Bản nháp, chưa trình duyệt.</b> Chỉ người lập và người cùng soạn nhìn thấy. Bấm “Sửa bản nháp” để điền tiếp và trình duyệt.</div>
+        ) : null}
 
         {r.status === "tu_choi" && r.decision_note ? (
           <div className="error-box"><b>Lý do từ chối:</b> {r.decision_note}</div>
         ) : null}
         {r.status === "tra_lai" ? (
-          <div className="error-box"><b>Đề nghị bị trả lại để sửa.</b>{r.decision_note ? ` Lý do: ${r.decision_note}` : ""}{mine ? " Bấm “Sửa và gửi lại” bên dưới; đề nghị sẽ được duyệt lại từ cấp đầu." : ""}</div>
+          <div className="error-box"><b>{Noun} bị trả lại để sửa.</b>{r.decision_note ? ` Lý do: ${r.decision_note}` : ""}{mine ? ` Bấm “${isLoa ? "Sửa và trình lại" : "Sửa và gửi lại"}” bên dưới; ${noun} sẽ được duyệt lại từ cấp đầu.` : ""}</div>
         ) : null}
 
+        {isLoa ? (loa ? <LoaView r={r} d={loa} /> : null) : (
         <dl className="card kv">
           {r.kind === "nghi_phep" ? (<>
             <dt>Loại nghỉ</dt><dd>{LEAVE_TYPE[r.sub_type ?? ""]}</dd>
@@ -156,7 +179,7 @@ export default function RequestDetail() {
             <dt>Số tiền</dt><dd className="num"><b>{vnd(r.amount)}</b></dd>
             <dt>{r.kind === "thanh_toan" ? "Ngày cần TT" : "Cần trước"}</dt><dd className="num">{fullDate(r.start_date)}</dd>
             {r.kind === "thanh_toan" && r.pay_type ? (<><dt>Loại thanh toán</dt><dd>{PAY_TYPE[r.pay_type] ?? r.pay_type}</dd></>) : null}
-            {r.loa_no ? (<><dt>LOA No.</dt><dd>{r.loa_no}</dd></>) : null}
+            {r.loa_no ? (<><dt>Số LOA</dt><dd className="num">{r.loa_no}</dd></>) : null}
             {r.kind === "tam_ung" && r.settle_due ? (<><dt>Hạn hoàn ứng</dt><dd className="num">{fullDate(r.settle_due)}</dd></>) : null}
             {r.payee ? (<><dt>{r.kind === "thanh_toan" ? "Đơn vị nhận" : "Người nhận"}</dt><dd>{r.payee}{r.vendor_code ? ` (${r.vendor_code})` : ""}</dd></>) : null}
             {r.contact_name || r.contact_code ? (<><dt>Liên hệ</dt><dd>{[r.contact_name, r.contact_code].filter(Boolean).join(" · ")}</dd></>) : null}
@@ -167,6 +190,15 @@ export default function RequestDetail() {
           {r.handover_to ? (<><dt>Bàn giao cho</dt><dd>{name(r.handover_to)}</dd></>) : null}
           {r.contact_phone ? (<><dt>SĐT liên hệ</dt><dd className="num">{r.contact_phone}</dd></>) : null}
         </dl>
+        )}
+
+        {isMoney && (r.loa_id || r.status === "cho_duyet" || r.status === "da_duyet" || r.status === "tra_lai") ? <LoaBudget loaId={r.loa_id} loaNo={r.loa_no} refreshKey={r.updated_at} /> : null}
+
+        {isLoa ? (
+          <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} title="Tài liệu đính kèm" docTypes={LOA_DOC_TYPE}
+            hint={r.status === "da_duyet" ? "Tờ trình đã duyệt xong, tài liệu đã khoá." : "Dự toán, báo giá, hợp đồng… (ảnh hoặc PDF, tối đa 10 MB mỗi tệp)."}
+            canUpload={loaFiles} canDelete={loaFiles} />
+        ) : null}
 
         {r.kind === "cong_tac" && r.status === "hoan_tat" ? (
           <>
@@ -212,18 +244,19 @@ export default function RequestDetail() {
         {steps.length ? (
           <>
             <div className="section-title">Luồng duyệt</div>
-            <ApprovalSteps steps={steps} people={people} requesterName={requester?.full_name ?? "—"} sentAt={r.created_at} />
+            <ApprovalSteps steps={steps} people={people} requesterName={requester?.full_name ?? "—"} sentAt={sentAt} />
           </>
         ) : null}
 
         <div className="section-title">Lịch sử</div>
         <ol className="card rq-log">
-          <li><b>{requester?.full_name}</b> gửi đề nghị<span>{clock(r.created_at)}</span></li>
+          <li><b>{requester?.full_name}</b> {isLoa ? "lập tờ trình" : "gửi đề nghị"}<span>{clock(r.created_at)}</span></li>
+          {isLoa && loa?.submitted_at ? <li><b>{requester?.full_name}</b> trình duyệt<span>{clock(loa.submitted_at)}</span></li> : null}
           {r.decided_at && !steps.length ? <li><b>{name(r.approver_id)}</b> {r.status === "tu_choi" ? "từ chối" : "duyệt"}{r.decision_note && r.status !== "tu_choi" ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at)}</span></li> : null}
           {r.reported_at ? <li><b>{requester?.full_name}</b> nhập thực tế công tác<span>{clock(r.reported_at)}</span></li> : null}
           {r.paid_at ? <li><b>{name(r.paid_by)}</b> đính kèm UNC và kết thúc<span>{clock(r.paid_at)}</span></li> : null}
-          {r.status === "tra_lai" ? <li><b>{name(r.approver_id)}</b> trả lại đề nghị{r.decision_note ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at ?? r.updated_at)}</span></li> : null}
-          {r.status === "da_huy" ? <li><b>{requester?.full_name}</b> rút lại đề nghị<span>{clock(r.updated_at)}</span></li> : null}
+          {r.status === "tra_lai" ? <li><b>{name(r.approver_id)}</b> trả lại {noun}{r.decision_note ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at ?? r.updated_at)}</span></li> : null}
+          {r.status === "da_huy" ? <li><b>{requester?.full_name}</b> rút lại {noun}<span>{clock(r.updated_at)}</span></li> : null}
         </ol>
 
         {err && !decide && !report ? <div className="error-box" role="alert">{err}</div> : null}
@@ -248,16 +281,17 @@ export default function RequestDetail() {
               {r.status === "hoan_tat" ? "Sửa báo cáo thực tế" : "Nhập thực tế công tác"}
             </button>
           ) : null}
-          {mine || isManager ? (
+          {mine || isManager || canEdit ? (
             <div className="row">
-              {mine ? (canEdit
-                ? <Link className="btn block" style={{ flex: 2 }} to={`/van-phong/${r.id}/sua`}>{Icon.edit}Sửa và gửi lại</Link>
+              {mine || canEdit ? (canEdit
+                ? <Link className="btn block" style={{ flex: 2 }} to={editUrl}>{Icon.edit}{r.status === "nhap" ? "Sửa bản nháp" : isLoa ? (mine ? "Sửa và trình lại" : "Sửa tờ trình") : "Sửa và gửi lại"}</Link>
                 : <button className="btn secondary block" style={{ flex: 2 }} disabled title={EDIT_LOCK_TIP}>{Icon.edit}Sửa</button>) : null}
-              <button className="btn danger" style={{ flex: 1 }} disabled={!canDelete} title={canDelete ? "Xoá đề nghị" : EDIT_LOCK_TIP} onClick={() => setConfirm("xoa")}>{Icon.trash}Xoá</button>
+              {mine || isManager ? <button className="btn danger" style={{ flex: 1 }} disabled={!canDelete} title={canDelete ? `Xoá ${noun}` : EDIT_LOCK_TIP} onClick={() => setConfirm("xoa")}>{Icon.trash}Xoá</button> : null}
             </div>
           ) : null}
-          {(mine || isManager) && !editable && r.status !== "hoan_tat" ? <p className="muted small" style={{ margin: 0 }}>Sửa và Xoá chỉ mở khi đề nghị bị trả lại, bị từ chối hoặc đã rút. Đang chờ duyệt thì bấm “Rút lại” trước.</p> : null}
-          {canCancel ? <button className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setConfirm("huy")}>Rút lại đề nghị</button> : null}
+          {(mine || isManager) && !editable && r.status !== "hoan_tat" && !(isLoa && r.status === "da_duyet") ? <p className="muted small" style={{ margin: 0 }}>Sửa và Xoá chỉ mở khi {noun} bị trả lại, bị từ chối hoặc đã rút. Đang chờ duyệt thì bấm “Rút lại” trước.</p> : null}
+          {isLoa && r.status === "da_duyet" ? <p className="muted small" style={{ margin: 0 }}>Tờ trình đã duyệt xong nên khoá, không sửa / xoá. Cần thay đổi thì lập LOA mới và chọn LOA này làm tham chiếu.</p> : null}
+          {canCancel ? <button className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setConfirm("huy")}>Rút lại {noun}</button> : null}
         </div>
       </main>
 
@@ -281,12 +315,12 @@ export default function RequestDetail() {
         </form>
       </Sheet>
 
-      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm === "chi" ? (r.kind === "thanh_toan" ? "Kết thúc đề nghị thanh toán?" : "Kết thúc đề nghị tạm ứng?") : confirm === "xoa" ? "Xoá đề nghị?" : "Rút lại đề nghị?"}>
+      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm === "chi" ? (r.kind === "thanh_toan" ? "Kết thúc đề nghị thanh toán?" : "Kết thúc đề nghị tạm ứng?") : confirm === "xoa" ? `Xoá ${noun}?` : `Rút lại ${noun}?`}>
         <p className="muted" style={{ marginTop: 0 }}>
           {confirm === "chi"
             ? `${vnd(r.amount)} cho ${r.payee || requester?.full_name}${r.bank_info ? ` (${r.bank_info})` : ""}. Đã đính kèm ${uncCount} tệp UNC. Sau khi kết thúc, UNC bị khoá, không sửa được. Người đề nghị sẽ nhận thông báo.`
-            : confirm === "xoa" ? "Xoá hẳn đề nghị cùng tệp đính kèm, không khôi phục được."
-            : r.status === "da_duyet" ? "Đề nghị đã được duyệt. Rút lại sẽ báo cho quản lý biết." : "Đề nghị sẽ không còn chờ duyệt nữa."}
+            : confirm === "xoa" ? `Xoá hẳn ${noun} cùng tệp đính kèm, không khôi phục được.`
+            : r.status === "da_duyet" ? "Đề nghị đã được duyệt. Rút lại sẽ báo cho quản lý biết." : `${Noun} sẽ không còn chờ duyệt nữa.`}
         </p>
         <div className="row">
           <button className="btn secondary" style={{ flex: 1 }} onClick={() => setConfirm(null)}>Thôi</button>
@@ -294,12 +328,12 @@ export default function RequestDetail() {
             onClick={async () => {
               if (confirm === "xoa") {
                 setBusy(true);
-                try { await deleteRequest(r.id); toast("Đã xoá đề nghị."); refreshUnread(); nav(listUrl, { replace: true }); }
+                try { await deleteRequest(r.id); toast(`Đã xoá ${noun}.`); refreshUnread(); nav(listUrl, { replace: true }); }
                 catch (e) { toast(friendlyError(e)); setConfirm(null); }
                 setBusy(false);
                 return;
               }
-              const ok = confirm === "chi" ? await markPaid() : await update({ status: "da_huy" }, "Đã rút lại đề nghị.");
+              const ok = confirm === "chi" ? await markPaid() : await update({ status: "da_huy" }, `Đã rút lại ${noun}.`);
               if (ok) { setConfirm(null); if (confirm === "huy") nav(listUrl, { replace: true }); }
             }}>{confirm === "chi" ? "Kết thúc" : confirm === "xoa" ? "Xoá" : "Rút lại"}</button>
         </div>

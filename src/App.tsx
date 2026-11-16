@@ -20,6 +20,7 @@ import BuildingMeters from "./pages/BuildingMeters";
 import Reports from "./pages/Reports";
 import Office from "./pages/Office";
 import RequestForm from "./pages/RequestForm";
+import LoaForm from "./pages/LoaForm";
 import RequestDetail from "./pages/RequestDetail";
 import RequestPrint from "./pages/RequestPrint";
 import RequestList from "./pages/RequestList";
@@ -149,6 +150,8 @@ export default function App() {
         <Route path="van-phong" element={<Office />} />
         <Route path="van-phong/ds/:kind" element={<RequestList />} />
         <Route path="van-phong/moi/:kind" element={<RequestForm />} />
+        <Route path="van-phong/loa/moi" element={<LoaForm />} />
+        <Route path="van-phong/loa/:id/sua" element={<LoaForm />} />
         <Route path="van-phong/:id" element={<RequestDetail />} />
         <Route path="van-phong/:id/sua" element={<RequestForm />} />
         <Route path="van-phong/:id/in" element={<RequestPrint />} />

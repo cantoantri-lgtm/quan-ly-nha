@@ -237,7 +237,7 @@ export default function Org() {
         <section className="card dn-sec">
           <h2 className="dn-h">Luồng duyệt đề nghị</h2>
           <p style={{ margin: 0 }}><b>Nghỉ phép, làm việc bên ngoài, công tác:</b> {FLOW_TEXT.nghi_phep}</p>
-          <p style={{ margin: 0 }}><b>Thanh toán, tạm ứng:</b> {FLOW_TEXT.thanh_toan}</p>
+          <p style={{ margin: 0 }}><b>Tờ trình (LOA), thanh toán, tạm ứng:</b> {FLOW_TEXT.thanh_toan}</p>
           <p className="muted small" style={{ margin: 0 }}>Bước chưa có người giữ tự bỏ qua; một người đứng nhiều bước chỉ duyệt một lần. Người giữ nhiệm vụ Nhân sự, Kế toán, Giám đốc đặt ở từng vị trí (nút Sửa).</p>
         </section>
 

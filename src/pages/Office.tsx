@@ -12,6 +12,7 @@ export const KIND_ICON: Record<ReqKind, JSX.Element> = {
   nghi_phep: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18M9 15l2 2 4-4" /></svg>,
   ra_ngoai: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21Z" /><circle cx="12" cy="9.5" r="2.5" /></svg>,
   cong_tac: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" /></svg>,
+  loa: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5M9 13h6M9 17h3" /><path d="m14.5 17.5 1.5 1.5 3-3.5" /></svg>,
   thanh_toan: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" /><path d="M9 8h6M9 12h6M9 16h3" /></svg>,
   tam_ung: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></svg>,
 };
@@ -98,7 +99,7 @@ export default function Office() {
         ((data ?? []) as { kind: ReqKind }[]).forEach((r) => { w[r.kind] = (w[r.kind] ?? 0) + 1; });
       }
       setWaiting(w);
-      const { data: f } = await supabase.from("requests").select("kind").eq("requester_id", profile.id).in("status", ["tra_lai", "tu_choi"]);
+      const { data: f } = await supabase.from("requests").select("kind").eq("requester_id", profile.id).in("status", ["nhap", "tra_lai", "tu_choi"]);
       const fx: Partial<Record<ReqKind, number>> = {};
       ((f ?? []) as { kind: ReqKind }[]).forEach((r) => { fx[r.kind] = (fx[r.kind] ?? 0) + 1; });
       setFix(fx);
@@ -110,7 +111,7 @@ export default function Office() {
       <section className="pg-card">
         <div className="pg-head">
           <span className="pg-ico">{Icon.office}</span>
-          <div className="grow"><h2>Văn phòng số</h2><p>Chọn nghiệp vụ để xem danh sách và lập đề nghị</p></div>
+          <div className="grow"><h2>Văn phòng số</h2><p>Chọn nghiệp vụ để xem danh sách và lập đề nghị, tờ trình</p></div>
         </div>
         <div className="kind-grid" style={{ padding: 16 }}>
           {KINDS.map((k) => (
@@ -119,7 +120,7 @@ export default function Office() {
               <span className="kt-label">{k.label}</span>
               <span className="kt-hint">
                 {waiting[k.kind] ? <b style={{ color: "var(--danger)" }}>{waiting[k.kind]} chờ bạn duyệt · </b> : null}
-                {fix[k.kind] ? <b style={{ color: "var(--today)" }}>{fix[k.kind]} cần sửa · </b> : null}
+                {fix[k.kind] ? <b style={{ color: "var(--today)" }}>{fix[k.kind]} {k.kind === "loa" ? "nháp / cần sửa" : "cần sửa"} · </b> : null}
                 {k.hint}
               </span>
             </Link>

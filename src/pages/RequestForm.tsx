@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { daysBetween, ddmmyyyy, todayVN, workDays } from "../lib/dates";
 import { parseMoney, vnd, vndWords } from "../lib/money";
-import { KINDS, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, isEditableStatus, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
+import { KINDS, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, isEditableStatus, loaLeft, type LoaPick, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
 import { uploadFile } from "../lib/files";
 import DnttEditor, { advFromRow, calcLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
 import { TopBar } from "../components/ui";
@@ -59,7 +59,9 @@ export default function RequestForm() {
   // Đề nghị thanh toán đầy đủ
   const [payMethod, setPayMethod] = useState("chuyen_khoan");
   const [payType, setPayType] = useState("nha_cung_cap");
-  const [loa, setLoa] = useState("");
+  const [loaId, setLoaId] = useState("");                      // Tờ trình (LOA) đã duyệt gắn với đề nghị tiền
+  const [oldLoaNo, setOldLoaNo] = useState<string | null>(null); // số LOA ghi tay của đề nghị lập trước đây
+  const [picks, setPicks] = useState<LoaPick[] | null>(null);
   const [vendorCode, setVendorCode] = useState("");
   const [contactName, setContactName] = useState("");
   const [contactCode, setContactCode] = useState("");
@@ -80,6 +82,7 @@ export default function RequestForm() {
     supabase.from("requests").select("*").eq("id", id).maybeSingle().then(({ data }) => {
       const r = data as Req | null;
       if (!r) { nav("/van-phong", { replace: true }); return; }
+      if (r.kind === "loa") { nav(`/van-phong/loa/${r.id}/sua`, { replace: true }); return; }
       if (!isEditableStatus(r.status)) { toast("Đề nghị đang trong quá trình duyệt nên chưa sửa được."); nav(`/van-phong/${r.id}`, { replace: true }); return; }
       setKind(r.kind); setSubType(r.sub_type ?? ""); setSpan(r.span ?? "ca_ngay");
       setStart(r.start_date); setEnd(r.end_date ?? r.start_date);
@@ -88,7 +91,7 @@ export default function RequestForm() {
       setPayee(r.payee ?? ""); setBank(r.bank_info ?? ""); setBuildingId(r.building_id ?? "");
       if (r.kind === "nghi_phep" && r.sub_type === "phep_nam" && r.status === "cho_duyet") setOrigPending(Number(r.days ?? 0));
       setPayMethod(r.pay_method ?? (r.bank_info ? "chuyen_khoan" : "tien_mat")); setPayType(r.pay_type ?? "khac");
-      setLoa(r.loa_no ?? ""); setVendorCode(r.vendor_code ?? ""); setContactName(r.contact_name ?? ""); setContactCode(r.contact_code ?? "");
+      setLoaId(r.loa_id ?? ""); setOldLoaNo(r.loa_id ? null : r.loa_no); setVendorCode(r.vendor_code ?? ""); setContactName(r.contact_name ?? ""); setContactCode(r.contact_code ?? "");
       setDocNo(r.doc_no);
       setHandover(r.handover_to ?? ""); setPhone(r.contact_phone ?? ""); setTransport(r.transport ?? ""); setSettleDue(r.settle_due ?? "");
       if (r.kind === "thanh_toan") {
@@ -108,6 +111,11 @@ export default function RequestForm() {
 
   const meta = KINDS.find((k) => k.kind === kind)!;
   const isMoney = kind === "thanh_toan" || kind === "tam_ung";
+  // LOA chi tiền đã duyệt mà mình được dùng (người lập, cùng soạn, được xem)
+  useEffect(() => {
+    if (!isMoney) return;
+    supabase.rpc("loa_pickable").then(({ data }) => setPicks((data ?? []) as LoaPick[]));
+  }, [isMoney]);
   const isPay = kind === "thanh_toan";
   const absence = kind === "nghi_phep" || kind === "ra_ngoai" || kind === "cong_tac";   // vắng mặt: có bàn giao
   const hasLines = isPay && lines.length > 0;
@@ -125,6 +133,7 @@ export default function RequestForm() {
     e.preventDefault();
     setErr(null);
     const amt = hasLines ? tot.net : parseMoney(amount);
+    if (isMoney && !loaId) { setErr("Chọn Tờ trình (LOA) đã duyệt cho đề nghị này. Chưa có LOA thì lập tờ trình và chờ duyệt xong trước."); return; }
     if (isMoney && !amt) { setErr(hasLines ? "Tiền tạm ứng phải nhỏ hơn tổng thanh toán." : "Nhập số tiền đề nghị."); return; }
     if (!hasLines && amount && !amt) { setErr("Số tiền chưa đúng định dạng."); return; }
     if (isPay) {
@@ -155,7 +164,7 @@ export default function RequestForm() {
       building_id: buildingId || null,
       pay_method: isPay ? payMethod : null,
       pay_type: isPay ? payType : null,
-      loa_no: isPay ? loa.trim() || null : null,
+      loa_id: isMoney ? loaId || null : null,
       vendor_code: isPay ? vendorCode.trim() || null : null,
       contact_name: isPay ? contactName.trim() || null : null,
       contact_code: isPay ? contactCode.trim() || null : null,
@@ -213,11 +222,38 @@ export default function RequestForm() {
     nav(`/van-phong/${rid}`, { replace: true });
   }
 
+  if (kindParam === "loa") return <Navigate to="/van-phong/loa/moi" replace />;
   if (!loaded) return (<><TopBar title="Sửa đề nghị" back /><div className="loading">Đang tải…</div></>);
 
   const bankReq = isPay && payMethod === "chuyen_khoan";
   const total = isPay ? (hasLines ? tot.net : parseMoney(amount)) : parseMoney(amount);
   const others = people.filter((p) => p.is_active && p.id !== profile?.id);
+  const pick = picks?.find((x) => x.id === loaId) ?? null;
+  const leftAfter2 = pick ? loaLeft(pick) - (total ?? 0) : null;   // dự toán còn lại sau đề nghị này
+
+  const LoaSel = isMoney ? (
+    <section className="card dn-sec k-loa">
+      <h2 className="dn-h">Tờ trình (LOA) *</h2>
+      <label className="field"><span>LOA đã duyệt dùng cho đề nghị này *</span>
+        <select id="rq-loa" className="input" value={loaId} onChange={(e) => setLoaId(e.target.value)} required>
+          <option value="">{picks == null ? "Đang tải…" : "Chọn LOA"}</option>
+          {loaId && picks && !pick ? <option value={loaId}>LOA đang gắn</option> : null}
+          {(picks ?? []).map((x) => <option key={x.id} value={x.id}>{x.doc_no} · {x.subject} · còn {vnd(loaLeft(x))}</option>)}
+        </select></label>
+      {oldLoaNo ? <p className="muted small" style={{ margin: 0 }}>Số LOA ghi tay trước đây: {oldLoaNo}. Hãy chọn LOA tương ứng trong danh sách.</p> : null}
+      {picks && !picks.length ? (
+        <div className="error-box">Bạn chưa có LOA chi tiền nào đã duyệt để dùng. <Link to="/van-phong/loa/moi" className="dt-link">Lập tờ trình (LOA)</Link> và chờ duyệt xong, hoặc nhờ người lập LOA thêm bạn / phòng bạn vào danh sách được xem.</div>
+      ) : null}
+      {pick ? (
+        <p className="calc-line num" style={{ margin: 0 }}>
+          Dự toán <b>{vnd(pick.amount)}</b> · đã duyệt chi {vnd(pick.used)} · đang chờ duyệt {vnd(pick.pending)} · người lập {pick.requester_name ?? "—"}
+          {leftAfter2 != null && total ? <><br />{leftAfter2 < 0 ? <span className="over">Vượt dự toán LOA {vnd(-leftAfter2)}. Vẫn gửi được, các cấp duyệt sẽ thấy cảnh báo này.</span> : <>Còn lại sau đề nghị này: <b>{vnd(leftAfter2)}</b></>}</> : null}
+        </p>
+      ) : (
+        <p className="muted small" style={{ margin: 0 }}>Tạm ứng và thanh toán phải gắn một LOA chi tiền đã duyệt, có dự toán ngân sách.</p>
+      )}
+    </section>
+  ) : null;
 
   const Handover = absence ? (
     <>
@@ -260,6 +296,8 @@ export default function RequestForm() {
               {!isMoney ? null : <ReadOnly label="Loại tiền" value="VND" />}
             </div>
           </section>
+
+          {LoaSel}
 
           {/* ---------- Nghỉ phép / Ra ngoài / Công tác ---------- */}
           {absence ? (
@@ -356,8 +394,6 @@ export default function RequestForm() {
               <section className="card dn-sec">
                 <h2 className="dn-h">Thông tin thanh toán</h2>
                 <div className="dn-fields">
-                  <label className="field"><span>LOA No.</span>
-                    <input id="rq-loa" className="input" value={loa} onChange={(e) => setLoa(e.target.value)} /></label>
                   <label className="field"><span>Loại thanh toán *</span>
                     <select id="rq-paytype" className="input" value={payType} onChange={(e) => setPayType(e.target.value)}>
                       {Object.entries(PAY_TYPE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}

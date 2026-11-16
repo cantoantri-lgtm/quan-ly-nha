@@ -5,6 +5,7 @@
   --k-trip: #A0670E;   --k-trip-bg: #F7ECD6;
   --k-pay: #1F5C4F;    --k-pay-bg: #E1EEEA;
   --k-adv: #9A3F5C;    --k-adv-bg: #F6E4EA;
+  --k-loa: #3F5A8C;    --k-loa-bg: #E6EBF5;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -13,6 +14,7 @@
     --k-trip: #E5AE52;  --k-trip-bg: #352812;
     --k-pay: #5FB39F;   --k-pay-bg: #1C332D;
     --k-adv: #E6909F;   --k-adv-bg: #3A1E26;
+    --k-loa: #93AEE0;   --k-loa-bg: #1B2740;
   }
 }
 :root[data-theme="dark"] {
@@ -21,12 +23,14 @@
     --k-trip: #E5AE52;  --k-trip-bg: #352812;
     --k-pay: #5FB39F;   --k-pay-bg: #1C332D;
     --k-adv: #E6909F;   --k-adv-bg: #3A1E26;
+    --k-loa: #93AEE0;   --k-loa-bg: #1B2740;
 }
 .k-nghi_phep  { --k: var(--k-leave); --k-bg: var(--k-leave-bg); }
 .k-ra_ngoai   { --k: var(--k-out);   --k-bg: var(--k-out-bg); }
 .k-cong_tac   { --k: var(--k-trip);  --k-bg: var(--k-trip-bg); }
 .k-thanh_toan { --k: var(--k-pay);   --k-bg: var(--k-pay-bg); }
 .k-tam_ung    { --k: var(--k-adv);   --k-bg: var(--k-adv-bg); }
+.k-loa        { --k: var(--k-loa);   --k-bg: var(--k-loa-bg); }
 
 .rq-ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--k-bg); color: var(--k); flex: none; }
 .rq-ico svg { width: 21px; height: 21px; }
@@ -48,6 +52,7 @@
 .rq-pill.tu_choi   { background: var(--s-block-bg); color: var(--s-block); }
 .rq-pill.da_huy    { background: var(--s-todo-bg); color: var(--s-todo); }
 .rq-pill.tra_lai   { background: var(--cream); color: var(--today); }
+.rq-pill.nhap      { background: var(--surface-2); color: var(--muted); border: 1px dashed var(--line); }
 
 .tab-n { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11.5px; line-height: 18px; }
 
@@ -152,3 +157,43 @@
 /* Bước cuối DNTT: khung UNC nổi bật khi đang chờ chi, dịu lại khi đã kết thúc */
 .rq-unc > .fg { border: 2px solid var(--brand); background: var(--brand-soft); }
 .rq-unc.done > .fg { border: 1px solid var(--s-done); background: var(--s-done-bg); }
+
+/* ---------- Tờ trình phê duyệt (LOA) ---------- */
+.loa-title { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.loa-conf { font-size: 12.5px; font-weight: 700; color: var(--danger); letter-spacing: .04em; text-transform: uppercase; }
+.loa-bar { flex-wrap: wrap; gap: 8px; }
+.loa-bar .btn { min-height: 38px; }
+.loa-help { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--surface-2); font-size: 13.5px; }
+.loa-help summary { cursor: pointer; font-weight: 600; color: var(--k, var(--brand)); }
+.loa-help p { margin: 8px 0 0; color: var(--muted); line-height: 1.45; }
+.loa-help p b { color: var(--ink); }
+.loa-meta { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.loa-meta > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); border-bottom: 1px solid var(--line); margin-bottom: -1px; font-size: 13.5px; }
+.loa-meta dt { background: var(--surface-2); color: var(--muted); padding: 7px 10px; }
+.loa-meta dd { margin: 0; padding: 7px 10px; min-width: 0; overflow-wrap: anywhere; }
+.opt[role="checkbox"][aria-checked="true"]::before { content: "✓ "; }
+.loa-switch { display: inline-flex; align-items: center; gap: 10px; font-size: 14.5px; font-weight: 600; cursor: pointer; min-height: 36px; }
+.loa-switch input { appearance: none; -webkit-appearance: none; width: 42px; height: 24px; border-radius: 999px; background: var(--line); position: relative; cursor: pointer; flex: none; margin: 0; transition: background-color .15s; }
+.loa-switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); transition: transform .15s; }
+.loa-switch input:checked { background: var(--brand); }
+.loa-switch input:checked::after { transform: translateX(18px); }
+.loa-switch input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.loa-submit .row { flex-wrap: nowrap; gap: 8px; }
+.loa-submit .btn { min-width: 0; white-space: nowrap; }
+@media (max-width: 480px) { .loa-submit { flex-direction: column; align-items: stretch; } .loa-submit .row .btn { flex: 1; } }
+.loa-text { padding: 14px 16px; display: grid; gap: 6px; }
+.loa-text h3 { margin: 6px 0 0; font-size: 13px; font-weight: 700; color: var(--muted); }
+.loa-text h3:first-child { margin-top: 0; }
+.loa-text p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; font-size: 14.5px; }
+.loa-card { padding: 14px 16px; display: grid; gap: 10px; border-left: 4px solid var(--k, var(--line)); }
+.loa-card.missing { border-left-color: var(--today); }
+.loa-track { display: flex; height: 10px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; }
+.loa-track .used { background: var(--s-done); }
+.loa-track .pend { background: var(--today); }
+.loa-nums { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px 12px; }
+.loa-nums dt { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.loa-nums dd { margin: 0; font-weight: 650; font-size: 14.5px; }
+.loa-nums .over dt, .loa-nums .over dd { color: var(--danger); }
+.loa-nums .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.loa-nums .dot.used { background: var(--s-done); }
+.loa-nums .dot.pend { background: var(--today); }

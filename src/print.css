@@ -45,3 +45,7 @@
   .pd-title { padding-right: 0; width: 100%; }
   .pd-logo { width: 96px; }
 }
+
+/* Tờ trình (LOA) */
+.pd-conf { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--danger); }
+.pd-pre { white-space: pre-wrap; }

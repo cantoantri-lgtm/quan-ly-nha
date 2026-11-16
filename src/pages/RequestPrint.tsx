@@ -4,13 +4,14 @@ import { supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { ddmmyyyy } from "../lib/dates";
 import { vnd, vndWords } from "../lib/money";
-import { DUTY_LABEL, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, fullDate, hhmm, kindLabel, statusLabel,
-  type Req, type ReqAdvance, type ReqLine, type ReqStep } from "../lib/office";
+import { DUTY_LABEL, LEAVE_SPAN, LEAVE_TYPE, LOA_BUDGET, LOA_CATEGORY, LOA_PAY, LOA_SBU, LOA_TAX, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, fullDate, hhmm, kindLabel, moneyCur, statusLabel,
+  type LoaDept, type LoaDetails, type LoaLine, type Req, type ReqAdvance, type ReqLine, type ReqStep } from "../lib/office";
 import { Empty, TopBar } from "../components/ui";
 import "../office.css";
 import "../print.css";
 
-/** Bản in / lưu PDF theo mẫu Đề nghị thanh toán: thông tin chứng từ, bảng chi tiết, trừ tạm ứng, chữ ký các cấp duyệt */
+/** Bản in / lưu PDF theo mẫu Đề nghị thanh toán: thông tin chứng từ, bảng chi tiết, trừ tạm ứng, chữ ký các cấp duyệt.
+ *  Tờ trình (LOA) dùng chung khung, phần thân là nội dung đề xuất và bảng dự toán. */
 export default function RequestPrint() {
   const { id } = useParams();
   const { people, buildings } = useSession();
@@ -20,6 +21,10 @@ export default function RequestPrint() {
   const [steps, setSteps] = useState<ReqStep[]>([]);
   const [dept, setDept] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  const [loa, setLoa] = useState<LoaDetails | null>(null);
+  const [loaLines, setLoaLines] = useState<LoaLine[]>([]);
+  const [loaDepts, setLoaDepts] = useState<LoaDept[]>([]);
+  const [refNo, setRefNo] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -34,6 +39,19 @@ export default function RequestPrint() {
         supabase.from("org_staff").select("department_id").eq("profile_id", q.requester_id).maybeSingle(),
       ]);
       setLines((l.data ?? []) as ReqLine[]); setAdvs((a.data ?? []) as ReqAdvance[]); setSteps((s.data ?? []) as ReqStep[]);
+      if (q.kind === "loa") {
+        const [d, ll, dp] = await Promise.all([
+          supabase.from("loa_details").select("*").eq("request_id", q.id).maybeSingle(),
+          supabase.from("loa_lines").select("*").eq("request_id", q.id).order("line_no"),
+          supabase.rpc("loa_departments"),
+        ]);
+        const det = d.data as LoaDetails | null;
+        setLoa(det); setLoaLines((ll.data ?? []) as LoaLine[]); setLoaDepts((dp.data ?? []) as LoaDept[]);
+        if (det?.ref_loa_id) {
+          const rf = await supabase.rpc("loa_brief", { p_loa: det.ref_loa_id });
+          setRefNo(((rf.data ?? []) as { doc_no: string | null }[])[0]?.doc_no ?? null);
+        }
+      }
       const did = (o.data as { department_id: string | null } | null)?.department_id;
       if (did) {
         const d = await supabase.from("departments").select("name").eq("id", did).maybeSingle();
@@ -47,6 +65,9 @@ export default function RequestPrint() {
 
   const name = (uid: string | null) => people.find((p) => p.id === uid)?.full_name ?? "—";
   const isMoney = r.kind === "thanh_toan" || r.kind === "tam_ung";
+  const isLoa = r.kind === "loa";
+  const loaTotal = loaLines.reduce((t, l) => t + Number(l.amount), 0);
+  const deptName = (did: string | null) => loaDepts.find((x) => x.id === did)?.name ?? "—";
   const gross = lines.reduce((t, l) => t + Number(l.total), 0);
   const adv = advs.reduce((t, a) => t + Number(a.amount), 0);
   const building = buildings.find((b) => b.id === r.building_id);
@@ -66,20 +87,35 @@ export default function RequestPrint() {
             <img className="pd-logo" src="/logo-next-vision.svg" alt="Next Vision" />
             <div className="pd-title">
               <div className="pd-brand">NEXT VISION</div>
-              <h1>{kindLabel(r).toUpperCase()}</h1>
-              {r.doc_no ? <div className="pd-no">Số chứng từ: <b>{r.doc_no}</b>{r.doc_date ? ` · ${ddmmyyyy(r.doc_date)}` : ""}</div> : null}
+              <h1>{isLoa ? "TỜ TRÌNH PHÊ DUYỆT (LOA)" : kindLabel(r).toUpperCase()}</h1>
+              {r.doc_no ? <div className="pd-no">{isLoa ? "Số LOA" : "Số chứng từ"}: <b>{r.doc_no}</b>{r.doc_date ? ` · ${ddmmyyyy(r.doc_date)}` : ""}</div> : null}
+              {isLoa ? <div className="pd-conf">BẢO MẬT</div> : null}
               <div className="pd-status">{statusLabel(r)}</div>
             </div>
           </header>
 
           <table className="pd-kv"><tbody>
-            <tr><th>Họ và tên người đề nghị</th><td>{name(r.requester_id)}</td></tr>
+            {isLoa ? <tr><th>Tiêu đề</th><td><b>{r.reason}</b></td></tr> : null}
+            <tr><th>{isLoa ? "Người trình" : "Họ và tên người đề nghị"}</th><td>{name(r.requester_id)}</td></tr>
             {dept ? <tr><th>Phòng ban</th><td>{dept}</td></tr> : null}
-            {isMoney ? (<>
+            {isLoa && loa ? (<>
+              {loa.updated_by && loa.updated_by !== r.requester_id ? <tr><th>Người soạn</th><td>{name(loa.updated_by)}</td></tr> : null}
+              <tr><th>Phân loại</th><td>{loa.category ? LOA_CATEGORY[loa.category] : "—"}</td></tr>
+              <tr><th>Đơn vị đề xuất cuối cùng</th><td>{deptName(loa.propose_dept)}</td></tr>
+              <tr><th>Mảng kinh doanh</th><td>{loa.sbu.map((k) => LOA_SBU[k] ?? k).join(", ") || "—"}</td></tr>
+              <tr><th>Bối cảnh</th><td className="pd-pre">{loa.background ?? "—"}</td></tr>
+              <tr><th>Nội dung xin phê duyệt</th><td className="pd-pre">{loa.seek_approval ?? "—"}</td></tr>
+              <tr><th>Số tiền</th><td>{r.amount ? <><b>{moneyCur(r.amount, r.currency)}</b> · {LOA_PAY[loa.pay_receive]} · {LOA_TAX[loa.tax]}</> : "Không phát sinh tiền"}</td></tr>
+              <tr><th>Ngân sách</th><td>{LOA_BUDGET[loa.budget_status]}{loa.budget_item_no ? ` · mã khoản mục ${loa.budget_item_no}` : ""}</td></tr>
+              {loa.details ? <tr><th>Chi tiết</th><td className="pd-pre">{loa.details}</td></tr> : null}
+              <tr><th>Ngày bắt đầu</th><td>{fullDate(r.start_date)}</td></tr>
+              <tr><th>Hạn báo cáo kết quả</th><td>{fullDate(loa.report_due)}</td></tr>
+              {loa.ref_loa_id ? <tr><th>LOA tham chiếu</th><td>{refNo ?? "—"}</td></tr> : null}
+            </>) : isMoney ? (<>
               <tr><th>Kính gửi</th><td>Giám đốc và phòng Kế toán</td></tr>
               <tr><th>{r.kind === "thanh_toan" ? "Hạn thanh toán" : "Ngày cần tiền"}</th><td>{fullDate(r.start_date)}</td></tr>
               {r.kind === "tam_ung" && r.settle_due ? <tr><th>Hạn hoàn ứng</th><td>{fullDate(r.settle_due)}</td></tr> : null}
-              {r.loa_no ? <tr><th>LOA No.</th><td>{r.loa_no}</td></tr> : null}
+              {r.loa_no ? <tr><th>Số LOA</th><td>{r.loa_no}</td></tr> : null}
               {r.pay_type ? <tr><th>Loại thanh toán</th><td>{PAY_TYPE[r.pay_type] ?? r.pay_type}</td></tr> : null}
               {r.payee ? <tr><th>Tên đơn vị</th><td>{r.payee}{r.vendor_code ? ` (${r.vendor_code})` : ""}</td></tr> : null}
               {r.contact_name || r.contact_code ? <tr><th>Người liên hệ</th><td>{[r.contact_name, r.contact_code].filter(Boolean).join(" · ")}</td></tr> : null}
@@ -102,7 +138,7 @@ export default function RequestPrint() {
               {r.handover_to ? <tr><th>Bàn giao cho</th><td>{name(r.handover_to)}</td></tr> : null}
               {r.contact_phone ? <tr><th>SĐT liên hệ</th><td>{r.contact_phone}</td></tr> : null}
             </>)}
-            <tr><th>{isMoney ? "Nội dung" : "Lý do / công việc"}</th><td>{r.reason}</td></tr>
+            {isLoa ? null : <tr><th>{isMoney ? "Nội dung" : "Lý do / công việc"}</th><td>{r.reason}</td></tr>}
             {building ? <tr><th>Toà nhà</th><td>{building.code} · {building.name}</td></tr> : null}
           </tbody></table>
 
@@ -134,10 +170,30 @@ export default function RequestPrint() {
           {isMoney ? (
             <p className="pd-words">Tổng tiền: <b>{vnd(r.amount)}</b> — bằng chữ: <i>{vndWords(r.amount)}</i></p>
           ) : null}
+          {isLoa && loaLines.length ? (
+            <>
+              <p className="pd-methods">Dự toán ngân sách · Loại tiền: {r.currency}</p>
+              <div className="pd-scroll"><table className="pd-grid">
+                <thead><tr><th>Stt</th><th>Nội dung</th><th>ĐVT</th><th>SL</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th></tr></thead>
+                <tbody>
+                  {loaLines.map((l) => (
+                    <tr key={l.id}>
+                      <td>{l.line_no}</td><td>{l.description}</td><td>{l.unit}</td><td className="r">{String(l.quantity).replace(".", ",")}</td>
+                      <td className="r">{moneyCur(l.unit_price, r.currency)}</td><td className="r">{moneyCur(l.amount, r.currency)}</td><td>{l.note}</td>
+                    </tr>
+                  ))}
+                  <tr className="pd-sum"><td colSpan={5}>TỔNG DỰ TOÁN</td><td className="r">{moneyCur(loaTotal, r.currency)}</td><td /></tr>
+                </tbody>
+              </table></div>
+            </>
+          ) : null}
+          {isLoa && r.amount && r.currency === "VND" ? (
+            <p className="pd-words">Số tiền xin duyệt: <b>{vnd(r.amount)}</b> — bằng chữ: <i>{vndWords(r.amount)}</i></p>
+          ) : null}
 
-          <p className="pd-date">Ngày {new Date(r.created_at).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" })}</p>
+          <p className="pd-date">Ngày {new Date(loa?.submitted_at ?? r.created_at).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" })}</p>
           <div className="pd-sign">
-            <div><b>Đề nghị bởi</b><small>(ký và ghi rõ họ tên)</small><span className="who">{name(r.requester_id)}</span><span className="when">{dt(r.created_at)}</span></div>
+            <div><b>{isLoa ? "Người trình" : "Đề nghị bởi"}</b><small>(ký và ghi rõ họ tên)</small><span className="who">{name(r.requester_id)}</span><span className="when">{dt(loa?.submitted_at ?? r.created_at)}</span></div>
             {signers.map((s) => {
               const o = outcome(s);
               return (

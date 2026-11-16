@@ -1,11 +1,11 @@
-// Module Văn phòng: nghỉ phép, làm việc bên ngoài, công tác, thanh toán, tạm ứng
+// Module Văn phòng: nghỉ phép, làm việc bên ngoài, công tác, tờ trình (LOA), thanh toán, tạm ứng
 import { ddmm, ddmmyyyy } from "./dates";
 import { vnd } from "./money";
 import { supabase } from "./supabase";
 import { listFiles, removeFile } from "./files";
 
-export type ReqKind = "nghi_phep" | "ra_ngoai" | "cong_tac" | "thanh_toan" | "tam_ung";
-export type ReqStatus = "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy" | "hoan_tat" | "tra_lai";
+export type ReqKind = "nghi_phep" | "ra_ngoai" | "cong_tac" | "loa" | "thanh_toan" | "tam_ung";
+export type ReqStatus = "nhap" | "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy" | "hoan_tat" | "tra_lai";
 
 export type Req = {
   id: string;
@@ -41,6 +41,8 @@ export type Req = {
   doc_date: string | null;
   currency: string;
   loa_no: string | null;
+  /** Tờ trình (LOA) đã duyệt mà đề nghị thanh toán / tạm ứng này dùng ngân sách */
+  loa_id: string | null;
   pay_method: string | null;
   pay_type: string | null;
   vendor_code: string | null;
@@ -78,6 +80,7 @@ export const FLOW_TEXT: Record<ReqKind, string> = {
   nghi_phep: "Người đề nghị → Leader → Trưởng phòng → Nhân sự",
   ra_ngoai: "Người đề nghị → Leader → Trưởng phòng → Nhân sự",
   cong_tac: "Người đề nghị → Leader → Trưởng phòng → Nhân sự",
+  loa: "Người lập → Leader → Trưởng phòng → Kế toán → Giám đốc",
   thanh_toan: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
   tam_ung: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
 };
@@ -91,6 +94,7 @@ export const KINDS: { kind: ReqKind; label: string; hint: string }[] = [
   { kind: "nghi_phep", label: "Xin nghỉ phép", hint: "Nửa ngày, cả ngày" },
   { kind: "ra_ngoai", label: "Làm việc bên ngoài", hint: "Ra ngoài trong giờ làm" },
   { kind: "cong_tac", label: "Đi công tác", hint: "Duyệt trước, báo cáo sau" },
+  { kind: "loa", label: "Tờ trình (LOA)", hint: "Xin duyệt chính sách, ngân sách" },
   { kind: "thanh_toan", label: "Đề nghị thanh toán", hint: "Chi tiền đã mua / cần trả" },
   { kind: "tam_ung", label: "Đề nghị tạm ứng", hint: "Ứng tiền trước để làm việc" },
 ];
@@ -108,6 +112,7 @@ export function kindLabel(r: Pick<Req, "kind" | "sub_type">): string {
     case "nghi_phep": return r.sub_type === "khong_luong" ? "Nghỉ không lương" : "Nghỉ phép năm";
     case "ra_ngoai": return "Làm việc bên ngoài";
     case "cong_tac": return "Đi công tác";
+    case "loa": return "Tờ trình (LOA)";
     case "thanh_toan": return "Đề nghị thanh toán";
     case "tam_ung": return "Đề nghị tạm ứng";
   }
@@ -115,6 +120,7 @@ export function kindLabel(r: Pick<Req, "kind" | "sub_type">): string {
 
 export function statusLabel(r: Pick<Req, "kind" | "status">): string {
   switch (r.status) {
+    case "nhap": return "Nháp";
     case "cho_duyet": return "Chờ duyệt";
     case "tu_choi": return "Từ chối";
     case "tra_lai": return "Trả lại";
@@ -130,6 +136,10 @@ export const fmtDays = (d: number | null | undefined) =>
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 
+/** Số tiền kèm loại tiền (LOA có thể lập bằng USD) */
+export const moneyCur = (n: number | null | undefined, currency = "VND") =>
+  currency === "VND" ? vnd(n) : `${Number(n ?? 0).toLocaleString("vi-VN")} ${currency}`;
+
 /** Một dòng tóm tắt: thời gian / số tiền */
 export function summary(r: Req): string {
   const range = (a: string, b: string | null) => (b && b !== a ? `${ddmm(a)} – ${ddmm(b)}` : ddmm(a));
@@ -142,6 +152,8 @@ export function summary(r: Req): string {
     }
     case "cong_tac":
       return `${r.location} · ${range(r.start_date, r.end_date)} (${fmtDays(r.days)})`;
+    case "loa":
+      return r.amount ? moneyCur(r.amount, r.currency) : "Không phát sinh tiền";
     default:
       return vnd(r.amount);
   }
@@ -151,11 +163,11 @@ export function fullDate(iso: string | null) { return iso ? ddmmyyyy(iso) : "—
 export { hhmm };
 
 /** Chỉ sửa / xoá được khi đề nghị KHÔNG đang trong quá trình duyệt (khớp request_editable ở cơ sở dữ liệu) */
-export const EDITABLE_STATUS: ReqStatus[] = ["tra_lai", "tu_choi", "da_huy"];
+export const EDITABLE_STATUS: ReqStatus[] = ["nhap", "tra_lai", "tu_choi", "da_huy"];
 export const isEditableStatus = (s: ReqStatus) => EDITABLE_STATUS.includes(s);
-/** Đã xong hẳn: nghỉ phép / ra ngoài chỉ cần duyệt; còn lại đợi chi tiền hoặc báo cáo thực tế */
+/** Đã xong hẳn: nghỉ phép / ra ngoài / tờ trình chỉ cần duyệt; còn lại đợi chi tiền hoặc báo cáo thực tế */
 export const isFinished = (r: Pick<Req, "kind" | "status">) =>
-  r.status === "hoan_tat" || (r.status === "da_duyet" && (r.kind === "nghi_phep" || r.kind === "ra_ngoai"));
+  r.status === "hoan_tat" || (r.status === "da_duyet" && (r.kind === "nghi_phep" || r.kind === "ra_ngoai" || r.kind === "loa"));
 export const EDIT_LOCK_TIP = "Đang trong quá trình phê duyệt hoặc đã duyệt xong nên không sửa / xoá được. Chỉ sửa được khi bị trả lại, bị từ chối hoặc đã rút.";
 
 /** Ngày theo giờ Việt Nam (yyyy-mm-dd) của một thời điểm ISO */
@@ -172,3 +184,38 @@ export async function deleteRequest(id: string): Promise<void> {
   if (error) throw new Error(error.message);
   if (!data?.length) throw new Error("Bạn không có quyền xoá đề nghị này.");
 }
+
+// ---------- Tờ trình phê duyệt (LOA) ----------
+export const LOA_CATEGORY: Record<string, string> = {
+  van_hanh: "Vận hành toà nhà & Bảo trì", marketing: "Marketing", kinh_doanh: "Kinh doanh",
+  dau_tu_mua_sam: "Đầu tư, Xây dựng & Mua sắm", he_thong: "Hệ thống thông tin", nhan_su: "Nhân sự",
+  ke_toan: "Kế toán – Tài chính", phap_ly: "Pháp lý", chung: "Chung / Khác",
+};
+/** Mảng kinh doanh (SBU) */
+export const LOA_SBU: Record<string, string> = {
+  tat_ca: "Tất cả", cho_thue: "Cho thuê căn hộ – phòng", khach_san: "Khách sạn", phap_ly_pccc: "Pháp lý – PCCC",
+  xay_dung: "Xây dựng", khong_ap_dung: "Không áp dụng",
+};
+export const LOA_PAY: Record<string, string> = { chi: "Chi", thu: "Thu" };
+export const LOA_TAX: Record<string, string> = { chua_gom: "Chưa gồm thuế", da_gom: "Đã gồm thuế" };
+export const LOA_BUDGET: Record<string, string> = { trong: "Trong ngân sách", ngoai: "Ngoài ngân sách" };
+/** Loại tài liệu đính kèm tờ trình (nhãn của tệp) */
+export const LOA_DOC_TYPE: Record<string, string> = {
+  du_toan: "Dự toán ngân sách", bao_gia: "Báo giá", hop_dong: "Hợp đồng / thoả thuận", chinh_sach: "Quy trình / chính sách", khac: "Tài liệu khác",
+};
+
+export type LoaDetails = {
+  request_id: string; subject: string; category: string | null; propose_dept: string | null; sbu: string[];
+  background: string | null; seek_approval: string | null; pay_receive: "chi" | "thu"; tax: "chua_gom" | "da_gom";
+  budget_status: "trong" | "ngoai"; budget_item_no: string | null; details: string | null; autosum: boolean;
+  ref_loa_id: string | null; report_due: string | null; submitted_at: string | null; updated_by: string | null; updated_at: string;
+};
+export type LoaLine = { id: string; request_id: string; line_no: number; description: string; unit: string | null; quantity: number; unit_price: number; amount: number; note: string | null };
+export type LoaMember = { request_id: string; user_id: string; role: "soan" | "xem" };
+export type LoaDept = { id: string; code: string; name: string; mine: boolean };
+/** LOA chi tiền đã duyệt, dùng được cho đề nghị thanh toán / tạm ứng */
+export type LoaPick = { id: string; doc_no: string | null; subject: string; amount: number; used: number; pending: number; start_date: string; requester_name: string | null };
+export type LoaBrief = { id: string; doc_no: string | null; subject: string; amount: number | null; currency: string; status: ReqStatus; pay_receive: "chi" | "thu"; used: number; pending: number; requester_name: string | null };
+export type LoaLinked = { id: string; kind: ReqKind; doc_no: string | null; requester_name: string | null; amount: number | null; status: ReqStatus; created_at: string; can_open: boolean };
+/** Ngân sách LOA còn lại sau các đề nghị đã duyệt và đang chờ duyệt */
+export const loaLeft = (l: { amount: number | null; used: number; pending: number }) => Number(l.amount ?? 0) - Number(l.used) - Number(l.pending);

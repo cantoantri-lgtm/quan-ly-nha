@@ -10,7 +10,7 @@ const COLUMN: Record<FileOwner["kind"], Column> = { cccd: "tenant_id", hop_dong:
 const ownerId = (o: FileOwner) => (o.kind === "cccd" ? o.tenantId : o.kind === "hop_dong" ? o.contractId : o.kind === "anh_phong" ? o.roomId : o.kind === "anh_loai_phong" ? o.roomTypeId : o.kind === "anh_toa" ? o.buildingId : o.requestId);
 
 /** Kho ảnh/tệp gắn với một đối tượng (khách, hợp đồng, phòng, đề nghị). Danh sách hiện ảnh nhỏ cho nhanh, bấm vào mới tải ảnh to. Tệp riêng tư mở bằng link tạm. */
-export default function FileGallery({ owner, title, hint, canUpload, canDelete, slots, cover, pdf = true, onChange, onlyLabel, hideLabel, onCount }: {
+export default function FileGallery({ owner, title, hint, canUpload, canDelete, slots, cover, pdf = true, onChange, onlyLabel, hideLabel, onCount, docTypes }: {
   owner: FileOwner; title: string; hint?: string; canUpload: boolean; canDelete: boolean;
   slots?: { label: string; text: string }[];   // VD CCCD: mặt trước / mặt sau
   cover?: boolean;                             // cho phép chọn ảnh đại diện (phòng)
@@ -20,6 +20,8 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
   /** Ẩn các tệp có nhãn này (VD kho chứng từ chung ẩn UNC) */
   hideLabel?: string;
   onCount?: (n: number) => void;
+  /** Loại tài liệu (nhãn → tên): hiện ô chọn loại khi tải lên và ghi tên loại dưới mỗi tệp (VD đính kèm tờ trình LOA) */
+  docTypes?: Record<string, string>;
 }) {
   const { toast } = useSession();
   const [files, setFiles] = useState<StoredFile[]>([]);
@@ -30,6 +32,7 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
   const [confirmDel, setConfirmDel] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const pendingLabel = useRef<string | undefined>(undefined);
+  const [docType, setDocType] = useState(docTypes ? Object.keys(docTypes)[0] : "");
   const id = ownerId(owner);
 
   const load = useCallback(async () => {
@@ -74,7 +77,7 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
     else if (ok) toast(ok === 1 ? "Đã tải ảnh lên." : `Đã tải ${ok} tệp lên.`);
     await load(); onChange?.();
   }
-  const pick = (label?: string) => { pendingLabel.current = label; input.current?.click(); };
+  const pick = (label?: string) => { pendingLabel.current = label ?? (docTypes ? docType : undefined); input.current?.click(); };
 
   async function setCover(f: StoredFile) {
     setBusy(true);
@@ -98,6 +101,7 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
       aria-label={f.file_name ?? "Tệp đính kèm"}>
       {urls[f.id] ? <img src={urls[f.id]} alt="" loading="lazy" decoding="async" /> : <span className="fg-doc">{f.mime_type === "application/pdf" ? "PDF" : "…"}</span>}
       {f.is_cover ? <i className="fg-badge">Đại diện</i> : null}
+      {docTypes && f.label && docTypes[f.label] ? <i className="fg-badge fg-type">{docTypes[f.label]}</i> : null}
     </button>
   );
 
@@ -105,7 +109,16 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
     <section className="fg">
       <div className="fg-head">
         <b>{title}</b>
-        {canUpload && !slots ? <button type="button" className="btn secondary sm" disabled={busy} onClick={() => pick()}>{busy ? "Đang tải…" : "+ Thêm"}</button> : null}
+        {canUpload && !slots ? (
+          <span className="row fg-add">
+            {docTypes ? (
+              <select className="input fg-doc-type" aria-label="Loại tài liệu" value={docType} onChange={(e) => setDocType(e.target.value)}>
+                {Object.entries(docTypes).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            ) : null}
+            <button type="button" className="btn secondary sm" disabled={busy} onClick={() => pick()}>{busy ? "Đang tải…" : "+ Thêm"}</button>
+          </span>
+        ) : null}
       </div>
       {hint ? <p className="muted small" style={{ margin: 0 }}>{hint}</p> : null}
       <input ref={input} type="file" hidden multiple={!slots} accept={pdf ? "image/*,application/pdf" : "image/*"} onChange={(e) => onPick(e.target.files)} />
@@ -129,6 +142,7 @@ export default function FileGallery({ owner, title, hint, canUpload, canDelete, 
       <Sheet open={!!view} onClose={() => { setView(null); setConfirmDel(false); }} title={view?.file_name ?? "Tệp"}>
         {view ? (
           <div className="stack">
+            {docTypes && view.label && docTypes[view.label] ? <p className="muted small" style={{ margin: 0 }}>Loại tài liệu: {docTypes[view.label]}</p> : null}
             {view.mime_type === "application/pdf" ? (
               <PdfOpen file={view} />
             ) : full ? <img className="fg-full" src={full} alt={view.file_name ?? ""} /> : <div className="loading">Đang tải ảnh…</div>}
