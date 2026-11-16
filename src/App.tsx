@@ -62,8 +62,8 @@ function MoneyOnly() {
 }
 
 function LeadOnly() {
-  const { isLeadUp } = useSession();
-  return isLeadUp ? <Outlet /> : <Navigate to="/" replace />;
+  const { isLeadUp, isAccountant } = useSession();
+  return isLeadUp || isAccountant ? <Outlet /> : <Navigate to="/" replace />;
 }
 
 function ManagerOnly() {

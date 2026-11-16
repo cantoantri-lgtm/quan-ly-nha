@@ -220,3 +220,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - `039_bao_cao.sql`, `040_sua_lap_day.sql`: chi phí theo toà (`building_expenses`), tiền thuê nhà (`building_rents`), báo cáo thu chi/lấp đầy/phản ánh/lợi nhuận (`report_*`). Giao diện `/bao-cao` (Lead Sale trở lên xem; lợi nhuận, chi phí, thuê nhà chỉ Quản lý).
 - `041_dntt_unc.sql`: bước cuối DNTT — Quản lý/Kế toán đính kèm UNC (tệp đề nghị label `unc`) rồi bấm Kết thúc (`mark_paid`, DNTT bắt buộc có UNC; UNC khoá sau khi kết thúc). Kế toán xem được đề nghị tiền đã duyệt/hoàn tất.
 - `042_tam_ung_unc.sql`: đề nghị tạm ứng cũng bắt buộc UNC trước khi Kết thúc.
+- `043_quyen_ke_toan.sql`: Kế toán xem báo cáo thu chi/lấp đầy/lợi nhuận mọi toà, nhập chi phí và tiền thuê nhà, xác nhận/huỷ khoản thu khách, xem danh sách toà (không xem phòng, hợp đồng, CCCD).

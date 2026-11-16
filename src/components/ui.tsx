@@ -182,7 +182,7 @@ export function AppHeader() {
     { to: "/khach-hang", label: "Khách hàng", icon: Icon.user },
     { to: "/thu-tien-khach", label: "Thu tiền khách", icon: Icon.money },
     { to: "/phan-anh", label: "Phản ánh", icon: Icon.help },
-    ...(isLeadUp ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
+    ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
     ...(isManager ? [
       { to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
       { to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user },

@@ -20,14 +20,15 @@ type FB = { grp_key: string; grp_name: string; total: number; cho_cong_ty: numbe
 type PR = { building_id: string; building_name: string; thu: number; chi: number; thue_nha: number; loi_nhuan: number; tien_coc: number };
 
 export default function Reports() {
-  const { isManager } = useSession();
+  const { isManager, isAccountant, isLeadUp } = useSession();
+  const fin = isManager || isAccountant;   // Quản lý, Kế toán: chi phí, lợi nhuận, mọi toà
   const [tab, setTab] = useState<Tab>("thu_chi");
   const [from, setFrom] = useState(() => monthStart(todayVN()));
   const [to, setTo] = useState(() => todayVN());
   const [group, setGroup] = useState<Group>("toa");
   const tabs: { k: Tab; t: string }[] = [
-    { k: "thu_chi", t: "Thu chi" }, { k: "lap_day", t: "Lấp đầy" }, { k: "phan_anh", t: "Phản ánh" },
-    ...(isManager ? [{ k: "loi_nhuan" as Tab, t: "Lợi nhuận" }, { k: "chi_phi" as Tab, t: "Chi phí & thuê nhà" }] : []),
+    { k: "thu_chi", t: "Thu chi" }, { k: "lap_day", t: "Lấp đầy" }, ...(isLeadUp ? [{ k: "phan_anh" as Tab, t: "Phản ánh" }] : []),
+    ...(fin ? [{ k: "loi_nhuan" as Tab, t: "Lợi nhuận" }, { k: "chi_phi" as Tab, t: "Chi phí & thuê nhà" }] : []),
   ];
   const range = tab !== "chi_phi";
   return (
@@ -48,11 +49,11 @@ export default function Reports() {
             {GROUPS.map((g) => <button key={g.k} className="chip" aria-pressed={group === g.k} onClick={() => setGroup(g.k)}>Theo {g.t.toLowerCase()}</button>)}
           </div>
         ) : null}
-        {tab === "thu_chi" ? <CashTab from={from} to={to} group={group} isManager={isManager} /> : null}
+        {tab === "thu_chi" ? <CashTab from={from} to={to} group={group} isManager={fin} /> : null}
         {tab === "lap_day" ? <OccTab from={from} to={to} /> : null}
-        {tab === "phan_anh" ? <FbTab from={from} to={to} group={group} /> : null}
-        {tab === "loi_nhuan" && isManager ? <ProfitTab from={from} to={to} /> : null}
-        {tab === "chi_phi" && isManager ? <CostTab /> : null}
+        {tab === "phan_anh" && isLeadUp ? <FbTab from={from} to={to} group={group} /> : null}
+        {tab === "loi_nhuan" && fin ? <ProfitTab from={from} to={to} /> : null}
+        {tab === "chi_phi" && fin ? <CostTab /> : null}
       </main>
     </>
   );
