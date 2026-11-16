@@ -297,8 +297,8 @@ export default function LoaForm() {
             </dl>
             <details className="loa-help">
               <summary>Quy định LOA áp dụng</summary>
-              <p>Mọi quy trình kiểm soát, chính sách và khoản ngân sách phải có tờ trình (LOA) được duyệt trước khi thực hiện.</p>
-              <p>Đề nghị tạm ứng và đề nghị thanh toán phải gắn một LOA chi tiền đã duyệt, có bảng dự toán ngân sách. Tổng tạm ứng và thanh toán được theo dõi so với dự toán của LOA; vượt dự toán sẽ có cảnh báo cho các cấp duyệt.</p>
+              <p>Tờ trình (LOA) dùng để xin duyệt và lưu lại các quy trình kiểm soát, chính sách, ngân sách.</p>
+              <p>Đề nghị tạm ứng và đề nghị thanh toán có thể chọn một LOA chi tiền đã duyệt để tham chiếu (không bắt buộc). Tổng tạm ứng và thanh toán được theo dõi so với dự toán của LOA; vượt dự toán sẽ có cảnh báo cho các cấp duyệt.</p>
               <p>LOA đã duyệt xong thì khoá, không sửa. Cần thay đổi thì lập LOA mới và chọn “LOA tham chiếu” là LOA cũ.</p>
             </details>
           </section>
@@ -367,7 +367,7 @@ export default function LoaForm() {
                   {Object.entries(LOA_BUDGET).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                 </select></label>
             </div>
-            {currency !== "VND" && payReceive === "chi" ? <p className="muted small" style={{ margin: 0 }}>Lưu ý: tạm ứng và đề nghị thanh toán chỉ gắn được LOA chi tiền bằng VND.</p> : null}
+            {currency !== "VND" && payReceive === "chi" ? <p className="muted small" style={{ margin: 0 }}>Lưu ý: tạm ứng và đề nghị thanh toán chỉ tham chiếu được LOA chi tiền bằng VND.</p> : null}
             <Switch id="loa-has-budget-no" checked={hasBudgetNo} onChange={setHasBudgetNo}>Có mã khoản mục ngân sách</Switch>
             {hasBudgetNo ? (
               <label className="field"><span>Mã khoản mục ngân sách</span>

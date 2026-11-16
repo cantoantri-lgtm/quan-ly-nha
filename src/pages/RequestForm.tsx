@@ -134,7 +134,6 @@ export default function RequestForm() {
     e.preventDefault();
     setErr(null);
     const amt = hasLines ? tot.net : parseMoney(amount);
-    if (isMoney && !loaId) { setErr("Chọn Tờ trình (LOA) đã duyệt cho đề nghị này. Chưa có LOA thì lập tờ trình và chờ duyệt xong trước."); return; }
     if (isMoney && !amt) { setErr(hasLines ? "Tiền tạm ứng phải nhỏ hơn tổng thanh toán." : "Nhập số tiền đề nghị."); return; }
     if (!hasLines && amount && !amt) { setErr("Số tiền chưa đúng định dạng."); return; }
     if (isPay) {
@@ -238,24 +237,21 @@ export default function RequestForm() {
 
   const LoaSel = isMoney ? (
     <section className="card dn-sec k-loa">
-      <h2 className="dn-h">Tờ trình (LOA) *</h2>
-      <label className="field"><span>LOA đã duyệt dùng cho đề nghị này *</span>
-        <select id="rq-loa" className="input" value={loaId} onChange={(e) => setLoaId(e.target.value)} required>
-          <option value="">{picks == null ? "Đang tải…" : "Chọn LOA"}</option>
+      <h2 className="dn-h">Tờ trình (LOA) tham chiếu <small className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</small></h2>
+      <label className="field"><span>LOA đã duyệt liên quan</span>
+        <select id="rq-loa" className="input" value={loaId} onChange={(e) => setLoaId(e.target.value)}>
+          <option value="">{picks == null ? "Đang tải…" : "Không gắn LOA"}</option>
           {loaId && picks && !pick ? <option value={loaId}>LOA đang gắn</option> : null}
           {(picks ?? []).map((x) => <option key={x.id} value={x.id}>{x.doc_no} · {x.subject} · còn {vnd(loaLeft(x))}</option>)}
         </select></label>
-      {oldLoaNo ? <p className="muted small" style={{ margin: 0 }}>Số LOA ghi tay trước đây: {oldLoaNo}. Hãy chọn LOA tương ứng trong danh sách.</p> : null}
-      {picks && !picks.length ? (
-        <div className="error-box">Bạn chưa có LOA chi tiền nào đã duyệt để dùng. <Link to="/van-phong/loa/moi" className="dt-link">Lập tờ trình (LOA)</Link> và chờ duyệt xong, hoặc nhờ người lập LOA thêm bạn / phòng bạn vào danh sách được xem.</div>
-      ) : null}
+      {oldLoaNo ? <p className="muted small" style={{ margin: 0 }}>Số LOA ghi tay trước đây: {oldLoaNo}. Có thể chọn LOA tương ứng trong danh sách để theo dõi dự toán.</p> : null}
       {pick ? (
         <p className="calc-line num" style={{ margin: 0 }}>
           Dự toán <b>{vnd(pick.amount)}</b> · đã duyệt chi {vnd(pick.used)} · đang chờ duyệt {vnd(pick.pending)} · người lập {pick.requester_name ?? "—"}
           {leftAfter2 != null && total ? <><br />{leftAfter2 < 0 ? <span className="over">Vượt dự toán LOA {vnd(-leftAfter2)}. Vẫn gửi được, các cấp duyệt sẽ thấy cảnh báo này.</span> : <>Còn lại sau đề nghị này: <b>{vnd(leftAfter2)}</b></>}</> : null}
         </p>
       ) : (
-        <p className="muted small" style={{ margin: 0 }}>Tạm ứng và thanh toán phải gắn một LOA chi tiền đã duyệt, có dự toán ngân sách.</p>
+        <p className="muted small" style={{ margin: 0 }}>Nếu khoản chi này thuộc một LOA đã duyệt, chọn LOA để theo dõi dự toán còn lại. Không có thì để trống.</p>
       )}
     </section>
   ) : null;

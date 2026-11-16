@@ -355,8 +355,8 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
           <p style={{ margin: 0 }}><b>Sửa / Xoá:</b> chỉ dùng được khi đề nghị bị trả lại, bị từ chối hoặc đã rút. Đang chờ duyệt hoặc đã duyệt xong thì hai nút bị khoá. Còn chờ duyệt mà muốn sửa: mở đề nghị, bấm “Rút lại”, rồi sửa và gửi lại.</p>
           <p style={{ margin: 0 }}><b>Thêm nhanh:</b> bấm “+ Thêm” hoặc phím F2. Bấm vào một dòng để xem {loa ? "dự toán" : "chi tiết hoá đơn"} và luồng duyệt ngay bên dưới.</p>
           {loa ? <p style={{ margin: 0 }}><b>Bản nháp:</b> tờ trình lưu nháp nhiều lần được, chỉ người lập và người cùng soạn nhìn thấy. Bấm “Trình duyệt” thì hệ thống cấp số LOA và bắt đầu luồng duyệt. LOA đã duyệt xong thì khoá.</p> : null}
-          {loa ? <p style={{ margin: 0 }}><b>Dùng LOA:</b> đề nghị tạm ứng và đề nghị thanh toán phải chọn một LOA chi tiền đã duyệt. Người lập, người cùng soạn, người và phòng ban được xem của LOA đó mới chọn được.</p> : null}
-          {money ? <p style={{ margin: 0 }}><b>Tờ trình (LOA):</b> mỗi đề nghị phải gắn một LOA chi tiền đã duyệt. Chưa có thì lập ở Văn phòng số → Tờ trình (LOA) và chờ duyệt xong.</p> : null}
+          {loa ? <p style={{ margin: 0 }}><b>Dùng LOA:</b> đề nghị tạm ứng và đề nghị thanh toán có thể chọn một LOA chi tiền đã duyệt để tham chiếu và theo dõi dự toán (không bắt buộc). Người lập, người cùng soạn, người và phòng ban được xem của LOA đó mới chọn được.</p> : null}
+          {money ? <p style={{ margin: 0 }}><b>Tờ trình (LOA):</b> không bắt buộc. Khoản chi thuộc một LOA đã duyệt thì chọn LOA đó để theo dõi dự toán.</p> : null}
         </div>
       </Sheet>
     </main>

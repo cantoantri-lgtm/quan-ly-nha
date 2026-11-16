@@ -192,7 +192,7 @@ export default function RequestDetail() {
         </dl>
         )}
 
-        {isMoney && (r.loa_id || r.status === "cho_duyet" || r.status === "da_duyet" || r.status === "tra_lai") ? <LoaBudget loaId={r.loa_id} loaNo={r.loa_no} refreshKey={r.updated_at} /> : null}
+        {isMoney && r.loa_id ? <LoaBudget loaId={r.loa_id} loaNo={r.loa_no} refreshKey={r.updated_at} /> : null}
 
         {isLoa ? (
           <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} title="Tài liệu đính kèm" docTypes={LOA_DOC_TYPE}
