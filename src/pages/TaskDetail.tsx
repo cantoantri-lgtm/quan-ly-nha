@@ -15,11 +15,12 @@ type Update = { id: string; note: string; status_after: TaskStatus | null; creat
 
 export default function TaskDetail() {
   const { id } = useParams();
-  const { profile, isManager, isSupervisor, myBuildingIds, toast } = useSession();
+  const { profile, people, isManager, isSupervisor, myBuildingIds, toast } = useSession();
   const nav = useNavigate();
   const [t, setT] = useState<Detail | null>(null);
   const [steps, setSteps] = useState<Task[]>([]);
   const [updates, setUpdates] = useState<Update[]>([]);
+  const [members, setMembers] = useState<string[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [note, setNote] = useState("");
   const [noteStatus, setNoteStatus] = useState<"" | TaskStatus>("");
@@ -28,11 +29,13 @@ export default function TaskDetail() {
   const [confirmDel, setConfirmDel] = useState(false);
 
   const load = useCallback(async () => {
-    const [a, b, c] = await Promise.all([
+    const [a, b, c, m] = await Promise.all([
       supabase.from("tasks").select("*, assignee:profiles!tasks_assignee_id_fkey(full_name,phone), creator:profiles!tasks_created_by_fkey(full_name), building:buildings(code,name)").eq("id", id!).maybeSingle(),
       supabase.from("tasks").select("*").eq("parent_id", id!).order("sort_order").order("created_at"),
       supabase.from("task_updates").select("id,note,status_after,created_at, author:profiles!task_updates_author_id_fkey(full_name)").eq("task_id", id!).order("created_at", { ascending: false }),
+      supabase.from("task_assignees").select("user_id").eq("task_id", id!).order("created_at"),
     ]);
+    setMembers(((m.data ?? []) as { user_id: string }[]).map((x) => x.user_id));
     if (!a.data) { setNotFound(true); return; }
     setT(a.data as Detail);
     setSteps((b.data as Task[]) ?? []);
@@ -57,7 +60,7 @@ export default function TaskDetail() {
   if (!t || !profile) return (<><TopBar title="Công việc" back="/viec" /><div className="loading">Đang tải…</div></>);
 
   const isOwner = isManager || (isSupervisor && t.created_by === profile.id) || (isSupervisor && !!t.building_id && myBuildingIds.includes(t.building_id));
-  const isAssignee = t.assignee_id === profile.id;
+  const isAssignee = t.assignee_id === profile.id || members.includes(profile.id);
   const canUpdate = isOwner || isAssignee;
   const d = dueInfo(t.due_date, t.status === "xong");
   const doneSteps = steps.filter((s) => s.status === "xong").length;
@@ -131,8 +134,9 @@ export default function TaskDetail() {
         </section>
 
         <dl className="card kv">
-          <dt>Người làm</dt>
-          <dd>{t.assignee?.full_name ?? "—"}{t.assignee?.phone && !isAssignee ? <> · <a href={`tel:${t.assignee.phone}`}>{t.assignee.phone}</a></> : null}</dd>
+          <dt>{members.length ? "Phụ trách chính" : "Người làm"}</dt>
+          <dd>{t.assignee?.full_name ?? "—"}{t.assignee?.phone && t.assignee_id !== profile.id ? <> · <a href={`tel:${t.assignee.phone}`}>{t.assignee.phone}</a></> : null}</dd>
+          {members.length ? (<><dt>Cùng làm</dt><dd>{members.map((uid) => people.find((p) => p.id === uid)?.full_name ?? "—").join(", ")}</dd></>) : null}
           <dt>Người giao</dt><dd>{t.creator?.full_name ?? "—"}</dd>
           {t.building ? (<><dt>Toà nhà</dt><dd>{t.building.code} · {t.building.name}</dd></>) : null}
           <dt>Hạn</dt><dd>{t.due_date ? ddmmyyyy(t.due_date) : "Không đặt hạn"}</dd>

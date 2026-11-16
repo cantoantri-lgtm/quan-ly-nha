@@ -6,11 +6,11 @@ import { PRIORITY_LABEL, STATUS_LABEL, type Task } from "../lib/labels";
 import { daysBetween, dueInfo, todayVN } from "../lib/dates";
 import { Empty, Icon, TopBar } from "../components/ui";
 
-type Row = Task & { assignee: { full_name: string } | null; creator: { full_name: string } | null; building: { code: string } | null };
+type Row = Task & { assignee: { full_name: string } | null; creator: { full_name: string } | null; building: { code: string } | null; members: { user_id: string }[] | null };
 type Tab = "mine" | "given" | "all";
 type Filter = "open" | "late" | "block" | "done";
 
-const SELECT = "*, assignee:profiles!tasks_assignee_id_fkey(full_name), creator:profiles!tasks_created_by_fkey(full_name), building:buildings(code)";
+const SELECT = "*, assignee:profiles!tasks_assignee_id_fkey(full_name), creator:profiles!tasks_created_by_fkey(full_name), building:buildings(code), members:task_assignees(user_id)";
 
 export default function Tasks() {
   const { profile, isManager, isSupervisor, buildings } = useSession();
@@ -34,9 +34,13 @@ export default function Tasks() {
   const load = useCallback(async () => {
     if (!profile) return;
     setErr(null);
+    // Việc tôi cùng làm (không phải người phụ trách chính)
+    const mineIds = tab === "mine"
+      ? (((await supabase.from("task_assignees").select("task_id").eq("user_id", profile.id)).data ?? []) as { task_id: string }[]).map((x) => x.task_id)
+      : [];
     const base = () => {
       let q = supabase.from("tasks").select(SELECT).is("parent_id", null);
-      if (tab === "mine") q = q.eq("assignee_id", profile.id);
+      if (tab === "mine") q = mineIds.length ? q.or(`assignee_id.eq.${profile.id},id.in.(${mineIds.join(",")})`) : q.eq("assignee_id", profile.id);
       if (tab === "given") q = q.eq("created_by", profile.id).neq("assignee_id", profile.id);
       if (bFilter) q = q.eq("building_id", bFilter);
       return q;
@@ -128,7 +132,8 @@ export default function Tasks() {
                   </div>
                   <div className="meta">
                     {r.building ? <span className="tag">{r.building.code}</span> : null}
-                    {tab !== "mine" && r.assignee ? <span>→ {r.assignee.full_name}</span> : null}
+                    {tab !== "mine" && r.assignee ? <span>→ {r.assignee.full_name}{r.members?.length ? ` +${r.members.length}` : ""}</span> : null}
+                    {tab === "mine" && r.members?.length ? <span>Nhóm {r.members.length + 1} người</span> : null}
                     {tab === "mine" && r.creator && r.created_by !== profile?.id ? <span>Giao bởi {r.creator.full_name}</span> : null}
                     {d ? <span className={`due ${d.tone}`}>{d.text}</span> : null}
                     {r.priority === "cao" || r.priority === "gap" ? <span className="prio">{PRIORITY_LABEL[r.priority]}</span> : null}

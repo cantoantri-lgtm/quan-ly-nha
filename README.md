@@ -221,3 +221,4 @@ Thiếu secrets thì hàm báo `enabled: false` và app dùng kho Supabase như 
 - `041_dntt_unc.sql`: bước cuối DNTT — Quản lý/Kế toán đính kèm UNC (tệp đề nghị label `unc`) rồi bấm Kết thúc (`mark_paid`, DNTT bắt buộc có UNC; UNC khoá sau khi kết thúc). Kế toán xem được đề nghị tiền đã duyệt/hoàn tất.
 - `042_tam_ung_unc.sql`: đề nghị tạm ứng cũng bắt buộc UNC trước khi Kết thúc.
 - `043_quyen_ke_toan.sql`: Kế toán xem báo cáo thu chi/lấp đầy/lợi nhuận mọi toà, nhập chi phí và tiền thuê nhà, xác nhận/huỷ khoản thu khách, xem danh sách toà (không xem phòng, hợp đồng, CCCD).
+- `044_giao_viec_nhieu_nguoi.sql`: giao một việc cho nhiều người — `tasks.assignee_id` là người phụ trách chính, `task_assignees` là người cùng làm (RPC `task_set_members`); người cùng làm xem, đổi trạng thái, tick/thêm bước, gửi cập nhật; nhắc hạn gửi cả nhóm.

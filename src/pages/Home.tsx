@@ -42,7 +42,11 @@ export default function Home() {
     // Việc của tôi: đề nghị bị trả lại / từ chối cần sửa, và công việc đang làm
     const [fx, tk] = await Promise.all([
       supabase.from("requests").select("id", { count: "exact", head: true }).eq("requester_id", profile.id).in("status", ["tra_lai", "tu_choi"]),
-      supabase.from("tasks").select("id,title,due_date").eq("assignee_id", profile.id).is("parent_id", null).neq("status", "xong").limit(300),
+      (async () => {
+        const mine = (((await supabase.from("task_assignees").select("task_id").eq("user_id", profile.id)).data ?? []) as { task_id: string }[]).map((x) => x.task_id);
+        const q = supabase.from("tasks").select("id,title,due_date").is("parent_id", null).neq("status", "xong").limit(300);
+        return mine.length ? q.or(`assignee_id.eq.${profile.id},id.in.(${mine.join(",")})`) : q.eq("assignee_id", profile.id);
+      })(),
     ]);
     setFixN(fx.count ?? 0);
     setTasks((tk.data as TaskLite[]) ?? []);

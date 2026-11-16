@@ -14,14 +14,17 @@ export default function AdminHome() {
 
   useEffect(() => {
     const today = todayVN();
-    supabase.from("tasks").select("assignee_id,status,due_date").is("parent_id", null).neq("status", "xong").then(({ data }) => {
+    // Khối lượng việc mỗi người: tính cả việc phụ trách chính và việc cùng làm
+    supabase.from("tasks").select("assignee_id,status,due_date,members:task_assignees(user_id)").is("parent_id", null).neq("status", "xong").then(({ data }) => {
       const m: Record<string, Load> = {};
-      (data ?? []).forEach((t: { assignee_id: string | null; status: string; due_date: string | null }) => {
-        if (!t.assignee_id) return;
-        m[t.assignee_id] ??= { id: t.assignee_id, open: 0, late: 0, block: 0 };
-        m[t.assignee_id].open++;
-        if (t.due_date && t.due_date < today) m[t.assignee_id].late++;
-        if (t.status === "vuong") m[t.assignee_id].block++;
+      (data ?? []).forEach((t: { assignee_id: string | null; status: string; due_date: string | null; members: { user_id: string }[] | null }) => {
+        const who = [...(t.assignee_id ? [t.assignee_id] : []), ...(t.members ?? []).map((x) => x.user_id)];
+        for (const u of who) {
+          m[u] ??= { id: u, open: 0, late: 0, block: 0 };
+          m[u].open++;
+          if (t.due_date && t.due_date < today) m[u].late++;
+          if (t.status === "vuong") m[u].block++;
+        }
       });
       setLoad(Object.values(m).sort((a, b) => b.late - a.late || b.open - a.open));
     });

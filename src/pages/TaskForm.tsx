@@ -15,7 +15,8 @@ export default function TaskForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [buildingId, setBuildingId] = useState(buildings.length === 1 ? buildings[0].id : "");
-  const [assigneeId, setAssigneeId] = useState(canAssign ? "" : profile?.id ?? "");
+  const [assigneeId, setAssigneeId] = useState(canAssign ? "" : profile?.id ?? "");   // người phụ trách chính
+  const [picked, setPicked] = useState<string[]>([]);                                   // tất cả người làm (gồm người chính)
   const [due, setDue] = useState("");
   const [priority, setPriority] = useState<Priority>("binh_thuong");
   const [steps, setSteps] = useState<string[]>([""]);
@@ -35,6 +36,9 @@ export default function TaskForm() {
       const t = data as Task;
       setTitle(t.title); setDescription(t.description ?? ""); setBuildingId(t.building_id ?? "");
       setAssigneeId(t.assignee_id ?? ""); setDue(t.due_date ?? ""); setPriority(t.priority);
+      supabase.from("task_assignees").select("user_id").eq("task_id", id).then(({ data: m }) => {
+        setPicked([...(t.assignee_id ? [t.assignee_id] : []), ...((m ?? []) as { user_id: string }[]).map((x) => x.user_id)]);
+      });
     });
   }, [id]);
 
@@ -56,22 +60,32 @@ export default function TaskForm() {
     e.preventDefault();
     setErr(null);
     if (!title.trim()) { setErr("Nhập tên việc."); return; }
-    if (!assigneeId) { setErr("Chọn người làm."); return; }
+    const main = canAssign ? (picked.includes(assigneeId) ? assigneeId : picked[0] ?? "") : assigneeId;
+    if (!main) { setErr("Chọn người làm."); return; }
+    const others = canAssign ? picked.filter((x) => x !== main) : [];
     setBusy(true);
     const row = {
       title: title.trim(), description: description.trim() || null, building_id: buildingId || null,
-      assignee_id: assigneeId, due_date: due || null, priority,
+      assignee_id: main, due_date: due || null, priority,
     };
     if (editing) {
       const { error } = await supabase.from("tasks").update(row).eq("id", id!);
+      if (error) { setBusy(false); setErr(friendlyError(error)); return; }
+      if (canAssign) {
+        const m = await supabase.rpc("task_set_members", { p_task: id!, p_users: others });
+        if (m.error) { setBusy(false); setErr("Đã lưu việc nhưng chưa cập nhật được người cùng làm: " + friendlyError(m.error)); return; }
+      }
       setBusy(false);
-      if (error) { setErr(friendlyError(error)); return; }
       toast("Đã lưu thay đổi.");
       nav(`/viec/${id}`, { replace: true });
       return;
     }
     const { data, error } = await supabase.from("tasks").insert(row).select("id").single();
     if (error || !data) { setBusy(false); setErr(friendlyError(error)); return; }
+    if (others.length) {
+      const m = await supabase.rpc("task_set_members", { p_task: data.id, p_users: others });
+      if (m.error) { setBusy(false); setErr("Đã giao việc cho người chính nhưng chưa thêm được người cùng làm: " + friendlyError(m.error)); nav(`/viec/${data.id}/sua`, { replace: true }); return; }
+    }
     const stepRows = steps.map((s) => s.trim()).filter(Boolean)
       .map((s, i) => ({ parent_id: data.id, title: s, sort_order: i + 1 }));
     if (stepRows.length) {
@@ -79,7 +93,7 @@ export default function TaskForm() {
       if (r.error) { setBusy(false); setErr("Đã tạo việc nhưng chưa thêm được các bước: " + friendlyError(r.error)); return; }
     }
     setBusy(false);
-    toast(assigneeId === profile?.id ? "Đã thêm việc." : "Đã giao việc. Người làm sẽ nhận thông báo.");
+    toast(main === profile?.id && !others.length ? "Đã thêm việc." : others.length ? `Đã giao việc cho ${others.length + 1} người. Mọi người sẽ nhận thông báo.` : "Đã giao việc. Người làm sẽ nhận thông báo.");
     nav(`/viec/${data.id}`, { replace: true });
   }
 
@@ -108,20 +122,33 @@ export default function TaskForm() {
             </label>
           ) : null}
           {canAssign ? (
-            <label className="field">
-              <span>Người làm *</span>
-              <select id="t-assignee" className="input" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} required>
-                <option value="">Chọn người</option>
-                {assignable.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.id === profile?.id ? `Tôi (${p.full_name})` : `${p.full_name} · ${ROLE_LABEL[p.role]}`}
-                  </option>
+            <>
+            <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
+              <legend style={{ padding: 0 }}><span>Người làm * <small className="muted">(chọn một hoặc nhiều người)</small></span></legend>
+              <div className="checks" style={{ maxHeight: 280, overflowY: "auto" }}>
+                {[...assignable, ...people.filter((p) => picked.includes(p.id) && !assignable.some((a) => a.id === p.id))].map((p) => (
+                  <label key={p.id}>
+                    <input type="checkbox" checked={picked.includes(p.id)}
+                      onChange={(e) => setPicked(e.target.checked ? [...picked, p.id] : picked.filter((x) => x !== p.id))} />
+                    <span style={{ flex: 1 }}>{p.id === profile?.id ? `Tôi (${p.full_name})` : `${p.full_name} · ${ROLE_LABEL[p.role]}`}</span>
+                    {picked.length > 1 && (assigneeId === p.id || (!picked.includes(assigneeId) && picked[0] === p.id)) ? <span className="tag">Phụ trách chính</span> : null}
+                  </label>
                 ))}
-              </select>
+              </div>
               {buildingId && assignable.length <= 1 ? (
                 <small className="muted">Toà này chưa có nhân sự. Vào Quản trị → Nhân sự để gán người vào toà.</small>
               ) : null}
-            </label>
+            </fieldset>
+            {picked.length > 1 ? (
+              <label className="field">
+                <span>Người phụ trách chính</span>
+                <select id="t-main" className="input" value={picked.includes(assigneeId) ? assigneeId : picked[0]} onChange={(e) => setAssigneeId(e.target.value)}>
+                  {picked.map((pid) => <option key={pid} value={pid}>{people.find((p) => p.id === pid)?.full_name ?? "?"}</option>)}
+                </select>
+                <small className="muted">Người chính chịu trách nhiệm cuối. Mọi người đều cập nhật được tiến độ và tick các bước.</small>
+              </label>
+            ) : null}
+            </>
           ) : null}
           <div className="row" style={{ alignItems: "flex-start" }}>
             <label className="field" style={{ flex: "1 1 160px" }}>
@@ -160,7 +187,7 @@ export default function TaskForm() {
 
           {err ? <div className="error-box" role="alert">{err}</div> : null}
           <button className="btn block" disabled={busy}>
-            {busy ? "Đang lưu…" : editing ? "Lưu thay đổi" : canAssign && assigneeId && assigneeId !== profile?.id ? "Giao việc" : "Thêm việc"}
+            {busy ? "Đang lưu…" : editing ? "Lưu thay đổi" : canAssign && picked.some((x) => x !== profile?.id) ? (picked.length > 1 ? `Giao việc cho ${picked.length} người` : "Giao việc") : "Thêm việc"}
           </button>
         </form>
       </main>
