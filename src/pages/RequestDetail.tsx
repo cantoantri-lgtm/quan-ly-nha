@@ -87,7 +87,7 @@ export default function RequestDetail() {
     const { error } = await supabase.rpc("mark_paid", { p_request: r!.id });
     setBusy(false);
     if (error) { setErr(friendlyError(error)); toast(friendlyError(error)); return false; }
-    toast(r!.kind === "thanh_toan" ? "Đã kết thúc đề nghị thanh toán." : "Đã ghi nhận chi tiền."); await load(); refreshUnread();
+    toast(r!.kind === "thanh_toan" ? "Đã kết thúc đề nghị thanh toán." : "Đã kết thúc đề nghị tạm ứng."); await load(); refreshUnread();
     return true;
   }
 
@@ -201,7 +201,7 @@ export default function RequestDetail() {
         {isMoney && (canPay || r.status === "hoan_tat") ? (
           <div className={`rq-unc${r.status === "hoan_tat" ? " done" : ""}`}>
             <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} onlyLabel="unc" onCount={setUncCount}
-              title={r.status === "hoan_tat" ? "Uỷ nhiệm chi (UNC)" : `Bước cuối · Đính kèm UNC${r.kind === "thanh_toan" ? " *" : ""}`}
+              title={r.status === "hoan_tat" ? "Uỷ nhiệm chi (UNC)" : "Bước cuối · Đính kèm UNC *"}
               hint={r.status === "hoan_tat" ? "Đã kết thúc, UNC đã khoá."
                 : r.pay_method === "tien_mat" ? "Chi tiền mặt: chụp phiếu chi có chữ ký người nhận. Sau đó bấm Kết thúc."
                 : "Ảnh hoặc PDF uỷ nhiệm chi / xác nhận chuyển khoản từ ngân hàng. Sau đó bấm Kết thúc."}
@@ -221,7 +221,7 @@ export default function RequestDetail() {
           <li><b>{requester?.full_name}</b> gửi đề nghị<span>{clock(r.created_at)}</span></li>
           {r.decided_at && !steps.length ? <li><b>{name(r.approver_id)}</b> {r.status === "tu_choi" ? "từ chối" : "duyệt"}{r.decision_note && r.status !== "tu_choi" ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at)}</span></li> : null}
           {r.reported_at ? <li><b>{requester?.full_name}</b> nhập thực tế công tác<span>{clock(r.reported_at)}</span></li> : null}
-          {r.paid_at ? <li><b>{name(r.paid_by)}</b> {r.kind === "thanh_toan" ? "đính kèm UNC và kết thúc" : "đã chi tiền"}<span>{clock(r.paid_at)}</span></li> : null}
+          {r.paid_at ? <li><b>{name(r.paid_by)}</b> đính kèm UNC và kết thúc<span>{clock(r.paid_at)}</span></li> : null}
           {r.status === "tra_lai" ? <li><b>{name(r.approver_id)}</b> trả lại đề nghị{r.decision_note ? ` — ${r.decision_note}` : ""}<span>{clock(r.decided_at ?? r.updated_at)}</span></li> : null}
           {r.status === "da_huy" ? <li><b>{requester?.full_name}</b> rút lại đề nghị<span>{clock(r.updated_at)}</span></li> : null}
         </ol>
@@ -236,13 +236,11 @@ export default function RequestDetail() {
               <button className="btn" style={{ flex: 2 }} disabled={busy} onClick={() => { setErr(null); setDecide("da_duyet"); }}>{Icon.check}Duyệt</button>
             </div>
           ) : null}
-          {canPay && r.kind === "thanh_toan" ? (
+          {canPay ? (
             <>
-              <button className="btn block" disabled={busy || uncCount === 0} onClick={() => setConfirm("chi")}>{Icon.check}Kết thúc DNTT · {vnd(r.amount)}</button>
+              <button className="btn block" disabled={busy || uncCount === 0} onClick={() => setConfirm("chi")}>{Icon.check}Kết thúc {r.kind === "thanh_toan" ? "DNTT" : "tạm ứng"} · {vnd(r.amount)}</button>
               {uncCount === 0 ? <p className="muted small" style={{ margin: 0 }}>Đính kèm UNC ở bước cuối phía trên để mở nút Kết thúc.</p> : null}
             </>
-          ) : canPay ? (
-            <button className="btn block" disabled={busy} onClick={() => setConfirm("chi")}>Đánh dấu đã chi {vnd(r.amount)}</button>
           ) : null}
           <Link className="btn secondary block" to={`/van-phong/${r.id}/in`}>In / lưu PDF</Link>
           {canReport ? (
@@ -283,10 +281,10 @@ export default function RequestDetail() {
         </form>
       </Sheet>
 
-      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm === "chi" ? (r.kind === "thanh_toan" ? "Kết thúc đề nghị thanh toán?" : "Xác nhận đã chi tiền?") : confirm === "xoa" ? "Xoá đề nghị?" : "Rút lại đề nghị?"}>
+      <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm === "chi" ? (r.kind === "thanh_toan" ? "Kết thúc đề nghị thanh toán?" : "Kết thúc đề nghị tạm ứng?") : confirm === "xoa" ? "Xoá đề nghị?" : "Rút lại đề nghị?"}>
         <p className="muted" style={{ marginTop: 0 }}>
           {confirm === "chi"
-            ? `${vnd(r.amount)} cho ${r.payee || requester?.full_name}${r.bank_info ? ` (${r.bank_info})` : ""}. ${r.kind === "thanh_toan" ? `Đã đính kèm ${uncCount} tệp UNC. Sau khi kết thúc, UNC bị khoá, không sửa được. ` : ""}Người đề nghị sẽ nhận thông báo.`
+            ? `${vnd(r.amount)} cho ${r.payee || requester?.full_name}${r.bank_info ? ` (${r.bank_info})` : ""}. Đã đính kèm ${uncCount} tệp UNC. Sau khi kết thúc, UNC bị khoá, không sửa được. Người đề nghị sẽ nhận thông báo.`
             : confirm === "xoa" ? "Xoá hẳn đề nghị cùng tệp đính kèm, không khôi phục được."
             : r.status === "da_duyet" ? "Đề nghị đã được duyệt. Rút lại sẽ báo cho quản lý biết." : "Đề nghị sẽ không còn chờ duyệt nữa."}
         </p>
@@ -303,7 +301,7 @@ export default function RequestDetail() {
               }
               const ok = confirm === "chi" ? await markPaid() : await update({ status: "da_huy" }, "Đã rút lại đề nghị.");
               if (ok) { setConfirm(null); if (confirm === "huy") nav(listUrl, { replace: true }); }
-            }}>{confirm === "chi" ? (r.kind === "thanh_toan" ? "Kết thúc" : "Đã chi") : confirm === "xoa" ? "Xoá" : "Rút lại"}</button>
+            }}>{confirm === "chi" ? "Kết thúc" : confirm === "xoa" ? "Xoá" : "Rút lại"}</button>
         </div>
       </Sheet>
     </>
