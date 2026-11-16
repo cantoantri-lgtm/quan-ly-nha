@@ -113,6 +113,16 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 .cal-day { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
 .cal-day .d { text-align: center; color: var(--brand); line-height: 1.3; }
 .cal-day .ev-list { display: grid; gap: 4px; font-size: 14px; }
+.cal-grid button.gv::before { content: ""; position: absolute; bottom: 3px; left: 50%; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: var(--brand); }
+.cal-grid button.ev.gv::after { margin-left: -6px; }
+.cal-grid button.ev.gv::before { margin-left: 1px; }
+.cal-grid button.today.gv::before { background: var(--brand-ink); }
+.cal-day .ev-list a { display: grid; padding: 4px 0 4px 8px; border-left: 3px solid var(--danger); line-height: 1.3; }
+.cal-day .ev-list a.ev-out { border-left-color: var(--brand); }
+.cal-day .ev-list small { color: var(--muted); font-size: 12px; }
+.cal-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.cal-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--danger); }
+.cal-legend i.out { background: var(--brand); }
 
 .menu-dd { position: relative; }
 .menu-dd > summary { list-style: none; cursor: pointer; }

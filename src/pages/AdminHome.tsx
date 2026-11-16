@@ -42,11 +42,11 @@ export default function AdminHome() {
             <div className="grow"><div className="name">Nhân sự & tài khoản</div>
               <div className="sub">{active.length} người đang hoạt động · cấp tài khoản, gán toà, cấp lại mật khẩu</div></div>›
           </Link>
-          <Link className="list-row" to="/quan-tri/toa-nha" style={{ color: "inherit" }}>
-            <div className="grow"><div className="name">Toà nhà</div><div className="sub">{buildings.length} toà</div></div>›
+          <Link className="list-row" to="/to-chuc" style={{ color: "inherit" }}>
+            <div className="grow"><div className="name">Sơ đồ công ty</div><div className="sub">Phòng ban, chức danh, người duyệt đề nghị</div></div>›
           </Link>
-          <Link className="list-row" to="/quan-tri/thu-tien" style={{ color: "inherit" }}>
-            <div className="grow"><div className="name">Thu tiền chuyển khoản</div><div className="sub">Tài khoản nhận tiền, mã QR, nối SePay</div></div>›
+          <Link className="list-row" to="/bao-cao" style={{ color: "inherit" }}>
+            <div className="grow"><div className="name">Báo cáo</div><div className="sub">Thu chi, lấp đầy, phản ánh, lợi nhuận · {buildings.length} toà</div></div>›
           </Link>
         </section>
 

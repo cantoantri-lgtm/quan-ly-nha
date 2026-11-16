@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/session";
 import "../nav.css";
@@ -163,7 +163,8 @@ export function AppHeader() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const apps: { to: string; label: string; icon: JSX.Element; n?: number }[] = isCustomer ? [
+  type AppItem = { to: string; label: string; icon: JSX.Element; n?: number };
+  const apps: AppItem[] = isCustomer ? [
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/thong-tin", label: "Thông tin", icon: Icon.user },
@@ -174,27 +175,33 @@ export function AppHeader() {
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/phan-anh", label: "Phản ánh", icon: Icon.help, n: unread },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
-  ] : [
-    { to: "/viec", label: "Công việc", icon: Icon.tasks },
-    { to: "/van-phong", label: "Văn phòng số", icon: Icon.office, n: pendingApprovals },
-    { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
-    { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
-    { to: "/khach-hang", label: "Khách hàng", icon: Icon.user },
-    { to: "/thu-tien-khach", label: "Thu tiền khách", icon: Icon.money },
-    { to: "/phan-anh", label: "Phản ánh", icon: Icon.help },
-    ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
-    ...(isManager ? [
-      { to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
-      { to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user },
-    ] : []),
-    ...(isManager || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
-    ...(isManager ? [
-      { to: "/quan-tri/thu-tien", label: "Thu tiền", icon: Icon.money },
-      { to: "/quan-tri", label: "Hệ thống", icon: Icon.gear },
-    ] : []),
-    ...(isManager || isAccountant ? [{ to: "/hoa-don-gtgt", label: "Hoá đơn GTGT", icon: Icon.money }] : []),
-    { to: "/thong-bao", label: "Thông báo", icon: Icon.bell, n: unread },
-    { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
+  ] : [];
+  // Nhân viên: gom theo nhóm. Quyền hiện / ẩn giữ như cũ (CSDL vẫn là nơi chặn quyền thật).
+  const groups: { title: string; items: AppItem[] }[] = isCustomer || isCollaborator ? [{ title: "", items: apps }] : [
+    { title: "Quản trị", items: [
+      ...(isManager ? [{ to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user }] : []),
+      ...(isManager || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
+      ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
+      ...(isManager ? [{ to: "/quan-tri", label: "Tổng quan quản trị", icon: Icon.gear }] : []),
+    ] },
+    { title: "Quản lý toà nhà", items: [
+      { to: "/ban-do", label: "Bản đồ", icon: Icon.map },
+      ...(isManager ? [{ to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building }] : []),
+      { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+      { to: "/thu-tien-khach", label: "Thu tiền", icon: Icon.money },
+      ...(isManager ? [{ to: "/quan-tri/thu-tien", label: "Tài khoản nhận tiền", icon: Icon.money }] : []),
+      ...(isManager || isAccountant ? [{ to: "/hoa-don-gtgt", label: "Hoá đơn GTGT", icon: Icon.money }] : []),
+      { to: "/phan-anh", label: "Phản ánh", icon: Icon.help },
+      { to: "/khach-hang", label: "Khách hàng", icon: Icon.user },
+    ] },
+    { title: "Văn phòng số", items: [
+      { to: "/van-phong", label: "Văn phòng số", icon: Icon.office, n: pendingApprovals },
+      { to: "/viec", label: "Công việc", icon: Icon.tasks },
+    ] },
+    { title: "Tài khoản và thông báo", items: [
+      { to: "/thong-bao", label: "Thông báo", icon: Icon.bell, n: unread },
+      { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
+    ] },
   ];
 
   function toggleTheme() {
@@ -224,11 +231,16 @@ export function AppHeader() {
         <>
           <div className="apps-back" onClick={() => setOpen(false)} />
           <nav className="apps-pop" aria-label="Chức năng">
-            {apps.map((a) => (
-              <NavLink key={a.to} to={a.to} end={a.to === "/quan-tri"} className={({ isActive }) => (isActive ? "active" : "")}>
-                <span className="ai">{a.icon}</span>{a.label}
-                {a.n ? <span className="n num">{a.n > 99 ? "99+" : a.n}</span> : null}
-              </NavLink>
+            {groups.filter((g) => g.items.length).map((g) => (
+              <Fragment key={g.title || "apps"}>
+                {g.title ? <div className="apps-grp">{g.title}</div> : null}
+                {g.items.map((a) => (
+                  <NavLink key={a.to} to={a.to} end={a.to === "/quan-tri"} className={({ isActive }) => (isActive ? "active" : "")}>
+                    <span className="ai">{a.icon}</span>{a.label}
+                    {a.n ? <span className="n num">{a.n > 99 ? "99+" : a.n}</span> : null}
+                  </NavLink>
+                ))}
+              </Fragment>
             ))}
           </nav>
         </>

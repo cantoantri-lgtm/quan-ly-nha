@@ -38,6 +38,8 @@
 .apps-pop .ai { width: 44px; height: 44px; display: grid; place-items: center; color: var(--brand); }
 .apps-pop .ai svg { width: 32px; height: 32px; }
 .apps-pop .n { position: absolute; top: 8px; right: calc(50% - 36px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+.apps-grp { grid-column: 1 / -1; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding: 10px 8px 2px; border-top: 1px solid var(--line); margin-top: 4px; }
+.apps-grp:first-child { border-top: 0; margin-top: 0; padding-top: 2px; }
 .apps-back { position: fixed; inset: 0; z-index: 44; background: transparent; }
 
 .topbar { top: var(--head-h); }

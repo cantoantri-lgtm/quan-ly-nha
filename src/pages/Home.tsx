@@ -11,7 +11,7 @@ import { KIND_ICON } from "./Office";
 import "../office.css";
 import "../table.css";
 
-type TaskLite = { id: string; title: string; due_date: string | null };
+type TaskLite = { id: string; title: string; due_date: string | null; assignee_id: string | null; created_by: string | null };
 
 /** Trang chủ: danh sách phiếu chờ tôi duyệt (bảng) + Bàn làm việc + lịch */
 export default function Home() {
@@ -25,7 +25,8 @@ export default function Home() {
   const [pos, setPos] = useState<Record<string, string>>({});
   const [decide, setDecide] = useState<{ req: Req; mode: DecideMode } | null>(null);
   const [fixN, setFixN] = useState(0);
-  const [tasks, setTasks] = useState<TaskLite[]>([]);
+  const [tasks, setTasks] = useState<TaskLite[]>([]);        // việc được giao cho tôi (phụ trách chính hoặc cùng làm)
+  const [given, setGiven] = useState<TaskLite[]>([]);        // việc tôi giao cho người khác, chưa xong
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -40,16 +41,21 @@ export default function Home() {
     } else setRows([]);
     setLoading(false);
     // Việc của tôi: đề nghị bị trả lại / từ chối cần sửa, và công việc đang làm
-    const [fx, tk] = await Promise.all([
+    const [fx, tk, gv] = await Promise.all([
       supabase.from("requests").select("id", { count: "exact", head: true }).eq("requester_id", profile.id).in("status", ["tra_lai", "tu_choi"]),
       (async () => {
         const mine = (((await supabase.from("task_assignees").select("task_id").eq("user_id", profile.id)).data ?? []) as { task_id: string }[]).map((x) => x.task_id);
-        const q = supabase.from("tasks").select("id,title,due_date").is("parent_id", null).neq("status", "xong").limit(300);
+        const q = supabase.from("tasks").select("id,title,due_date,assignee_id,created_by").is("parent_id", null).neq("status", "xong").limit(300);
         return mine.length ? q.or(`assignee_id.eq.${profile.id},id.in.(${mine.join(",")})`) : q.eq("assignee_id", profile.id);
       })(),
+      supabase.from("tasks").select("id,title,due_date,assignee_id,created_by").is("parent_id", null).neq("status", "xong")
+        .eq("created_by", profile.id).or(`assignee_id.is.null,assignee_id.neq.${profile.id}`).limit(300),
     ]);
     setFixN(fx.count ?? 0);
-    setTasks((tk.data as TaskLite[]) ?? []);
+    const mineList = (tk.data as TaskLite[]) ?? [];
+    setTasks(mineList);
+    const mineIds = new Set(mineList.map((t) => t.id));
+    setGiven(((gv.data as TaskLite[]) ?? []).filter((t) => !mineIds.has(t.id)));
   }, [profile]);
 
   useEffect(() => { load(); }, [load]);
@@ -151,8 +157,9 @@ export default function Home() {
               <div className="grp">Công việc</div>
               <Link to="/viec" className="it">Việc đang làm của bạn<span className={`cnt num${tasks.length ? "" : " soft"}`}>{tasks.length}</span></Link>
               {overdue ? <Link to="/viec" className="it">Việc trễ hạn<span className="cnt num">{overdue}</span></Link> : null}
+              {given.length ? <Link to="/viec" className="it">Việc bạn đã giao, chưa xong<span className="cnt soft num">{given.length}</span></Link> : null}
             </section>
-            <Calendar tasks={tasks} />
+            <Calendar tasks={tasks} given={given} name={name} />
           </aside>
         </div>
       </main>
@@ -165,8 +172,8 @@ const DOW = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const WEEKDAY_FULL = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
 const iso = (y: number, m: number, d: number) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
-/** Lịch tháng: chấm đỏ ở ngày có việc đến hạn của tôi */
-function Calendar({ tasks }: { tasks: TaskLite[] }) {
+/** Lịch tháng theo hạn chót: chấm đỏ = việc được giao cho tôi, chấm xanh = việc tôi giao cho người khác */
+function Calendar({ tasks, given, name }: { tasks: TaskLite[]; given: TaskLite[]; name: (id: string) => string }) {
   const today = todayVN();
   const [ty, tm] = today.split("-").map(Number);
   const [view, setView] = useState({ y: ty, m: tm - 1 });
@@ -183,9 +190,15 @@ function Calendar({ tasks }: { tasks: TaskLite[] }) {
     tasks.forEach((t) => { if (t.due_date) (m[t.due_date] ??= []).push(t); });
     return m;
   }, [tasks]);
+  const givenByDate = useMemo(() => {
+    const m: Record<string, TaskLite[]> = {};
+    given.forEach((t) => { if (t.due_date) (m[t.due_date] ??= []).push(t); });
+    return m;
+  }, [given]);
   const move = (n: number) => setView(({ y, m }) => { const dt = new Date(Date.UTC(y, m + n, 1)); return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() }; });
   const selWd = WEEKDAY_FULL[new Date(sel + "T00:00:00Z").getUTCDay()];
   const evs = byDate[sel] ?? [];
+  const gEvs = givenByDate[sel] ?? [];
   return (
     <section className="card" aria-label="Lịch">
       <div className="cal-head">
@@ -199,14 +212,20 @@ function Calendar({ tasks }: { tasks: TaskLite[] }) {
       <div className="cal-grid">
         {DOW.map((d) => <span key={d} className="dow">{d}</span>)}
         {cells.map((c) => (
-          <button key={c.date} type="button" className={`${c.out ? "out" : ""}${c.date === today ? " today" : ""}${c.date === sel ? " sel" : ""}${byDate[c.date] ? " ev" : ""}`}
-            onClick={() => setSel(c.date)} aria-label={ddmmyyyy(c.date)}>{c.d}</button>
+          <button key={c.date} type="button" className={`${c.out ? "out" : ""}${c.date === today ? " today" : ""}${c.date === sel ? " sel" : ""}${byDate[c.date] ? " ev" : ""}${givenByDate[c.date] ? " gv" : ""}`}
+            onClick={() => setSel(c.date)}
+            aria-label={`${ddmmyyyy(c.date)}${byDate[c.date] ? `, ${byDate[c.date].length} việc được giao` : ""}${givenByDate[c.date] ? `, ${givenByDate[c.date].length} việc đã giao` : ""}`}>{c.d}</button>
         ))}
       </div>
       <div className="cal-day">
         <div className="d"><div>{selWd}</div><b className="num">{sel.slice(8)} / {sel.slice(5, 7)}</b></div>
-        <div className="ev-list">{evs.length ? evs.map((t) => <Link key={t.id} to={`/viec/${t.id}`}>{t.title}</Link>) : <span className="muted">Không có việc đến hạn</span>}</div>
+        <div className="ev-list">
+          {evs.map((t) => <Link key={t.id} to={`/viec/${t.id}`} className="ev-in"><small>Được giao{t.created_by && t.created_by !== t.assignee_id ? ` · từ ${name(t.created_by)}` : ""}</small>{t.title}</Link>)}
+          {gEvs.map((t) => <Link key={t.id} to={`/viec/${t.id}`} className="ev-out"><small>Đã giao · {t.assignee_id ? name(t.assignee_id) : "chưa có người"}</small>{t.title}</Link>)}
+          {!evs.length && !gEvs.length ? <span className="muted">Không có việc đến hạn</span> : null}
+        </div>
       </div>
+      <div className="cal-legend"><span><i className="in" />Việc được giao</span><span><i className="out" />Việc đã giao</span></div>
     </section>
   );
 }
