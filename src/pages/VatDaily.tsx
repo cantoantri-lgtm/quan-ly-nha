@@ -4,12 +4,14 @@ import { useSession } from "../lib/session";
 import { ddmmyyyy, todayVN } from "../lib/dates";
 import { vnd } from "../lib/money";
 import { Empty, TopBar } from "../components/ui";
+import { InvoiceLines, type InvLine } from "./Invoices";
 import "../table.css";
 
 type Row = {
   invoice_id: string; collected_at: string; building_code: string; room_code: string; tenant_name: string; phone: string | null;
   id_number: string | null; id_address: string | null; amount: number; content: string; paid_via: string | null;
   collected_by_name: string | null; contract_code: string | null;
+  lines: InvLine[] | null; vat_amount: number | null;
 };
 
 /** Danh sách khoản thu tiền thuê trong ngày để xuất hoá đơn GTGT (chỉ Quản lý / Kế toán) */
@@ -58,7 +60,17 @@ export default function VatDaily() {
         { header: "Thành tiền (chưa thuế)", width: 18, style: { numFmt: "#,##0" } }, { header: "Thuế suất", width: 10 },
         { header: "Tiền thuế", width: 14, style: { numFmt: "#,##0" } }, { header: "Tổng tiền thanh toán", width: 18, style: { numFmt: "#,##0" } },
       ];
+      const UNIT: Record<string, string> = { phong: "Tháng", dien: "kWh", nuoc: "Người", dich_vu: "Tháng", xe: "Xe" };
       rows.forEach((r, i) => {
+        const [yy, mm, dd] = r.collected_at.split("-").map(Number);
+        const day0 = new Date(Date.UTC(yy, mm - 1, dd));
+        const base = [i + 1, day0, r.tenant_name, r.id_number ?? "", r.id_address ?? "", r.phone ?? "", r.paid_via === "chuyen_khoan" ? "CK" : "TM/CK"];
+        if (r.lines?.length) {
+          // Hoá đơn nhiều dòng: mỗi khoản một dòng hàng, thuế suất riêng (phòng 10%, điện 8%, nước 5%, dịch vụ 10%)
+          r.lines.forEach((l) => ws.addRow([...base, l.detail ? `${l.label} (${l.detail})` : l.label, UNIT[l.k] ?? "Lần", 1,
+            Number(l.pre), Number(l.pre), `${l.rate}%`, Number(l.vat), Number(l.amount)]));
+          return;
+        }
         const pay = Number(r.amount);
         const net = inclusive ? Math.round(pay / (1 + pct)) : pay;
         const tax = inclusive ? pay - net : Math.round(pay * pct);
@@ -108,7 +120,7 @@ export default function VatDaily() {
           {rows ? <div><b className="num" style={{ fontSize: 22 }}>{rows.length}</b> khoản · tổng <b className="num">{vnd(total)}</b></div> : null}
           {missing ? <p className="small" style={{ margin: 0, color: "var(--today)" }}>{missing} khách thiếu số CCCD hoặc địa chỉ CCCD — bổ sung ở hồ sơ khách trước khi xuất hoá đơn.</p> : null}
           <div className="row" style={{ alignItems: "flex-end" }}>
-            <label className="field" style={{ flex: "1 1 120px" }}><span>Thuế suất GTGT (cho file MISA)</span>
+            <label className="field" style={{ flex: "1 1 120px" }}><span>Thuế suất cho hoá đơn cũ chỉ có tiền phòng</span>
               <select id="vat-rate" className="input" value={rate} onChange={(e) => setRate(e.target.value)}>
                 {["10%", "8%", "5%", "0%", "KCT"].map((x) => <option key={x} value={x}>{x === "KCT" ? "KCT (không chịu thuế)" : x}</option>)}
               </select></label>
@@ -134,7 +146,7 @@ export default function VatDaily() {
                     <td className="num">{r.phone ?? ""}</td>
                     <td>{r.building_code} · {r.room_code}</td>
                     <td className="r num">{vnd(Number(r.amount))}</td>
-                    <td>{r.content}</td>
+                    <td>{r.lines?.length ? <InvoiceLines lines={r.lines} /> : r.content}</td>
                   </tr>
                 ))}
               </tbody>

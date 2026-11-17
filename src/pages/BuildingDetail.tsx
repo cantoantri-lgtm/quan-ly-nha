@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { useCanEditBuilding } from "../lib/useCanEdit";
+import LeasePanel from "../components/LeasePanel";
 import { KIND_LABEL, type Building } from "../lib/labels";
 import { naturalCompare, parseMoney, vnd, vndShort } from "../lib/money";
 import { todayVN } from "../lib/dates";
@@ -142,6 +143,8 @@ export default function BuildingDetail() {
           </div>
           {canEdit ? <button className="btn ghost sm" onClick={() => setEditBuilding(true)}>Sửa toà</button> : null}
         </section>
+
+        <LeasePanel buildingId={building.id} />
 
         <FileGallery owner={{ kind: "anh_toa", buildingId: building.id }} title="Ảnh toà nhà" pdf={false} cover
           hint={'Ảnh có nhãn "Đại diện" hiện trên bản đồ cho cả nhân viên và cộng tác viên.'} canUpload={canEdit} canDelete={canEdit} />

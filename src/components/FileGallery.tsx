@@ -6,8 +6,8 @@ import { Sheet } from "./ui";
 import "../files.css";
 
 type Column = "building_id" | "tenant_id" | "contract_id" | "room_id" | "room_type_id" | "request_id";
-const COLUMN: Record<FileOwner["kind"], Column> = { cccd: "tenant_id", hop_dong: "contract_id", anh_phong: "room_id", anh_loai_phong: "room_type_id", anh_toa: "building_id", dinh_kem_de_nghi: "request_id" };
-const ownerId = (o: FileOwner) => (o.kind === "cccd" ? o.tenantId : o.kind === "hop_dong" ? o.contractId : o.kind === "anh_phong" ? o.roomId : o.kind === "anh_loai_phong" ? o.roomTypeId : o.kind === "anh_toa" ? o.buildingId : o.requestId);
+const COLUMN: Record<FileOwner["kind"], Column> = { cccd: "tenant_id", hop_dong: "contract_id", anh_phong: "room_id", anh_loai_phong: "room_type_id", anh_toa: "building_id", dinh_kem_de_nghi: "request_id", ho_so_toa: "building_id" };
+const ownerId = (o: FileOwner) => (o.kind === "cccd" ? o.tenantId : o.kind === "hop_dong" ? o.contractId : o.kind === "anh_phong" ? o.roomId : o.kind === "anh_loai_phong" ? o.roomTypeId : o.kind === "anh_toa" || o.kind === "ho_so_toa" ? o.buildingId : o.requestId);
 
 /** Kho ảnh/tệp gắn với một đối tượng (khách, hợp đồng, phòng, đề nghị). Danh sách hiện ảnh nhỏ cho nhanh, bấm vào mới tải ảnh to. Tệp riêng tư mở bằng link tạm. */
 export default function FileGallery({ owner, title, hint, canUpload, canDelete, slots, cover, pdf = true, onChange, onlyLabel, hideLabel, onCount, docTypes }: {

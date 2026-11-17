@@ -16,6 +16,7 @@ type Contract = {
   id: string; code: string | null; room_id: string; building_id: string; tenant_id: string; start_date: string; end_date: string | null;
   rent_amount: number; deposit_amount: number; deposit_status: "chua_thu" | "da_thu" | "da_hoan"; billing_day: number;
   status: "hieu_luc" | "da_ket_thuc" | "da_huy"; sign_method: "giay" | "dien_tu" | null; signed_on: string | null; note: string | null;
+  vehicles: number;
   rooms: { code: string } | null; tenants: { full_name: string } | null;
 };
 const ST: Record<Contract["status"], string> = { hieu_luc: "Hiệu lực", da_ket_thuc: "Đã kết thúc", da_huy: "Đã huỷ" };
@@ -90,6 +91,7 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
   const [rent, setRent] = useState("");
   const [deposit, setDeposit] = useState("");
   const [billing, setBilling] = useState("5");
+  const [vehicles, setVehicles] = useState("0");
   const [sign, setSign] = useState<"" | "giay" | "dien_tu">("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -120,7 +122,7 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
     setBusy(true);
     const { data, error } = await supabase.from("contracts").insert({
       room_id: roomId, tenant_id: tenantId, code: code.trim() || null, start_date: start, end_date: end || null,
-      rent_amount: rentN, deposit_amount: depN, billing_day: Number(billing) || 5,
+      rent_amount: rentN, deposit_amount: depN, billing_day: Number(billing) || 5, vehicles: Number(vehicles) || 0,
       sign_method: sign || null, signed_on: sign ? start : null,
     }).select("id").single();
     setBusy(false);
@@ -152,8 +154,12 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
           <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input id="c-rent" className="input num" inputMode="decimal" value={rent} onChange={(e) => setRent(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Tiền cọc</span><input id="c-dep" className="input num" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
         </div>
-        <label className="field"><span>Hạn đóng tiền hằng tháng (ngày 1–28)</span>
-          <input id="c-bill" className="input num" inputMode="numeric" value={billing} onChange={(e) => setBilling(e.target.value.replace(/\D/g, ""))} /></label>
+        <div className="row" style={{ alignItems: "flex-start" }}>
+          <label className="field" style={{ flex: "1 1 150px" }}><span>Hạn đóng tiền hằng tháng (ngày 1–28)</span>
+            <input id="c-bill" className="input num" inputMode="numeric" value={billing} onChange={(e) => setBilling(e.target.value.replace(/\D/g, ""))} /></label>
+          <label className="field" style={{ flex: "1 1 120px" }}><span>Số xe gửi</span>
+            <input id="c-veh" className="input num" inputMode="numeric" value={vehicles} onChange={(e) => setVehicles(e.target.value.replace(/\D/g, "").slice(0, 2))} /></label>
+        </div>
         <div className="field"><span>Cách ký</span>
           <div className="seg" style={{ gridTemplateColumns: "repeat(3, 1fr)" }} role="group">
             {([["", "Chưa ký"], ["giay", "Ký giấy"], ["dien_tu", "Ký điện tử"]] as ["" | "giay" | "dien_tu", string][]).map(([k, l]) => (
@@ -191,6 +197,7 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
           <dt>Thời hạn</dt><dd>{ddmmyyyy(c.start_date)} → {c.end_date ? ddmmyyyy(c.end_date) : "không thời hạn"}</dd>
           <dt>Giá thuê</dt><dd className="num">{vnd(c.rent_amount)}/tháng · hạn ngày {c.billing_day}</dd>
           <dt>Tiền cọc</dt><dd className="num">{vnd(c.deposit_amount)} · {DEP[c.deposit_status]}</dd>
+          <dt>Số xe gửi</dt><dd className="num">{c.vehicles ?? 0} xe</dd>
           <dt>Cách ký</dt><dd>{c.sign_method ? `${SIGN[c.sign_method]}${c.signed_on ? ` ngày ${ddmmyyyy(c.signed_on)}` : ""}` : "Chưa ký"}</dd>
         </dl>
         <div className="row">
@@ -238,6 +245,7 @@ function EditContract({ c, onClose, onSaved }: { c: Contract; onClose: () => voi
   const [rent, setRent] = useState(fmt(c.rent_amount));
   const [deposit, setDeposit] = useState(fmt(c.deposit_amount));
   const [billing, setBilling] = useState(String(c.billing_day));
+  const [vehicles, setVehicles] = useState(String(c.vehicles ?? 0));
   const [note, setNote] = useState(c.note ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -250,7 +258,7 @@ function EditContract({ c, onClose, onSaved }: { c: Contract; onClose: () => voi
     if (end && end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
     setBusy(true);
     const { error } = await supabase.from("contracts").update({
-      code: code.trim() || null, start_date: start, end_date: end || null, rent_amount: r, deposit_amount: d, billing_day: b, note: note.trim() || null,
+      code: code.trim() || null, start_date: start, end_date: end || null, rent_amount: r, deposit_amount: d, billing_day: b, vehicles: Number(vehicles) || 0, note: note.trim() || null,
     }).eq("id", c.id);
     setBusy(false);
     if (error) { setErr(friendlyError(error)); return; }
@@ -268,8 +276,12 @@ function EditContract({ c, onClose, onSaved }: { c: Contract; onClose: () => voi
           <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input className="input num" inputMode="decimal" value={rent} onChange={(e) => setRent(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Tiền cọc</span><input className="input num" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
         </div>
-        <label className="field"><span>Hạn đóng tiền hằng tháng (ngày 1–28)</span>
-          <input className="input num" inputMode="numeric" value={billing} onChange={(e) => setBilling(e.target.value.replace(/\D/g, ""))} /></label>
+        <div className="row" style={{ alignItems: "flex-start" }}>
+          <label className="field" style={{ flex: "1 1 150px" }}><span>Hạn đóng tiền hằng tháng (ngày 1–28)</span>
+            <input className="input num" inputMode="numeric" value={billing} onChange={(e) => setBilling(e.target.value.replace(/\D/g, ""))} /></label>
+          <label className="field" style={{ flex: "1 1 120px" }}><span>Số xe gửi</span>
+            <input className="input num" inputMode="numeric" value={vehicles} onChange={(e) => setVehicles(e.target.value.replace(/\D/g, "").slice(0, 2))} /></label>
+        </div>
         <label className="field"><span>Ghi chú</span><textarea className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} /></label>
         {err ? <div className="error-box" role="alert">{err}</div> : null}
         <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Lưu hợp đồng"}</button>

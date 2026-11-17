@@ -230,7 +230,8 @@ type Rent = { id: string; building_id: string; effective_from: string; monthly_r
 const CATS = ["Điện", "Nước", "Internet", "Sửa chữa", "Vệ sinh", "Nhân sự", "Quảng cáo", "Khác"];
 
 function CostTab() {
-  const { buildings, toast } = useSession();
+  const { buildings, toast, isManager } = useSession();
+  const canRent = isManager;   // tiền thuê toà: Quản lý, Lead Sale sửa (Lead Sale sửa ở trang toà → Hồ sơ thuê toà); Kế toán chỉ xem
   const [exps, setExps] = useState<Exp[]>([]);
   const [rents, setRents] = useState<Rent[]>([]);
   const [month, setMonth] = useState(() => monthStart(todayVN()));
@@ -269,9 +270,9 @@ function CostTab() {
       <section className="card stack" style={{ padding: 14 }}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
           <b>Tiền thuê nhà mỗi tháng</b>
-          <button className="btn sm" onClick={() => { setEditR(null); setSheet("rent"); }}>+ Nhập tiền thuê</button>
+          {canRent ? <button className="btn sm" onClick={() => { setEditR(null); setSheet("rent"); }}>+ Nhập tiền thuê</button> : null}
         </div>
-        <p className="muted small" style={{ margin: 0 }}>Số tiền công ty trả chủ nhà mỗi tháng cho từng toà, áp dụng từ tháng được chọn đến khi nhập mức mới.</p>
+        <p className="muted small" style={{ margin: 0 }}>Số tiền công ty trả chủ nhà mỗi tháng cho từng toà, áp dụng từ tháng được chọn đến khi nhập mức mới.{canRent ? "" : " Chỉ Quản lý và Lead Sale cập nhật (ở trang toà → Hồ sơ thuê toà nhà)."}</p>
         {buildings.map((b) => {
           const list = rents.filter((r) => r.building_id === b.id);
           const c = curRent(b.id);
@@ -283,10 +284,10 @@ function CostTab() {
               {list.map((r) => (
                 <div key={r.id} className="row small muted" style={{ justifyContent: "space-between", flexWrap: "nowrap", marginTop: 4 }}>
                   <span>Từ {r.effective_from.slice(5, 7)}/{r.effective_from.slice(0, 4)}: <span className="num">{vnd(r.monthly_rent)}</span>{r.note ? ` · ${r.note}` : ""}</span>
-                  <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                  {canRent ? <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
                     <button className="btn ghost sm" onClick={() => { setEditR(r); setSheet("rent"); }}>Sửa</button>
                     <button className="btn ghost sm" onClick={() => delRent(r)}>Xoá</button>
-                  </span>
+                  </span> : null}
                 </div>
               ))}
             </div>

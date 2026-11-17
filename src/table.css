@@ -140,3 +140,6 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
   .apphead, .filterbar, .toolbar, .tiles, .acts, .pager, .pg-card .ico-btn { display: none !important; }
   table.dt thead th { position: static; }
 }
+
+.inv-lines th, .inv-lines td { padding: 8px 10px; font-size: 13.5px; }
+.inv-lines tfoot td { font-weight: 700; border-top: 1px solid var(--line); padding: 8px 10px; }

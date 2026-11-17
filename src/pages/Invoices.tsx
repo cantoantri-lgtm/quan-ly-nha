@@ -8,12 +8,16 @@ import { Empty, Sheet, TopBar, copyText } from "../components/ui";
 import PayQR from "../components/PayQR";
 import type { PaySettings } from "../lib/vietqr";
 import "../files.css";
+import "../table.css";
 
 type Invoice = {
   id: string; contract_id: string; period: string; amount: number; due_date: string; status: "chua_thu" | "da_thu" | "huy";
   collected_at: string | null; paid_via: "thu_cong" | "chuyen_khoan" | null; pay_code: string; note: string | null;
+  lines: InvLine[] | null; vat_amount: number | null;
   contracts: { rooms: { code: string } | null; tenants: { full_name: string; phone: string | null } | null } | null;
 };
+/** Một dòng hoá đơn: amount = giá đã gồm thuế; pre = tiền trước thuế; vat = tiền thuế; rate = % GTGT */
+export type InvLine = { k: string; label: string; detail: string | null; amount: number; rate: number; pre: number; vat: number };
 const room = (i: Invoice) => i.contracts?.rooms?.code ?? "?";
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 const monthLabel = (k: string) => `Tháng ${Number(k.slice(5, 7))}/${k.slice(0, 4)}`;
@@ -35,7 +39,7 @@ export default function Invoices() {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("invoices")
-      .select("id,contract_id,period,amount,due_date,status,collected_at,paid_via,pay_code,note, contracts(rooms(code), tenants(full_name,phone))")
+      .select("id,contract_id,period,amount,due_date,status,collected_at,paid_via,pay_code,note,lines,vat_amount, contracts(rooms(code), tenants(full_name,phone))")
       .eq("building_id", id!).eq("period", period).neq("status", "huy");
     setList(((data as unknown as Invoice[]) ?? []).sort((a, b) => naturalCompare(room(a), room(b))));
     setLoading(false);
@@ -58,7 +62,7 @@ export default function Invoices() {
     const { data, error } = await supabase.rpc("generate_monthly_invoices", { p_period: period });
     setBusy(false);
     if (error) { toast(friendlyError(error)); return; }
-    toast(data ? `Đã tạo ${data} hoá đơn cho ${monthLabel(period).toLowerCase()}.` : "Không có hoá đơn mới (đã đủ hoặc chưa có hợp đồng).");
+    toast(data ? `Đã tạo / cập nhật ${data} hoá đơn ${monthLabel(period).toLowerCase()}.` : "Không có hoá đơn nào để tạo hoặc cập nhật (hoá đơn đã thu giữ nguyên).");
     load();
   }
 
@@ -83,7 +87,8 @@ export default function Invoices() {
           {([["", "Tất cả", sums.n], ["chua_thu", "Chưa thu", sums.n - sums.nPaid], ["da_thu", "Đã thu", sums.nPaid]] as ["" | "chua_thu" | "da_thu", string, number][])
             .map(([k, l, n]) => <button key={k} className="chip" aria-pressed={filter === k} onClick={() => setFilter(k)}>{l}<span className="n">{n}</span></button>)}
         </div>
-        {isManager ? <button className="btn secondary sm" disabled={busy} onClick={generate}>{busy ? "Đang tạo…" : `Tạo hoá đơn ${monthLabel(period).toLowerCase()}`}</button> : null}
+        {isManager ? <button className="btn secondary sm" disabled={busy} onClick={generate}>{busy ? "Đang tạo…" : `Tạo / cập nhật hoá đơn ${monthLabel(period).toLowerCase()}`}</button> : null}
+        {isManager ? <p className="muted small" style={{ margin: 0 }}>Hoá đơn gồm tiền phòng tháng này, điện và nước tháng trước, phí dịch vụ, phí xe. Nhập số điện phòng xong thì bấm lại nút này để cập nhật các hoá đơn chưa thu.</p> : null}
 
         {loading ? <div className="loading">Đang tải…</div> : shown.length === 0 ? (
           <Empty title="Chưa có hoá đơn">Hoá đơn tự tạo vào ngày 1 hằng tháng cho các hợp đồng đang hiệu lực. <Link to={`/toa/${building.id}/hop-dong`}>Xem hợp đồng</Link></Empty>
@@ -141,6 +146,7 @@ function InvoiceSheet({ inv, bank, canUndo, onClose, onChanged }: { inv: Invoice
           {inv.status === "da_thu" ? <span className="paid-stamp">Đã thu{inv.paid_via === "chuyen_khoan" ? " · chuyển khoản" : ""}</span> : <span className="tag">Hạn {ddmm(inv.due_date)}</span>}
         </div>
         {inv.note ? <p className="muted small" style={{ margin: 0 }}>{inv.note}</p> : null}
+        {inv.lines?.length ? <InvoiceLines lines={inv.lines} /> : null}
 
         {inv.status !== "da_thu" ? (
           bank ? (
@@ -167,5 +173,28 @@ function InvoiceSheet({ inv, bank, canUndo, onClose, onChanged }: { inv: Invoice
         ) : null}
       </div>
     </Sheet>
+  );
+}
+
+/** Bảng các dòng hoá đơn: giá đã gồm thuế, tách tiền trước thuế và thuế GTGT theo từng dòng */
+export function InvoiceLines({ lines }: { lines: InvLine[] }) {
+  const pre = lines.reduce((t, l) => t + Number(l.pre), 0), vat = lines.reduce((t, l) => t + Number(l.vat), 0), all = lines.reduce((t, l) => t + Number(l.amount), 0);
+  return (
+    <div className="dt-wrap">
+      <table className="dt inv-lines">
+        <thead><tr><th>Khoản</th><th className="r">Trước thuế</th><th className="r">GTGT</th><th className="r">Thành tiền</th></tr></thead>
+        <tbody>
+          {lines.map((l, i) => (
+            <tr key={i}>
+              <td>{l.label}{l.detail ? <div className="t2">{l.detail}</div> : null}</td>
+              <td className="r num">{vnd(l.pre)}</td>
+              <td className="r num">{vnd(l.vat)}<div className="t2">{l.rate}%</div></td>
+              <td className="r num"><b>{vnd(l.amount)}</b></td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot><tr><td>Cộng</td><td className="r num">{vnd(pre)}</td><td className="r num">{vnd(vat)}</td><td className="r num"><b>{vnd(all)}</b></td></tr></tfoot>
+      </table>
+    </div>
   );
 }
