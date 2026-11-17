@@ -16,7 +16,7 @@
   --s-doing: #2C64A3;  --s-doing-bg: #E3ECF7;
   --s-block: #B3402F;  --s-block-bg: #F8E4E0;
   --s-done: #2E7A4C;   --s-done-bg: #E1F1E6;
-  --late: #B3402F; --today: #A0670E; --today-bg: #F7ECD6; --soon: #2C64A3;
+  --late: #B3402F; --today: #A0670E; --today-bg: #F7ECD6; --soon: #2C64A3; --near-bg: #FCF6EA; --late-bg: #FBEDEA;
     --gc-xam_xanh: #6F929C; --gc-xam_xanh-bg: #DDE8EB;
     --gc-kem: #B8913A; --gc-kem-bg: #FBF1D3;
     --gc-cam: #D9822B; --gc-cam-bg: #FAE3CB;
@@ -42,7 +42,7 @@
     --brand: #5FB39F; --brand-ink: #0B1210; --brand-soft: #1C332D; --cream: #2A261E; --danger: #EE8270;
     --s-todo: #A0ACA7; --s-todo-bg: #232C29; --s-doing: #79ACE6; --s-doing-bg: #182A3E;
     --s-block: #EE8270; --s-block-bg: #3A1F1A; --s-done: #66C391; --s-done-bg: #17321F;
-    --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6;
+    --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6; --near-bg: #2A2112; --late-bg: #2E1A16;
     --gc-xam_xanh: #8FB4BF; --gc-xam_xanh-bg: #1E2F34;
     --gc-kem: #E0BC62; --gc-kem-bg: #352C14;
     --gc-cam: #EE9D4F; --gc-cam-bg: #3A2512;
@@ -60,7 +60,7 @@
     --brand: #5FB39F; --brand-ink: #0B1210; --brand-soft: #1C332D; --cream: #2A261E; --danger: #EE8270;
     --s-todo: #A0ACA7; --s-todo-bg: #232C29; --s-doing: #79ACE6; --s-doing-bg: #182A3E;
     --s-block: #EE8270; --s-block-bg: #3A1F1A; --s-done: #66C391; --s-done-bg: #17321F;
-    --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6;
+    --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6; --near-bg: #2A2112; --late-bg: #2E1A16;
     --gc-xam_xanh: #8FB4BF; --gc-xam_xanh-bg: #1E2F34;
     --gc-kem: #E0BC62; --gc-kem-bg: #352C14;
     --gc-cam: #EE9D4F; --gc-cam-bg: #3A2512;
@@ -180,6 +180,8 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 .task-card.done .t { color: var(--muted); }
 .task-card .meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; color: var(--muted); }
 .task-card.late { box-shadow: inset 3px 0 0 var(--late); }
+.task-card.near { box-shadow: inset 3px 0 0 var(--today); background: var(--near-bg); }
+.task-card.near.today { background: var(--today-bg); }
 .progress { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; border: 1px solid var(--line); }
 .progress > span { display: block; height: 100%; background: var(--s-done); }
 

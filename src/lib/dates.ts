@@ -27,6 +27,20 @@ export function dow(iso: string): string {
 }
 
 /** "Trễ 2 ngày" / "Hôm nay" / "Ngày mai" / "T7 31/10" */
+/** Cộng n ngày vào ngày dạng YYYY-MM-DD */
+export function addDaysISO(iso: string, n: number): string {
+  return new Date(Date.parse(iso + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+}
+
+/** Sắp đến hạn = hạn hôm nay hoặc trong SOON_DAYS ngày tới (việc chưa xong) */
+export const SOON_DAYS = 2;
+/** Mức nhắc hạn để tô màu: trễ, hạn hôm nay, sắp đến hạn; null nếu còn xa hoặc không có hạn */
+export function dueLevel(due: string | null, done: boolean): "late" | "today" | "soon" | null {
+  if (!due || done) return null;
+  const diff = daysBetween(todayVN(), due);
+  return diff < 0 ? "late" : diff === 0 ? "today" : diff <= SOON_DAYS ? "soon" : null;
+}
+
 export function dueInfo(due: string | null, done: boolean): { text: string; tone: "late" | "today" | "soon" | "plain" } | null {
   if (!due) return null;
   if (done) return { text: `Hạn ${ddmm(due)}`, tone: "plain" };
@@ -34,6 +48,7 @@ export function dueInfo(due: string | null, done: boolean): { text: string; tone
   if (diff < 0) return { text: `Trễ ${-diff} ngày`, tone: "late" };
   if (diff === 0) return { text: "Hạn hôm nay", tone: "today" };
   if (diff === 1) return { text: "Hạn ngày mai", tone: "soon" };
+  if (diff <= SOON_DAYS) return { text: `Còn ${diff} ngày · ${dow(due)} ${ddmm(due)}`, tone: "soon" };
   return { text: `${dow(due)} ${ddmm(due)}`, tone: "plain" };
 }
 

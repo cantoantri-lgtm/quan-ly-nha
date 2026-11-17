@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { PRIORITY_LABEL, STATUS_LABEL, type Task } from "../lib/labels";
-import { daysBetween, dueInfo, todayVN } from "../lib/dates";
+import { daysBetween, dueInfo, dueLevel, todayVN } from "../lib/dates";
 import { Empty, Icon, TopBar } from "../components/ui";
 
 type Row = Task & { assignee: { full_name: string } | null; creator: { full_name: string } | null; building: { code: string } | null; members: { user_id: string }[] | null };
@@ -125,7 +125,7 @@ export default function Tasks() {
               const d = dueInfo(r.due_date, r.status === "xong");
               const s = steps[r.id];
               return (
-                <Link key={r.id} to={`/viec/${r.id}`} className={`card task-card${r.status === "xong" ? " done" : ""}${isLate(r) ? " late" : ""}`}>
+                <Link key={r.id} to={`/viec/${r.id}`} className={`card task-card${r.status === "xong" ? " done" : ""}${isLate(r) ? " late" : ""}${(() => { const l = dueLevel(r.due_date, r.status === "xong"); return l === "today" || l === "soon" ? ` near ${l}` : ""; })()}`}>
                   <div className="row" style={{ alignItems: "flex-start", flexWrap: "nowrap" }}>
                     <div className="t" style={{ flex: 1, minWidth: 0 }}>{r.title}</div>
                     <span className={`pill ${r.status}`}>{STATUS_LABEL[r.status]}</span>

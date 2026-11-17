@@ -90,6 +90,19 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 .home-grid { display: grid; gap: 16px; align-items: start; }
 .home-main { min-width: 0; }
 .dt tr.todo-late td:first-child { box-shadow: inset 3px 0 0 var(--late); }
+/* Nhắc hạn: trễ (đỏ), hạn hôm nay (vàng đậm), sắp đến hạn 1–2 ngày (vàng nhạt) */
+.dt tr.todo-late, .dt tr.todo-late > td { background: var(--late-bg); }
+.dt tr.todo-today, .dt tr.todo-today > td { background: var(--today-bg); }
+.dt tr.todo-soon, .dt tr.todo-soon > td { background: var(--near-bg); }
+.dt tr.todo-today td:first-child, .dt tr.todo-soon td:first-child { box-shadow: inset 3px 0 0 var(--today); }
+.due.due-hl { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--surface); border: 1px solid currentColor; white-space: nowrap; }
+.due.soon.due-hl, .due.today.due-hl { color: var(--today); }
+.tile.tile-near b { color: var(--today); }
+.tile.tile-late b { color: var(--late); }
+.bench .cnt.near { background: var(--today); color: var(--surface); }
+.cal-grid button.near:not(.today) { background: var(--today-bg); color: var(--today); font-weight: 700; }
+.cal-grid button.today.near { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--today); }
+.cal-legend i.near { background: var(--today-bg); border: 1.5px solid var(--today); }
 @media (min-width: 1100px) { .home-grid { grid-template-columns: minmax(0, 1fr) 340px; } }
 .bench { display: grid; gap: 16px; }
 .bench .card { padding: 16px; }
@@ -122,7 +135,7 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 .cal-day .ev-list a { display: grid; padding: 4px 0 4px 8px; border-left: 3px solid var(--danger); line-height: 1.3; }
 .cal-day .ev-list a.ev-out { border-left-color: var(--brand); }
 .cal-day .ev-list small { color: var(--muted); font-size: 12px; }
-.cal-legend { display: flex; gap: 14px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+.cal-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; font-size: 12.5px; color: var(--muted); }
 .cal-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--danger); }
 .cal-legend i.out { background: var(--brand); }
 

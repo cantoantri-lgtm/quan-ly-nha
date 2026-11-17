@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { ddmmyyyy, dueInfo, todayVN } from "../lib/dates";
+import { addDaysISO, ddmmyyyy, dueInfo, dueLevel, SOON_DAYS, todayVN } from "../lib/dates";
 import { PRIORITY_LABEL, STATUS_LABEL, type Priority, type TaskStatus } from "../lib/labels";
 import { KINDS, kindLabel, summary, type Req, type ReqKind } from "../lib/office";
 import { Icon } from "../components/ui";
@@ -85,6 +85,7 @@ export default function Home() {
 
   const name = (id: string) => people.find((p) => p.id === id)?.full_name ?? "—";
   const overdue = tasks.filter((t) => t.due_date && t.due_date < todayVN()).length;
+  const nearDue = tasks.filter((t) => { const l = dueLevel(t.due_date, false); return l === "today" || l === "soon"; }).length;
 
   return (
     <>
@@ -162,6 +163,7 @@ export default function Home() {
               <div className="grp">Công việc</div>
               <Link to="/viec" className="it">Việc đang làm của bạn<span className={`cnt num${tasks.length ? "" : " soft"}`}>{tasks.length}</span></Link>
               {overdue ? <Link to="/viec" className="it">Việc trễ hạn<span className="cnt num">{overdue}</span></Link> : null}
+              {nearDue ? <Link to="/viec" className="it">Việc sắp đến hạn ({SOON_DAYS + 1} ngày)<span className="cnt near num">{nearDue}</span></Link> : null}
               {given.length ? <Link to="/viec" className="it">Việc bạn đã giao, chưa xong<span className="cnt soft num">{given.length}</span></Link> : null}
             </section>
             <Calendar tasks={tasks} given={given} name={name} />
@@ -200,6 +202,8 @@ function Calendar({ tasks, given, name }: { tasks: TaskLite[]; given: TaskLite[]
     given.forEach((t) => { if (t.due_date) (m[t.due_date] ??= []).push(t); });
     return m;
   }, [given]);
+  const nearEnd = addDaysISO(today, SOON_DAYS);
+  const near = (d: string) => d >= today && d <= nearEnd && !!(byDate[d] || givenByDate[d]);
   const move = (n: number) => setView(({ y, m }) => { const dt = new Date(Date.UTC(y, m + n, 1)); return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() }; });
   const selWd = WEEKDAY_FULL[new Date(sel + "T00:00:00Z").getUTCDay()];
   const evs = byDate[sel] ?? [];
@@ -217,9 +221,9 @@ function Calendar({ tasks, given, name }: { tasks: TaskLite[]; given: TaskLite[]
       <div className="cal-grid">
         {DOW.map((d) => <span key={d} className="dow">{d}</span>)}
         {cells.map((c) => (
-          <button key={c.date} type="button" className={`${c.out ? "out" : ""}${c.date === today ? " today" : ""}${c.date === sel ? " sel" : ""}${byDate[c.date] ? " ev" : ""}${givenByDate[c.date] ? " gv" : ""}`}
+          <button key={c.date} type="button" className={`${c.out ? "out" : ""}${c.date === today ? " today" : ""}${c.date === sel ? " sel" : ""}${byDate[c.date] ? " ev" : ""}${givenByDate[c.date] ? " gv" : ""}${near(c.date) ? " near" : ""}`}
             onClick={() => setSel(c.date)}
-            aria-label={`${ddmmyyyy(c.date)}${byDate[c.date] ? `, ${byDate[c.date].length} việc được giao` : ""}${givenByDate[c.date] ? `, ${givenByDate[c.date].length} việc đã giao` : ""}`}>{c.d}</button>
+            aria-label={`${ddmmyyyy(c.date)}${near(c.date) ? ", sắp đến hạn" : ""}${byDate[c.date] ? `, ${byDate[c.date].length} việc được giao` : ""}${givenByDate[c.date] ? `, ${givenByDate[c.date].length} việc đã giao` : ""}`}>{c.d}</button>
         ))}
       </div>
       <div className="cal-day">
@@ -230,12 +234,12 @@ function Calendar({ tasks, given, name }: { tasks: TaskLite[]; given: TaskLite[]
           {!evs.length && !gEvs.length ? <span className="muted">Không có việc đến hạn</span> : null}
         </div>
       </div>
-      <div className="cal-legend"><span><i className="in" />Việc được giao</span><span><i className="out" />Việc đã giao</span></div>
+      <div className="cal-legend"><span><i className="in" />Việc được giao</span><span><i className="out" />Việc đã giao</span><span><i className="near" />Sắp đến hạn</span></div>
     </section>
   );
 }
 
-type TodoFilter = "" | "chua_lam" | "dang_lam" | "vuong" | "gap" | "tre";
+type TodoFilter = "" | "chua_lam" | "dang_lam" | "vuong" | "gap" | "sap" | "tre";
 const PRIO_RANK: Record<Priority, number> = { gap: 0, cao: 1, binh_thuong: 2, thap: 3 };
 
 /** Việc chưa xong ngay trên Trang chủ: chưa làm, đang làm, vướng, gấp, trễ hạn. Gấp và trễ hạn lên đầu. */
@@ -246,25 +250,29 @@ function TodoCard({ mine, given, name }: { mine: TaskLite[]; given: TaskLite[]; 
   const today = todayVN();
   const list = who === "mine" ? mine : given;
   const late = (t: TaskLite) => !!t.due_date && t.due_date < today;
+  const lv = (t: TaskLite) => dueLevel(t.due_date, false);
+  const isNear = (t: TaskLite) => { const l = lv(t); return l === "today" || l === "soon"; };
   const count = (k: TodoFilter) => list.filter((t) => match(t, k)).length;
   function match(t: TaskLite, k: TodoFilter) {
     if (!k) return true;
     if (k === "gap") return t.priority === "gap" || t.priority === "cao";
     if (k === "tre") return late(t);
+    if (k === "sap") return isNear(t);
     return t.status === k;
   }
   const rows = useMemo(() => list.filter((t) => match(t, f)).sort((a, b) =>
-    Number(late(b)) - Number(late(a)) || PRIO_RANK[a.priority] - PRIO_RANK[b.priority]
+    Number(late(b)) - Number(late(a)) || Number(isNear(b)) - Number(isNear(a))
+    || (isNear(a) ? (a.due_date ?? "").localeCompare(b.due_date ?? "") : 0) || PRIO_RANK[a.priority] - PRIO_RANK[b.priority]
     || (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999")), [list, f]); // eslint-disable-line react-hooks/exhaustive-deps
   const paging = usePaging(rows, 10);
   useEffect(() => { paging.setPage(1); }, [f, who]); // eslint-disable-line react-hooks/exhaustive-deps
   const code = (id: string | null) => buildings.find((b) => b.id === id)?.code;
-  const chips: [TodoFilter, string][] = [["", "Tất cả"], ["chua_lam", "Chưa làm"], ["dang_lam", "Đang làm"], ["vuong", "Vướng"], ["gap", "Gấp, cao"], ["tre", "Trễ hạn"]];
+  const chips: [TodoFilter, string][] = [["", "Tất cả"], ["chua_lam", "Chưa làm"], ["dang_lam", "Đang làm"], ["vuong", "Vướng"], ["gap", "Gấp, cao"], ["sap", "Sắp đến hạn"], ["tre", "Trễ hạn"]];
   return (
     <section className="pg-card" aria-label="Việc cần làm">
       <div className="pg-head">
         <span className="pg-ico">{Icon.tasks}</span>
-        <div className="grow"><h2>Việc cần làm</h2><p>Việc chưa xong: gấp và trễ hạn xếp lên đầu</p></div>
+        <div className="grow"><h2>Việc cần làm</h2><p>Việc chưa xong: trễ hạn, sắp đến hạn ({SOON_DAYS + 1} ngày) xếp lên đầu và tô màu</p></div>
         <select className="input" aria-label="Việc của ai" value={who} onChange={(e) => setWho(e.target.value as "mine" | "given")}>
           <option value="mine">Việc được giao cho tôi</option>
           <option value="given">Việc tôi đã giao</option>
@@ -272,7 +280,7 @@ function TodoCard({ mine, given, name }: { mine: TaskLite[]; given: TaskLite[]; 
       </div>
       <div className="tiles" role="group" aria-label="Lọc việc">
         {chips.map(([k, l]) => (
-          <button key={k} className="tile" aria-pressed={f === k} onClick={() => setF(f === k ? "" : k)}><b>{count(k)}</b> {l}</button>
+          <button key={k} className={`tile${k === "sap" && count(k) ? " tile-near" : ""}${k === "tre" && count(k) ? " tile-late" : ""}`} aria-pressed={f === k} onClick={() => setF(f === k ? "" : k)}><b>{count(k)}</b> {l}</button>
         ))}
       </div>
       {rows.length === 0 ? (
@@ -286,9 +294,9 @@ function TodoCard({ mine, given, name }: { mine: TaskLite[]; given: TaskLite[]; 
                 const d = dueInfo(t.due_date, false);
                 const b = code(t.building_id);
                 return (
-                  <tr key={t.id} className={late(t) ? "todo-late" : undefined}>
+                  <tr key={t.id} className={lv(t) ? `todo-${lv(t)}` : undefined}>
                     <td data-label="Việc"><Link to={`/viec/${t.id}`} className="dt-link">{t.title}</Link>{b ? <div className="t2">{b}</div> : null}</td>
-                    <td data-label="Hạn">{d ? <span className={`due ${d.tone}`}>{d.text}</span> : <span className="muted">Không hạn</span>}</td>
+                    <td data-label="Hạn">{d ? <span className={`due ${d.tone}${lv(t) ? " due-hl" : ""}`}>{d.text}</span> : <span className="muted">Không hạn</span>}</td>
                     <td data-label="Trạng thái"><span className={`pill ${t.status}`}>{STATUS_LABEL[t.status]}</span></td>
                     <td data-label="Ưu tiên">{t.priority === "gap" || t.priority === "cao" ? <span className="prio">{PRIORITY_LABEL[t.priority]}</span> : <span className="muted">{PRIORITY_LABEL[t.priority]}</span>}</td>
                     <td data-label={who === "mine" ? "Người giao" : "Người làm"}>{who === "mine" ? (t.created_by ? name(t.created_by) : "—") : (t.assignee_id ? name(t.assignee_id) : "Chưa có người")}</td>
