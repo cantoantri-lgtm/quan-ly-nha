@@ -11,3 +11,16 @@
 .rpt-kpi { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
 .rpt-kpi b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .rpt-kpi span { font-size: 12px; color: var(--muted); }
+
+/* Pivot: bấm mở xuống từng cấp */
+.pv-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.pv-cell { display: flex; align-items: flex-start; gap: 4px; width: 100%; border: 0; background: none; color: inherit; font: inherit; text-align: left; padding: 0; cursor: pointer; }
+.pv-cell:disabled { cursor: default; color: inherit; }
+.pv-caret { width: 12px; flex: none; color: var(--muted); }
+.rpt.pv td:first-child { min-width: 150px; }
+.rpt.pv .pv-l0 td { font-weight: 600; }
+.rpt.pv .pv-l1 td, .rpt.pv .pv-l1 td:first-child { background: var(--surface-2); }
+.rpt.pv .pv-l2 td, .rpt.pv .pv-l3 td { font-size: 13px; }
+.rpt.pv .pv-l3 td, .rpt.pv .pv-l3 td:first-child { color: var(--muted); }
+.rpt-pc { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.rpt-pc .rpt-bar { min-width: 50px; width: 60px; }

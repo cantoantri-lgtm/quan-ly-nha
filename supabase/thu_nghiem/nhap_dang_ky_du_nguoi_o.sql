@@ -1,3 +1,4 @@
+-- BẢN NHÁP, CHƯA CHẠY trên CSDL (17/11/2026). Giữ lại để tham khảo; muốn dùng thì chép sang file 0NN mới.
 -- Phòng ở bao nhiêu người thì đăng ký đủ bấy nhiêu người, ai cũng có số CCCD + ảnh mặt trước, mặt sau.
 -- 1) Hợp đồng ghi "Số người ở" (khai khi ký). Tiền nước tính theo max(số khai, số đã đăng ký) để không thất thu.
 -- 2) Danh sách hợp đồng còn thiếu người đăng ký (hiện ở trang chủ, trang hợp đồng).

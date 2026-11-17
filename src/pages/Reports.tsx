@@ -4,6 +4,7 @@ import { useSession } from "../lib/session";
 import { todayVN } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
+import Pivot, { withSales, type Dim, type SaleMap, type WithSale } from "../components/Pivot";
 import "../reports.css";
 
 type Tab = "thu_chi" | "lap_day" | "phan_anh" | "loi_nhuan" | "chi_phi";
@@ -13,7 +14,6 @@ type G = { k: Group; t: string };
 const CASH_GROUPS: G[] = [{ k: "toa", t: "Toà nhà" }, { k: "sale", t: "Sale" }, { k: "lead_sale", t: "Leader sale" }, { k: "nhan_vien", t: "Người thu tiền" }];
 const OCC_GROUPS: G[] = [{ k: "toa", t: "Toà nhà" }, { k: "sale", t: "Sale" }, { k: "lead_sale", t: "Leader sale" }];
 const FB_GROUPS: G[] = [{ k: "toa", t: "Toà nhà" }, { k: "nhan_vien", t: "Nhân viên" }, { k: "lead", t: "Lead Sale" }];
-const groupTitle = (list: G[], k: Group) => list.find((g) => g.k === k)?.t ?? "";
 const SALE_NOTE = " Sale = nhân viên phòng Kinh doanh được gán phụ trách toà (Quản trị → Nhân sự); Leader sale = Trưởng nhóm của sale đó trong Sơ đồ công ty. Toà có nhiều sale thì số liệu toà tính cho mỗi người, nên dòng Cộng lấy theo toà.";
 const overlaps = (k: Group) => k === "sale" || k === "lead_sale";   // toà nhiều sale → tính cho mỗi người
 const n0 = (x: number | string | null | undefined) => Number(x ?? 0);
@@ -21,8 +21,6 @@ const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 :
 const dmy = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
 const monthStart = (iso: string) => iso.slice(0, 7) + "-01";
 
-type CF = { grp_key: string; grp_name: string; tien_phong: number; phieu_thu: number; doanh_thu_dem: number; tien_coc: number; chi: number; thu: number; rong: number };
-type Occ = { grp_key: string; grp_name: string; buildings: number; rooms: number; dang_o: number; trong: number; dang_sua: number; giu_cho: number; room_days: number; occupied_days: number };
 type FB = { grp_key: string; grp_name: string; total: number; cho_cong_ty: number; cho_khach: number; da_dong: number; chua_tra_loi: number; avg_reply_hours: number | null };
 type PR = { building_id: string; building_name: string; thu: number; chi: number; thue_nha: number; loi_nhuan: number; tien_coc: number };
 
@@ -97,50 +95,80 @@ function Money({ v, neg }: { v: number; neg?: boolean }) {
   return <span className={neg && v < 0 ? "neg num" : "num"}>{vnd(v)}</span>;
 }
 
+type CFD = { building_id: string | null; building_name: string; user_key: string; user_name: string; tien_phong: number; phieu_thu: number; doanh_thu_dem: number; tien_coc: number; chi: number; thu: number; rong: number };
+type OccR = { building_id: string; building_name: string; room_id: string; room_code: string; floor: number | null; status: string; room_days: number; occupied_days: number };
+const ROOM_ST: Record<string, string> = { dang_o: "Đang ở", trong: "Trống", dang_sua: "Đang sửa", giu_cho: "Giữ chỗ" };
+// Các cấp pivot dùng chung
+const D_TOA: Dim<{ building_id: string | null; building_name: string }> = { id: "toa", title: "Toà", key: (f) => f.building_id ?? "khong_toa", label: (f) => f.building_name };
+// Toà ở cấp con: chỉ mã toà cho gọn trên điện thoại
+const D_TOA_S: Dim<{ building_id: string | null; building_name: string }> = { ...D_TOA, label: (f) => f.building_name.split(" · ")[0] };
+const D_SALE: Dim<{ sale_key: string; sale_name: string }> = { id: "sale", title: "Sale", key: (f) => f.sale_key, label: (f) => f.sale_name };
+const D_LEAD: Dim<{ lead_key: string; lead_name: string }> = { id: "lead", title: "Leader sale", key: (f) => f.lead_key, label: (f) => f.lead_name };
+const D_USER: Dim<CFD> = { id: "nguoi_thu", title: "Người thu", key: (f) => f.user_key, label: (f) => f.user_name };
+const D_ROOM: Dim<OccR> = { id: "phong", title: "Phòng", key: (f) => f.room_id, label: (f) => `P.${f.room_code} ${ROOM_ST[f.status] ?? f.status}` };
+const ABOVE_TOA = new Set(["lead", "sale"]);
+
+function useSaleMap(on: boolean) {
+  const [map, setMap] = useState<SaleMap[] | null>(null);
+  useEffect(() => { if (on && map === null) supabase.rpc("report_building_sales").then(({ data }) => setMap((data as SaleMap[]) ?? [])); }, [on, map]);
+  return map;
+}
+
+type CA = { tp: number; pt: number; dem: number; coc: number; chi: number; thu: number; rong: number };
+const caZero = (): CA => ({ tp: 0, pt: 0, dem: 0, coc: 0, chi: 0, thu: 0, rong: 0 });
+const caAdd = (a: CA, f: CFD) => { a.tp += n0(f.tien_phong); a.pt += n0(f.phieu_thu); a.dem += n0(f.doanh_thu_dem); a.coc += n0(f.tien_coc); a.chi += n0(f.chi); a.thu += n0(f.thu); a.rong += n0(f.rong); };
+const caOrder = (a: CA) => a.thu;
+
 function CashTab({ from, to, group, isManager }: { from: string; to: string; group: Group; isManager: boolean }) {
-  const { rows, err } = useRpc<CF>("report_cashflow", { p_from: from, p_to: to, p_group: group });
-  // Tổng luôn lấy theo toà để không cộng trùng khi một toà có nhiều sale
-  const { rows: byToa } = useRpc<CF>("report_cashflow", { p_from: from, p_to: to, p_group: "toa" });
-  const sum = useMemo(() => {
-    const s = { tp: 0, pt: 0, dem: 0, coc: 0, chi: 0, thu: 0, rong: 0 };
-    (byToa ?? []).forEach((r) => { s.tp += n0(r.tien_phong); s.pt += n0(r.phieu_thu); s.dem += n0(r.doanh_thu_dem); s.coc += n0(r.tien_coc); s.chi += n0(r.chi); s.thu += n0(r.thu); s.rong += n0(r.rong); });
-    return s;
-  }, [byToa]);
+  const { rows, err } = useRpc<CFD>("report_cashflow_detail", { p_from: from, p_to: to });
+  const map = useSaleMap(overlaps(group));
+  const sum = useMemo(() => { const s = caZero(); (rows ?? []).forEach((r) => caAdd(s, r)); return s; }, [rows]);
+  // Cấp mở xuống theo nhóm đang chọn
+  const dims = useMemo(() => (
+    group === "sale" ? [D_SALE, D_TOA_S, D_USER] : group === "lead_sale" ? [D_LEAD, D_SALE, D_TOA_S, D_USER] : group === "nhan_vien" ? [D_USER, D_TOA_S] : [D_TOA, D_USER]
+  ) as unknown as Dim<WithSale<CFD>>[], [group]);
+  const facts = useMemo(() => (overlaps(group) ? (map ? withSales(rows ?? [], map) : []) : (rows ?? []) as WithSale<CFD>[]), [rows, map, group]);
+  const waiting = overlaps(group) && rows !== null && map === null;
   return (
     <>
       <div className="rpt-kpis">
         <div className="rpt-kpi"><b>{vnd(sum.thu)}</b><span>Tổng thu (không gồm cọc)</span></div>
         {isManager ? <div className="rpt-kpi"><b>{vnd(sum.chi)}</b><span>Tổng chi</span></div> : <div className="rpt-kpi"><b>{vnd(sum.coc)}</b><span>Tiền cọc đã thu</span></div>}
       </div>
-      <Status rows={rows} err={err} />
-      {rows && rows.length ? (
-        <div className="rpt-wrap"><table className="rpt">
-          <thead><tr><th>{groupTitle(CASH_GROUPS, group)}</th><th>Tiền phòng</th><th>Phiếu thu</th><th>Thuê đêm</th><th>Thu</th>{isManager ? <><th>Chi</th><th>Thu - chi</th></> : null}<th>Cọc (riêng)</th></tr></thead>
-          <tbody>{rows.map((r) => (
-            <tr key={r.grp_key}><td>{r.grp_name}</td><td><Money v={n0(r.tien_phong)} /></td><td><Money v={n0(r.phieu_thu)} /></td><td><Money v={n0(r.doanh_thu_dem)} /></td>
-              <td><b><Money v={n0(r.thu)} /></b></td>{isManager ? <><td><Money v={n0(r.chi)} /></td><td><Money v={n0(r.rong)} neg /></td></> : null}<td><Money v={n0(r.tien_coc)} /></td></tr>
-          ))}</tbody>
-          <tfoot><tr><td>{overlaps(group) ? "Cộng (theo toà, không trùng)" : "Cộng"}</td><td><Money v={sum.tp} /></td><td><Money v={sum.pt} /></td><td><Money v={sum.dem} /></td><td><Money v={sum.thu} /></td>{isManager ? <><td><Money v={sum.chi} /></td><td><Money v={sum.rong} neg /></td></> : null}<td><Money v={sum.coc} /></td></tr></tfoot>
-        </table></div>
+      <Status rows={waiting ? null : rows} err={err} />
+      {rows && rows.length && !waiting ? (
+        <Pivot facts={facts} dims={dims} zero={caZero} add={caAdd} order={caOrder} total={sum}
+          totalLabel={overlaps(group) ? "Cộng (theo toà, không trùng)" : "Cộng"}
+          head={<><th>Tiền phòng</th><th>Phiếu thu</th><th>Thuê đêm</th><th>Thu</th>{isManager ? <><th>Chi</th><th>Thu - chi</th></> : null}<th>Cọc (riêng)</th></>}
+          cells={(a) => <><td><Money v={a.tp} /></td><td><Money v={a.pt} /></td><td><Money v={a.dem} /></td><td><b><Money v={a.thu} /></b></td>
+            {isManager ? <><td><Money v={a.chi} /></td><td><Money v={a.rong} neg /></td></> : null}<td><Money v={a.coc} /></td></>} />
       ) : null}
       <p className="muted small" style={{ margin: 0 }}>
-        Tính theo ngày thu: hoá đơn tiền phòng (ngày đánh dấu đã thu), phiếu thu khách (ngày xác nhận), doanh thu thuê đêm. Tiền cọc hiện riêng, không cộng vào Thu.
-        {group === "nhan_vien" ? " Người thu là người bấm xác nhận; tiền về tự động qua SePay xếp vào “chưa rõ người”." : ""}
+        Bấm vào dòng có dấu ▸ để mở xuống cấp chi tiết. Tính theo ngày thu: hoá đơn tiền phòng (ngày đánh dấu đã thu), phiếu thu khách (ngày xác nhận), doanh thu thuê đêm. Tiền cọc hiện riêng, không cộng vào Thu.
+        {" "}Người thu là người bấm xác nhận; tiền về tự động qua SePay xếp vào “chưa rõ người”.
         {overlaps(group) ? SALE_NOTE : ""}
-        {isManager && group === "nhan_vien" ? " Chi tính cho người nhập khoản chi." : ""}
+        {isManager ? " Chi tính cho người nhập khoản chi." : ""}
       </p>
     </>
   );
 }
 
+type OA = { b: Set<string>; rooms: number; o: number; tr: number; sua: number; giu: number; rd: number; od: number };
+const oaZero = (): OA => ({ b: new Set(), rooms: 0, o: 0, tr: 0, sua: 0, giu: 0, rd: 0, od: 0 });
+const oaAdd = (a: OA, f: OccR) => {
+  a.b.add(f.building_id); a.rooms += 1; a.rd += f.room_days; a.od += f.occupied_days;
+  if (f.status === "dang_o") a.o += 1; else if (f.status === "trong") a.tr += 1; else if (f.status === "dang_sua") a.sua += 1; else if (f.status === "giu_cho") a.giu += 1;
+};
+
 function OccTab({ from, to, group }: { from: string; to: string; group: Group }) {
-  const { rows, err } = useRpc<Occ>("report_occupancy_group", { p_from: from, p_to: to, p_group: group });
-  const { rows: byToa } = useRpc<Occ>("report_occupancy_group", { p_from: from, p_to: to, p_group: "toa" });
-  const t = useMemo(() => {
-    const s = { rooms: 0, o: 0, rd: 0, od: 0 };
-    (byToa ?? []).forEach((r) => { s.rooms += r.rooms; s.o += r.dang_o; s.rd += r.room_days; s.od += r.occupied_days; });
-    return s;
-  }, [byToa]);
+  const { rows, err } = useRpc<OccR>("report_occupancy_rooms", { p_from: from, p_to: to });
+  const map = useSaleMap(overlaps(group));
+  const t = useMemo(() => { const s = oaZero(); (rows ?? []).forEach((r) => oaAdd(s, r)); return s; }, [rows]);
+  const dims = useMemo(() => (
+    group === "sale" ? [D_SALE, D_TOA_S, D_ROOM] : group === "lead_sale" ? [D_LEAD, D_SALE, D_TOA_S, D_ROOM] : [D_TOA, D_ROOM]
+  ) as unknown as Dim<WithSale<OccR>>[], [group]);
+  const facts = useMemo(() => (overlaps(group) ? (map ? withSales(rows ?? [], map) : []) : (rows ?? []) as WithSale<OccR>[]), [rows, map, group]);
+  const waiting = overlaps(group) && rows !== null && map === null;
   const many = group !== "toa";
   return (
     <>
@@ -148,22 +176,19 @@ function OccTab({ from, to, group }: { from: string; to: string; group: Group })
         <div className="rpt-kpi"><b>{pct(t.o, t.rooms)}%</b><span>Lấp đầy hôm nay ({t.o}/{t.rooms} phòng)</span></div>
         <div className="rpt-kpi"><b>{pct(t.od, t.rd)}%</b><span>Lấp đầy trong kỳ ({dmy(from)} - {dmy(to)})</span></div>
       </div>
-      <Status rows={rows} err={err} />
-      {rows && rows.length ? (
-        <div className="rpt-wrap"><table className="rpt">
-          <thead><tr><th>{groupTitle(OCC_GROUPS, group)}</th>{many ? <th>Số toà</th> : null}<th>Phòng</th><th>Đang ở</th><th>Trống</th><th>Sửa / giữ</th><th>Hôm nay</th><th>Trong kỳ</th></tr></thead>
-          <tbody>{rows.map((r) => {
-            const now = pct(r.dang_o, r.rooms), per = pct(r.occupied_days, r.room_days);
-            return (
-              <tr key={r.grp_key}><td>{r.grp_name}</td>{many ? <td className="num">{r.buildings}</td> : null}<td className="num">{r.rooms}</td><td className="num">{r.dang_o}</td><td className="num">{r.trong}</td><td className="num">{r.dang_sua} / {r.giu_cho}</td>
-                <td><b className="num">{now}%</b></td>
-                <td><div className="rpt-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, per)}%` }} /></div><b className="num">{per}%</b></td></tr>
-            );
-          })}</tbody>
-          <tfoot><tr><td>{many ? "Cộng (theo toà, không trùng)" : "Cộng"}</td>{many ? <td className="num">{byToa?.length ?? 0}</td> : null}<td className="num">{t.rooms}</td><td className="num">{t.o}</td><td /><td /><td className="num">{pct(t.o, t.rooms)}%</td><td className="num">{pct(t.od, t.rd)}%</td></tr></tfoot>
-        </table></div>
+      <Status rows={waiting ? null : rows} err={err} />
+      {rows && rows.length && !waiting ? (
+        <Pivot facts={facts} dims={dims} zero={oaZero} add={oaAdd} total={t}
+          totalLabel={many ? "Cộng (theo toà, không trùng)" : "Cộng"}
+          head={<>{many ? <th>Số toà</th> : null}<th>Phòng</th><th>Đang ở</th><th>Trống</th><th>Sửa / giữ</th><th>Hôm nay</th><th>Trong kỳ</th></>}
+          cells={(a, d) => {
+            const per = pct(a.od, a.rd);
+            return <>{many ? <td className="num">{ABOVE_TOA.has(d.id) ? a.b.size : ""}</td> : null}<td className="num">{a.rooms}</td><td className="num">{a.o}</td><td className="num">{a.tr}</td><td className="num">{a.sua} / {a.giu}</td>
+              <td><b className="num">{pct(a.o, a.rooms)}%</b></td>
+              <td><span className="rpt-pc"><span className="rpt-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, per)}%` }} /></span><b className="num">{per}%</b></span></td></>;
+          }} />
       ) : null}
-      <p className="muted small" style={{ margin: 0 }}>Chỉ tính phòng thuê theo tháng. “Hôm nay” theo trạng thái phòng (Đang ở). “Trong kỳ” = số ngày phòng có hợp đồng chia tổng số ngày phòng, tính theo ngày bắt đầu và kết thúc hợp đồng.{many ? SALE_NOTE : ""}</p>
+      <p className="muted small" style={{ margin: 0 }}>Bấm vào dòng có dấu ▸ để mở xuống toà, rồi từng phòng. Chỉ tính phòng thuê theo tháng. “Hôm nay” theo trạng thái phòng (Đang ở). “Trong kỳ” = số ngày phòng có hợp đồng chia tổng số ngày phòng, tính theo ngày bắt đầu và kết thúc hợp đồng; phòng “Đang ở” mà chưa nhập hợp đồng thì Trong kỳ = 0%.{many ? SALE_NOTE : ""}</p>
     </>
   );
 }
