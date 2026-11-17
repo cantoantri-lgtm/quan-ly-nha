@@ -163,6 +163,7 @@ export default function BuildingDetail() {
           <Link className="btn secondary sm" to={`/toa/${building.id}/khach`}>Khách thuê</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hop-dong`}>Hợp đồng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hoa-don`}>Thu tiền phòng</Link>
+          <Link className="btn secondary sm" to={`/toa/${building.id}/dien-phong`}>Điện nước phòng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/dien-nuoc`}>Điện nước toà</Link>
           <button type="button" className="btn secondary sm" aria-expanded={polOpen} onClick={() => setPolOpen(!polOpen)}>{polOpen ? "Ẩn dịch vụ & chính sách" : "Dịch vụ & chính sách"}</button>
         </div>
@@ -370,16 +371,20 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
         cccd_consent_at: new Date().toISOString(), cccd_consent_note: "Khách đồng ý trực tiếp",
       }).select("id").single();
       if (t.error) { setBusy(false); setErr(`Đã lưu phòng nhưng chưa thêm được khách: ${friendlyError(t.error)}`); return; }
-      const c = await supabase.from("contracts").insert({
-        room_id: room.id!, tenant_id: t.data.id, start_date: cStart, rent_amount: rentN, deposit_amount: depN, billing_day: 5,
-      }).select("id").single();
-      if (c.error) { setBusy(false); }
-      if (c.error) { setErr(`Đã thêm khách nhưng chưa lập được hợp đồng: ${/contracts_one_active/.test(c.error.message) ? "phòng đang có hợp đồng hiệu lực." : friendlyError(c.error)}`); return; }
-      // Tải ảnh CCCD và file hợp đồng (cần mã khách / mã hợp đồng nên làm sau khi đã tạo)
+      // Ảnh CCCD tải trước: hợp đồng chỉ lập được khi khách đứng tên đủ CCCD (CSDL kiểm tra)
       const bid = building.id, failed: string[] = [];
       for (const [f, label] of [[fFront!, "truoc"], [fBack!, "sau"]] as [File, string][]) {
         try { await uploadFile({ kind: "cccd", buildingId: bid, tenantId: t.data.id }, f, { label }); } catch (e) { failed.push(`CCCD: ${friendlyError(e)}`); }
       }
+      if (failed.length) {
+        setBusy(false);
+        setErr(`Đã thêm khách nhưng chưa tải được ảnh CCCD (${failed.join("; ")}). Mở hồ sơ khách tải lại ảnh, rồi lập hợp đồng ở mục Hợp đồng.`);
+        return;
+      }
+      const c = await supabase.from("contracts").insert({
+        room_id: room.id!, tenant_id: t.data.id, start_date: cStart, rent_amount: rentN, deposit_amount: depN, billing_day: 5,
+      }).select("id").single();
+      if (c.error) { setBusy(false); setErr(`Đã thêm khách nhưng chưa lập được hợp đồng: ${/contracts_one_active/.test(c.error.message) ? "phòng đang có hợp đồng hiệu lực." : friendlyError(c.error)}`); return; }
       for (const f of fContract) {
         try { await uploadFile({ kind: "hop_dong", buildingId: bid, contractId: c.data.id }, f); } catch (e) { failed.push(`Hợp đồng: ${friendlyError(e)}`); }
       }

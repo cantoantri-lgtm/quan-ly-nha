@@ -17,6 +17,7 @@ import Buildings from "./pages/Buildings";
 import VoiceTask from "./pages/VoiceTask";
 import BuildingDetail from "./pages/BuildingDetail";
 import BuildingMeters from "./pages/BuildingMeters";
+import RoomUtilities from "./pages/RoomUtilities";
 import Reports from "./pages/Reports";
 import Office from "./pages/Office";
 import RequestForm from "./pages/RequestForm";
@@ -145,6 +146,7 @@ export default function App() {
         <Route path="toa/:id/hop-dong" element={<Contracts />} />
         <Route path="toa/:id/hoa-don" element={<Invoices />} />
         <Route path="toa/:id/dien-nuoc" element={<BuildingMeters />} />
+        <Route path="toa/:id/dien-phong" element={<RoomUtilities />} />
         <Route path="khach/:id" element={<TenantDetail />} />
         <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
         <Route path="van-phong" element={<Office />} />

@@ -8,6 +8,7 @@ import { naturalCompare, parseMoney, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import FileGallery from "../components/FileGallery";
 import ContractQR from "../components/ContractQR";
+import { uploadFile } from "../lib/files";
 import type { Room } from "./BuildingDetail";
 import "../files.css";
 
@@ -171,6 +172,7 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
   const { toast } = useSession();
   const [busy, setBusy] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   async function patch(p: Partial<Contract>, msg: string) {
     setBusy(true);
@@ -191,7 +193,12 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
           <dt>Tiền cọc</dt><dd className="num">{vnd(c.deposit_amount)} · {DEP[c.deposit_status]}</dd>
           <dt>Cách ký</dt><dd>{c.sign_method ? `${SIGN[c.sign_method]}${c.signed_on ? ` ngày ${ddmmyyyy(c.signed_on)}` : ""}` : "Chưa ký"}</dd>
         </dl>
-        <Link className="small" to={`/khach/${c.tenant_id}`}>Xem hồ sơ khách</Link>
+        <div className="row">
+          <Link className="small" to={`/khach/${c.tenant_id}`}>Xem hồ sơ khách</Link>
+          {canEdit ? <button type="button" className="btn ghost sm" onClick={() => setEditing(true)}>Sửa hợp đồng</button> : null}
+        </div>
+
+        <OccupantsPanel c={c} canEdit={canEdit} />
 
         <div className="row">
           {c.deposit_status === "chua_thu" && c.deposit_amount > 0 && c.status === "hieu_luc" ? <button className="btn secondary sm" disabled={busy} onClick={() => patch({ deposit_status: "da_thu" }, "Đã đánh dấu thu cọc.")}>Đánh dấu đã thu cọc</button> : null}
@@ -216,6 +223,196 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
           ) : <button className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setConfirmEnd(true)}>Kết thúc hợp đồng</button>
         ) : null}
       </div>
+      {editing ? <EditContract c={c} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} /> : null}
+    </Sheet>
+  );
+}
+
+/* ---------- Sửa hợp đồng (sale phụ trách toà, Giám sát, Quản lý) ---------- */
+function EditContract({ c, onClose, onSaved }: { c: Contract; onClose: () => void; onSaved: () => void }) {
+  const { toast } = useSession();
+  const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
+  const [code, setCode] = useState(c.code ?? "");
+  const [start, setStart] = useState(c.start_date);
+  const [end, setEnd] = useState(c.end_date ?? "");
+  const [rent, setRent] = useState(fmt(c.rent_amount));
+  const [deposit, setDeposit] = useState(fmt(c.deposit_amount));
+  const [billing, setBilling] = useState(String(c.billing_day));
+  const [note, setNote] = useState(c.note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function submit(e: FormEvent) {
+    e.preventDefault(); setErr(null);
+    const r = parseMoney(rent), d = deposit.trim() ? parseMoney(deposit) : 0, b = Number(billing);
+    if (r == null) { setErr("Giá thuê chưa đúng, VD 4.500.000 hoặc 4,5tr."); return; }
+    if (d == null) { setErr("Tiền cọc chưa đúng."); return; }
+    if (!Number.isInteger(b) || b < 1 || b > 28) { setErr("Hạn đóng tiền là ngày từ 1 đến 28."); return; }
+    if (end && end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
+    setBusy(true);
+    const { error } = await supabase.from("contracts").update({
+      code: code.trim() || null, start_date: start, end_date: end || null, rent_amount: r, deposit_amount: d, billing_day: b, note: note.trim() || null,
+    }).eq("id", c.id);
+    setBusy(false);
+    if (error) { setErr(friendlyError(error)); return; }
+    toast("Đã lưu hợp đồng."); onSaved();
+  }
+  return (
+    <Sheet open onClose={onClose} title={`Sửa hợp đồng phòng ${c.rooms?.code ?? ""}`}>
+      <form className="stack" onSubmit={submit}>
+        <label className="field"><span>Số hợp đồng</span><input className="input" value={code} onChange={(e) => setCode(e.target.value)} /></label>
+        <div className="row" style={{ alignItems: "flex-start" }}>
+          <label className="field" style={{ flex: "1 1 150px" }}><span>Bắt đầu *</span><input className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} required /></label>
+          <label className="field" style={{ flex: "1 1 150px" }}><span>Kết thúc</span><input className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
+        </div>
+        <div className="row" style={{ alignItems: "flex-start" }}>
+          <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input className="input num" inputMode="decimal" value={rent} onChange={(e) => setRent(e.target.value)} /></label>
+          <label className="field" style={{ flex: "1 1 150px" }}><span>Tiền cọc</span><input className="input num" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
+        </div>
+        <label className="field"><span>Hạn đóng tiền hằng tháng (ngày 1–28)</span>
+          <input className="input num" inputMode="numeric" value={billing} onChange={(e) => setBilling(e.target.value.replace(/\D/g, ""))} /></label>
+        <label className="field"><span>Ghi chú</span><textarea className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} /></label>
+        {err ? <div className="error-box" role="alert">{err}</div> : null}
+        <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Lưu hợp đồng"}</button>
+      </form>
+    </Sheet>
+  );
+}
+
+/* ---------- Người ở trong phòng: mỗi người phải đủ CCCD (số, đồng ý lưu, ảnh 2 mặt) ---------- */
+type Occ = { id: string; tenant_id: string; move_in: string; move_out: string | null; tenants: { full_name: string; phone: string | null } | null };
+
+function OccupantsPanel({ c, canEdit }: { c: Contract; canEdit: boolean }) {
+  const { toast } = useSession();
+  const [list, setList] = useState<Occ[]>([]);
+  const [ok, setOk] = useState<Record<string, boolean>>({});
+  const [max, setMax] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    const [o, r] = await Promise.all([
+      supabase.from("contract_occupants").select("id,tenant_id,move_in,move_out,tenants(full_name,phone)").eq("contract_id", c.id).is("move_out", null).order("move_in"),
+      supabase.from("rooms").select("max_occupants").eq("id", c.room_id).maybeSingle(),
+    ]);
+    const rows = (o.data ?? []) as unknown as Occ[];
+    setList(rows); setMax((r.data as { max_occupants: number | null } | null)?.max_occupants ?? null);
+    const checks = await Promise.all(rows.map((x) => supabase.rpc("tenant_has_cccd", { p_tenant: x.tenant_id })));
+    setOk(Object.fromEntries(rows.map((x, i) => [x.tenant_id, !!checks[i].data])));
+  }, [c.id, c.room_id]);
+  useEffect(() => { load(); }, [load]);
+
+  async function moveOut(o: Occ) {
+    setBusy(o.id);
+    const { error } = await supabase.from("contract_occupants").update({ move_out: todayVN() }).eq("id", o.id);
+    setBusy(null);
+    if (error) { toast(friendlyError(error)); return; }
+    toast(`Đã ghi ${o.tenants?.full_name ?? "khách"} chuyển đi.`); load();
+  }
+
+  const full = max != null && list.length >= max;
+  return (
+    <section className="stack" style={{ gap: 6 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <b>Người ở ({list.length}{max ? `/${max}` : ""} người)</b>
+        {canEdit && c.status === "hieu_luc" && !full ? <button type="button" className="btn secondary sm" onClick={() => setAdding(true)}>+ Người ở cùng</button> : null}
+      </div>
+      <p className="muted small" style={{ margin: 0 }}>Mỗi người ở phải đủ CCCD: số CCCD, xác nhận đồng ý lưu, ảnh mặt trước và mặt sau. Tiền nước khoán tính theo số người ở.</p>
+      {list.map((o) => (
+        <div key={o.id} className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap", borderTop: "1px solid var(--line)", paddingTop: 6 }}>
+          <span style={{ minWidth: 0 }}>
+            <Link to={`/khach/${o.tenant_id}`}>{o.tenants?.full_name ?? "—"}</Link>
+            {o.tenant_id === c.tenant_id ? <small className="muted"> · đứng tên</small> : null}
+            <br /><small className={ok[o.tenant_id] ? "muted" : ""} style={ok[o.tenant_id] ? undefined : { color: "var(--danger)" }}>
+              {ok[o.tenant_id] ? "Đủ CCCD" : "Thiếu CCCD: mở hồ sơ để bổ sung"} · vào ở {ddmmyyyy(o.move_in)}</small>
+          </span>
+          {canEdit && o.tenant_id !== c.tenant_id ? <button type="button" className="btn ghost sm" disabled={busy === o.id} onClick={() => moveOut(o)}>Chuyển đi</button> : null}
+        </div>
+      ))}
+      {full && canEdit ? <small className="muted">Phòng đã đủ số người tối đa ({max}). Sửa "Số người tối đa" ở phòng nếu cần.</small> : null}
+      {adding ? <AddOccupant c={c} taken={list.map((x) => x.tenant_id)} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} /> : null}
+    </section>
+  );
+}
+
+function AddOccupant({ c, taken, onClose, onSaved }: { c: Contract; taken: string[]; onClose: () => void; onSaved: () => void }) {
+  const { toast } = useSession();
+  const [mode, setMode] = useState<"moi" | "co_san">("moi");
+  const [existing, setExisting] = useState<{ id: string; full_name: string; phone: string | null }[]>([]);
+  const [pick, setPick] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [idNo, setIdNo] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [front, setFront] = useState<File | null>(null);
+  const [back, setBack] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.from("tenants").select("id,full_name,phone").eq("building_id", c.building_id).order("full_name")
+      .then(({ data }) => setExisting(((data ?? []) as typeof existing).filter((t) => !taken.includes(t.id))));
+  }, [c.building_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function link(tenantId: string) {
+    const { error } = await supabase.from("contract_occupants").insert({ contract_id: c.id, tenant_id: tenantId, move_in: todayVN() });
+    if (error) throw error;
+  }
+  async function submit(e: FormEvent) {
+    e.preventDefault(); setErr(null);
+    if (mode === "co_san") {
+      if (!pick) { setErr("Chọn khách."); return; }
+      setBusy(true);
+      try { await link(pick); toast("Đã thêm người ở cùng."); onSaved(); }
+      catch (ex) { setErr(`${friendlyError(ex)} Mở hồ sơ khách để bổ sung CCCD.`); }
+      finally { setBusy(false); }
+      return;
+    }
+    const digits = idNo.replace(/\s/g, "");
+    if (!name.trim()) { setErr("Nhập họ tên."); return; }
+    if (!/^(\d{9}|\d{12})$/.test(digits)) { setErr("Nhập số CCCD (12 chữ số, CMND cũ 9 số)."); return; }
+    if (!consent) { setErr("Cần tích xác nhận khách đồng ý cho lưu CCCD."); return; }
+    if (!front || !back) { setErr("Cần ảnh CCCD mặt trước và mặt sau."); return; }
+    setBusy(true);
+    const t = await supabase.from("tenants").insert({
+      building_id: c.building_id, full_name: name.trim(), phone: phone.trim() || null, id_number: digits,
+      cccd_consent_at: new Date().toISOString(), cccd_consent_note: "Khách đồng ý trực tiếp",
+    }).select("id").single();
+    if (t.error) { setBusy(false); setErr(friendlyError(t.error)); return; }
+    try {
+      await uploadFile({ kind: "cccd", buildingId: c.building_id, tenantId: t.data.id }, front, { label: "truoc" });
+      await uploadFile({ kind: "cccd", buildingId: c.building_id, tenantId: t.data.id }, back, { label: "sau" });
+    } catch (ex) {
+      setBusy(false); setErr(`Đã lưu khách nhưng chưa tải được ảnh CCCD: ${friendlyError(ex)}. Mở hồ sơ khách tải lại, rồi thêm vào phòng.`); return;
+    }
+    try { await link(t.data.id); } catch (ex) { setBusy(false); setErr(friendlyError(ex)); return; }
+    setBusy(false); toast(`Đã thêm ${name.trim()} vào phòng ${c.rooms?.code ?? ""}.`); onSaved();
+  }
+  return (
+    <Sheet open onClose={onClose} title={`Thêm người ở · phòng ${c.rooms?.code ?? ""}`}>
+      <form className="stack" onSubmit={submit}>
+        <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group">
+          <button type="button" aria-pressed={mode === "moi"} onClick={() => setMode("moi")}>Người mới</button>
+          <button type="button" aria-pressed={mode === "co_san"} onClick={() => setMode("co_san")}>Khách đã có trong toà</button>
+        </div>
+        {mode === "co_san" ? (
+          <label className="field"><span>Khách *</span>
+            <select className="input" value={pick} onChange={(e) => setPick(e.target.value)}>
+              <option value="">— Chọn khách —</option>
+              {existing.map((t) => <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ""}</option>)}
+            </select>
+            <small className="muted">Khách phải đủ CCCD (số, đồng ý lưu, ảnh 2 mặt) mới thêm được.</small></label>
+        ) : (<>
+          <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
+          <label className="field"><span>Số điện thoại</span><input className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
+          <label className="field"><span>Số CCCD *</span><input className="input num" inputMode="numeric" value={idNo} onChange={(e) => setIdNo(e.target.value)} /></label>
+          <label className="field"><span>Ảnh CCCD mặt trước *</span><input className="input" type="file" accept="image/*" onChange={(e) => setFront(e.target.files?.[0] ?? null)} /></label>
+          <label className="field"><span>Ảnh CCCD mặt sau *</span><input className="input" type="file" accept="image/*" onChange={(e) => setBack(e.target.files?.[0] ?? null)} /></label>
+          <label className="row" style={{ flexWrap: "nowrap", alignItems: "flex-start", gap: 8 }}>
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span className="small">Khách đã đồng ý cho công ty lưu số và ảnh CCCD để đăng ký tạm trú, quản lý hợp đồng.</span>
+          </label>
+        </>)}
+        {err ? <div className="error-box" role="alert">{err}</div> : null}
+        <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Thêm người ở"}</button>
+      </form>
     </Sheet>
   );
 }
