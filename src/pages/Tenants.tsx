@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
+import { useCanEditBuilding } from "../lib/useCanEdit";
 import { ddmmyyyy } from "../lib/dates";
 import { vnd } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
@@ -17,10 +18,8 @@ export const TENANT_COLS = "id,building_id,full_name,phone,date_of_birth,hometow
 export const FLAG_LABEL = { luu_y: "Cần lưu ý", quen: "Khách quen" } as const;
 const CONSENT_NOTES = ["Khách đồng ý trực tiếp", "Khách đồng ý qua Zalo / tin nhắn", "Đã ghi trong hợp đồng"];
 
-function useCanManage(buildingId?: string) {
-  const { isManager, isSupervisor, myBuildingIds } = useSession();
-  return isManager || (isSupervisor && !!buildingId && myBuildingIds.includes(buildingId));
-}
+// Sửa khách thuê, CCCD: Quản lý, Giám sát toà, sale phòng Kinh doanh phụ trách toà (khớp can_edit_building)
+const useCanManage = (buildingId?: string) => useCanEditBuilding(buildingId);
 
 /* ---------- Danh sách khách thuê của một toà ---------- */
 export default function Tenants() {

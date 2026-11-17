@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
+import { useCanEditBuilding } from "../lib/useCanEdit";
 import { ddmmyyyy, todayVN } from "../lib/dates";
 import { naturalCompare, parseMoney, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
@@ -26,7 +27,8 @@ export default function Contracts() {
   const [sp, setSp] = useSearchParams();
   const { buildings, isManager, isSupervisor, myBuildingIds } = useSession();
   const building = buildings.find((b) => b.id === id);
-  const canManage = isManager || (isSupervisor && !!id && myBuildingIds.includes(id));
+  const canManage = isManager || (isSupervisor && !!id && myBuildingIds.includes(id));   // hoàn cọc
+  const canEdit = useCanEditBuilding(id);                                                 // lập, sửa hợp đồng, tải file: thêm sale phụ trách toà
   const [list, setList] = useState<Contract[]>([]);
   const [all, setAll] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -47,14 +49,14 @@ export default function Contracts() {
   return (
     <>
       <TopBar title={`Hợp đồng · ${building.code}`} back={`/toa/${building.id}`}
-        action={canManage ? <button className="tb-action" onClick={() => setAdding(true)}>+ Hợp đồng</button> : null} />
+        action={canEdit ? <button className="tb-action" onClick={() => setAdding(true)}>+ Hợp đồng</button> : null} />
       <main className="main stack">
         <div className="chips" role="group" aria-label="Lọc hợp đồng">
           <button className="chip" aria-pressed={!all} onClick={() => setAll(false)}>Đang hiệu lực<span className="n">{list.filter((c) => c.status === "hieu_luc").length}</span></button>
           <button className="chip" aria-pressed={all} onClick={() => setAll(true)}>Tất cả<span className="n">{list.length}</span></button>
         </div>
         {loading ? <div className="loading">Đang tải…</div> : shown.length === 0 ? (
-          <Empty title="Chưa có hợp đồng">{canManage ? "Bấm \"+ Hợp đồng\" để lập hợp đồng cho phòng. Cần có khách thuê trước (mục Khách thuê)." : undefined}</Empty>
+          <Empty title="Chưa có hợp đồng">{canEdit ? "Bấm \"+ Hợp đồng\" để lập hợp đồng cho phòng. Cần có khách thuê trước (mục Khách thuê)." : undefined}</Empty>
         ) : (
           <section className="card">
             {shown.map((c) => (
@@ -70,7 +72,7 @@ export default function Contracts() {
         )}
       </main>
       {adding ? <NewContract buildingId={building.id} onClose={() => setAdding(false)} onSaved={(cid) => { setAdding(false); load(); setSp({ mo: cid }); }} /> : null}
-      {opened ? <ContractView c={opened} canManage={canManage} onClose={() => setSp({})} onChanged={load} /> : null}
+      {opened ? <ContractView c={opened} canManage={canManage} canEdit={canEdit} onClose={() => setSp({})} onChanged={load} /> : null}
     </>
   );
 }
@@ -165,7 +167,7 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
   );
 }
 
-function ContractView({ c, canManage, onClose, onChanged }: { c: Contract; canManage: boolean; onClose: () => void; onChanged: () => void }) {
+function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contract; canManage: boolean; canEdit: boolean; onClose: () => void; onChanged: () => void }) {
   const { toast } = useSession();
   const [busy, setBusy] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -194,17 +196,17 @@ function ContractView({ c, canManage, onClose, onChanged }: { c: Contract; canMa
         <div className="row">
           {c.deposit_status === "chua_thu" && c.deposit_amount > 0 && c.status === "hieu_luc" ? <button className="btn secondary sm" disabled={busy} onClick={() => patch({ deposit_status: "da_thu" }, "Đã đánh dấu thu cọc.")}>Đánh dấu đã thu cọc</button> : null}
           {canManage && c.deposit_status === "da_thu" ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ deposit_status: "da_hoan" }, "Đã đánh dấu hoàn cọc.")}>Đã hoàn cọc</button> : null}
-          {canManage && !c.sign_method ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ sign_method: "giay", signed_on: todayVN() }, "Đã ghi nhận ký giấy.")}>Ghi nhận đã ký giấy</button> : null}
-          {canManage && !c.sign_method ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ sign_method: "dien_tu", signed_on: todayVN() }, "Đã ghi nhận ký điện tử.")}>Ghi nhận đã ký điện tử</button> : null}
+          {canEdit && !c.sign_method ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ sign_method: "giay", signed_on: todayVN() }, "Đã ghi nhận ký giấy.")}>Ghi nhận đã ký giấy</button> : null}
+          {canEdit && !c.sign_method ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ sign_method: "dien_tu", signed_on: todayVN() }, "Đã ghi nhận ký điện tử.")}>Ghi nhận đã ký điện tử</button> : null}
         </div>
 
         {c.status === "hieu_luc" ? <ContractQR buildingId={c.building_id} tenantName={c.tenants?.full_name ?? ""} roomCode={c.rooms?.code ?? ""} rent={c.rent_amount} deposit={c.deposit_amount} /> : null}
 
         <FileGallery owner={{ kind: "hop_dong", buildingId: c.building_id, contractId: c.id }} title="File hợp đồng (ảnh chụp, PDF đã ký)"
-          canUpload={canManage} canDelete={canManage}
+          canUpload={canEdit} canDelete={canEdit}
           hint="Hợp đồng ký điện tử: tải file PDF đã ký (kèm chứng thư số / biên bản xác nhận) lên đây." />
 
-        {canManage && c.status === "hieu_luc" ? (
+        {canEdit && c.status === "hieu_luc" ? (
           confirmEnd ? (
             <div className="row">
               <span className="small" style={{ flex: 1 }}>Kết thúc hợp đồng hôm nay? Phòng sẽ chuyển về Trống.</span>

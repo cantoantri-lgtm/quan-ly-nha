@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
+import { useCanEditBuilding } from "../lib/useCanEdit";
 import { KIND_LABEL, type Building } from "../lib/labels";
 import { naturalCompare, parseMoney, vnd, vndShort } from "../lib/money";
 import { todayVN } from "../lib/dates";
@@ -37,15 +38,8 @@ export default function BuildingDetail() {
   const { buildings, isManager, isSupervisor, myBuildingIds, reloadBase, toast } = useSession();
   const building = buildings.find((b) => b.id === id);
   const canManage = isManager || (isSupervisor && !!id && myBuildingIds.includes(id));      // xoá phòng, khách thuê, hợp đồng
-  // Sale (phòng Kinh doanh) phụ trách toà: sửa toà, phòng, chính sách. Hỏi CSDL (can_edit_building) để khớp quyền thật.
-  const [saleEdit, setSaleEdit] = useState(false);
-  useEffect(() => {
-    if (!id || canManage || !myBuildingIds.includes(id)) { setSaleEdit(false); return; }
-    let live = true;
-    supabase.rpc("can_edit_building", { b: id }).then(({ data }) => { if (live) setSaleEdit(!!data); });
-    return () => { live = false; };
-  }, [id, canManage, myBuildingIds]);
-  const canEdit = canManage || saleEdit;
+  // Sale (phòng Kinh doanh) phụ trách toà: sửa toà, phòng, chính sách, khách thuê, hợp đồng
+  const canEdit = useCanEditBuilding(id);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [types, setTypes] = useState<RoomType[]>([]);
   const [typesOpen, setTypesOpen] = useState(false);
@@ -329,7 +323,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
   // Chọn "Đang cho thuê" cho phòng thuê tháng chưa có hợp đồng → phải nhập khách, CCCD, hợp đồng
   // Phòng công ty cho nhân viên ở: ghi chú bắt đầu bằng HOME thì không cần khách và hợp đồng
   const isHome = /^home\b/i.test(note.trim());
-  const needTenant = status === "dang_o" && mode === "thang" && hasContract === false && canManage && !isNew && !isHome;
+  const needTenant = status === "dang_o" && mode === "thang" && hasContract === false && canEdit && !isNew && !isHome;
   const [tName, setTName] = useState("");
   const [tPhone, setTPhone] = useState("");
   const [tIdNo, setTIdNo] = useState("");
@@ -467,7 +461,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
             ))}
           </div>
           {isNew && status === "dang_o" ? <small className="muted">Lưu phòng trước, rồi mở lại phòng để nhập khách đang ở, CCCD và hợp đồng.</small> : null}
-          {!canManage && status === "dang_o" && room.status !== "dang_o" ? <small style={{ color: "var(--danger)" }}>Chỉ Quản lý hoặc Giám sát toà lập hợp đồng để chuyển phòng sang "Đang cho thuê".</small> : null}
+          {!canEdit && status === "dang_o" && room.status !== "dang_o" ? <small style={{ color: "var(--danger)" }}>Chỉ sale phụ trách toà, Giám sát hoặc Quản lý lập hợp đồng để chuyển phòng sang "Đang cho thuê".</small> : null}
         </div>
         {needTenant ? (
           <section className="fg" aria-label="Khách đang ở">
@@ -502,7 +496,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
         ) : null}
         <label className="field"><span>Ghi chú</span>
           <textarea id="r-note" className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} />
-          {canManage ? <small className="muted">Phòng công ty cho nhân viên ở: ghi HOME ở đầu ghi chú để không phải nhập khách và hợp đồng.</small> : null}</label>
+          {canEdit ? <small className="muted">Phòng công ty cho nhân viên ở: ghi HOME ở đầu ghi chú để không phải nhập khách và hợp đồng.</small> : null}</label>
         {err ? <div className="error-box" role="alert">{err}</div> : null}
         {canEdit ? <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : isNew ? "Thêm phòng" : "Lưu"}</button>
           : <p className="muted small" style={{ margin: 0 }}>Bạn chỉ xem. Sale phòng Kinh doanh phụ trách toà, Giám sát hoặc Quản lý mới cập nhật phòng.</p>}
