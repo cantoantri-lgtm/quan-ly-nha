@@ -70,3 +70,7 @@
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .swatches button { display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--line); background: var(--gc-bg, var(--surface)); color: var(--ink); border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .swatches button[aria-pressed="true"] { border-color: var(--gc, var(--brand)); }
+
+/* Từng người ở khi lập hợp đồng */
+.occ-person { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; margin: 0; min-width: 0; }
+.occ-person legend { padding: 0 4px; }
