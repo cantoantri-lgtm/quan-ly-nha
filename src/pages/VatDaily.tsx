@@ -53,7 +53,7 @@ export default function VatDaily() {
       const pct = rate.endsWith("%") ? Number(rate.replace("%", "")) / 100 : 0;
       ws.columns = [
         { header: "Số thứ tự", width: 10 }, { header: "Ngày hóa đơn", width: 14, style: { numFmt: "dd/mm/yyyy" } },
-        { header: "Họ tên người mua", width: 26 }, { header: "Số CCCD / Mã số thuế người mua", width: 24, style: { numFmt: "@" } },
+        { header: "Họ tên người mua", width: 26 }, { header: "Số CCCD / Hộ chiếu / MST người mua", width: 26, style: { numFmt: "@" } },
         { header: "Địa chỉ người mua", width: 44 }, { header: "Số điện thoại", width: 15, style: { numFmt: "@" } },
         { header: "Hình thức thanh toán", width: 18 }, { header: "Tên hàng hóa, dịch vụ", width: 40 }, { header: "Đơn vị tính", width: 12 },
         { header: "Số lượng", width: 10 }, { header: "Đơn giá", width: 16, style: { numFmt: "#,##0" } },
@@ -93,8 +93,8 @@ export default function VatDaily() {
       const wb = new Workbook();
       const ws = wb.addWorksheet("Hoá đơn GTGT");
       ws.columns = [
-        { header: "STT", width: 6 }, { header: "Họ tên khách", width: 26 }, { header: "Số CCCD", width: 16, style: { numFmt: "@" } },
-        { header: "Địa chỉ trên CCCD", width: 44 }, { header: "Số điện thoại", width: 15, style: { numFmt: "@" } },
+        { header: "STT", width: 6 }, { header: "Họ tên khách", width: 26 }, { header: "Số CCCD / Hộ chiếu", width: 18, style: { numFmt: "@" } },
+        { header: "Địa chỉ trên CCCD / hộ chiếu", width: 44 }, { header: "Số điện thoại", width: 15, style: { numFmt: "@" } },
         { header: "Toà", width: 10 }, { header: "Phòng", width: 9 }, { header: "Nội dung", width: 40 },
         { header: "Số tiền (VNĐ)", width: 16, style: { numFmt: "#,##0" } }, { header: "Hình thức", width: 14 }, { header: "Người ghi nhận", width: 20 },
       ];
@@ -118,7 +118,7 @@ export default function VatDaily() {
           <label className="field"><span>Ngày thu tiền</span>
             <input id="vat-day" className="input" type="date" value={day} max={todayVN()} onChange={(e) => e.target.value && setDay(e.target.value)} /></label>
           {rows ? <div><b className="num" style={{ fontSize: 22 }}>{rows.length}</b> khoản · tổng <b className="num">{vnd(total)}</b></div> : null}
-          {missing ? <p className="small" style={{ margin: 0, color: "var(--today)" }}>{missing} khách thiếu số CCCD hoặc địa chỉ CCCD — bổ sung ở hồ sơ khách trước khi xuất hoá đơn.</p> : null}
+          {missing ? <p className="small" style={{ margin: 0, color: "var(--today)" }}>{missing} khách thiếu số CCCD / hộ chiếu hoặc địa chỉ — bổ sung ở hồ sơ khách trước khi xuất hoá đơn.</p> : null}
           <div className="row" style={{ alignItems: "flex-end" }}>
             <label className="field" style={{ flex: "1 1 120px" }}><span>Thuế suất cho hoá đơn cũ chỉ có tiền phòng</span>
               <select id="vat-rate" className="input" value={rate} onChange={(e) => setRate(e.target.value)}>
@@ -136,7 +136,7 @@ export default function VatDaily() {
         {rows?.length ? (
           <section className="card dt-wrap">
             <table className="dt">
-              <thead><tr><th>Khách</th><th>CCCD</th><th>Địa chỉ CCCD</th><th>SĐT</th><th>Phòng</th><th className="r">Số tiền</th><th>Nội dung</th></tr></thead>
+              <thead><tr><th>Khách</th><th>CCCD / HC</th><th>Địa chỉ</th><th>SĐT</th><th>Phòng</th><th className="r">Số tiền</th><th>Nội dung</th></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.invoice_id}>

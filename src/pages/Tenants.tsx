@@ -7,14 +7,16 @@ import { ddmmyyyy } from "../lib/dates";
 import { vnd } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import FileGallery from "../components/FileGallery";
+import { ID_NAME, ID_PHOTOS, ID_TYPES, idError, normId, type IdType } from "../lib/idDoc";
 import "../files.css";
 
 export type Tenant = {
   id: string; building_id: string; full_name: string; phone: string | null; date_of_birth: string | null; hometown: string | null;
   note: string | null; flag: "luu_y" | "quen" | null; flag_note: string | null;
   cccd_consent_at: string | null; cccd_consent_by: string | null; cccd_consent_note: string | null; created_at: string;
+  id_type: IdType; nationality: string | null;
 };
-export const TENANT_COLS = "id,building_id,full_name,phone,date_of_birth,hometown,note,flag,flag_note,cccd_consent_at,cccd_consent_by,cccd_consent_note,created_at";
+export const TENANT_COLS = "id,building_id,full_name,phone,date_of_birth,hometown,note,flag,flag_note,cccd_consent_at,cccd_consent_by,cccd_consent_note,created_at,id_type,nationality";
 export const FLAG_LABEL = { luu_y: "Cần lưu ý", quen: "Khách quen" } as const;
 const CONSENT_NOTES = ["Khách đồng ý trực tiếp", "Khách đồng ý qua Zalo / tin nhắn", "Đã ghi trong hợp đồng"];
 
@@ -73,7 +75,7 @@ export default function Tenants() {
         </div>
         {loading ? <div className="loading">Đang tải…</div> : shown.length === 0 ? (
           <Empty title={list.length ? "Không có khách phù hợp" : "Toà này chưa có khách thuê"}>
-            {canManage && !list.length ? "Bấm \"+ Thêm\" để nhập khách và đính ảnh CCCD." : undefined}
+            {canManage && !list.length ? "Bấm \"+ Thêm\" để nhập khách và đính ảnh CCCD / hộ chiếu." : undefined}
           </Empty>
         ) : (
           <section className="card">
@@ -85,7 +87,7 @@ export default function Tenants() {
                 </div>
                 <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
                   {t.flag ? <span className={`tag flag-${t.flag}`}>{FLAG_LABEL[t.flag]}</span> : null}
-                  {canManage ? <span className="tag" title={hasId.has(t.id) ? "Đã có ảnh CCCD" : "Chưa có ảnh CCCD"}>{hasId.has(t.id) ? "Có CCCD" : "Thiếu CCCD"}</span> : null}
+                  {canManage ? <span className="tag" title={hasId.has(t.id) ? `Đã có ảnh ${ID_NAME[t.id_type ?? "cccd"]}` : `Chưa có ảnh ${ID_NAME[t.id_type ?? "cccd"]}`}>{hasId.has(t.id) ? `Có ${ID_NAME[t.id_type ?? "cccd"]}` : `Thiếu ${ID_NAME[t.id_type ?? "cccd"]}`}</span> : null}
                 </div>
               </div>
             ))}
@@ -104,6 +106,8 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
   const { toast } = useSession();
   const [name, setName] = useState(tenant?.full_name ?? "");
   const [phone, setPhone] = useState(tenant?.phone ?? "");
+  const [idType, setIdType] = useState<IdType>(tenant?.id_type ?? "cccd");
+  const [nation, setNation] = useState(tenant?.nationality ?? "");
   const [idNo, setIdNo] = useState("");
   const [idDate, setIdDate] = useState("");
   const [idPlace, setIdPlace] = useState("");
@@ -128,11 +132,14 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
 
   async function submit(e: FormEvent) {
     e.preventDefault(); setErr(null);
-    const digits = idNo.replace(/\s/g, "");
-    if (digits && !/^(\d{9}|\d{12})$/.test(digits)) { setErr("Số CCCD gồm 12 chữ số (CMND cũ 9 số). Kiểm tra lại."); return; }
+    const digits = normId(idType, idNo);
+    const bad = digits ? idError(idType, digits) : null;
+    if (bad) { setErr(bad.charAt(0).toUpperCase() + bad.slice(1) + ". Kiểm tra lại."); return; }
+    if (idType === "passport" && !nation.trim()) { setErr("Khách dùng hộ chiếu: nhập quốc tịch."); return; }
     setBusy(true);
     const row = {
       building_id: buildingId, full_name: name.trim(), phone: phone.trim() || null, id_number: digits || null,
+      id_type: idType, nationality: idType === "passport" ? nation.trim() || null : null,
       id_issued_date: idDate || null, id_issued_place: idPlace.trim() || null, id_address: idAddr.trim() || null, date_of_birth: dob || null, hometown: home.trim() || null,
       note: note.trim() || null, flag, flag_note: flag ? flagNote.trim() || null : null,
       cccd_consent_at: consent ? (tenant?.cccd_consent_at ?? new Date().toISOString()) : null,
@@ -155,12 +162,19 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
           <label className="field" style={{ flex: "1 1 150px" }}><span>Số điện thoại</span><input id="t-phone" className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Ngày sinh</span><input id="t-dob" className="input" type="date" value={dob} onChange={(e) => setDob(e.target.value)} /></label>
         </div>
-        <label className="field"><span>Số CCCD</span><input id="t-id" className="input num" inputMode="numeric" value={idNo} onChange={(e) => setIdNo(e.target.value.replace(/[^\d\s]/g, ""))} placeholder="12 chữ số" /></label>
+        <div className="field"><span>Giấy tờ</span>
+          <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label="Loại giấy tờ">
+            {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={idType === k} onClick={() => setIdType(k)}>{l}</button>)}
+          </div>
+          {tenant && tenant.id_type !== idType ? <small style={{ color: "var(--today)" }}>Đổi loại giấy tờ: nhớ tải lại ảnh đúng loại ở hồ sơ khách.</small> : null}</div>
+        {idType === "passport" ? <label className="field"><span>Quốc tịch *</span><input id="t-nation" className="input" value={nation} onChange={(e) => setNation(e.target.value)} placeholder="VD: Hàn Quốc" /></label> : null}
+        <label className="field"><span>Số {ID_NAME[idType]}</span><input id="t-id" className="input num" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" value={idNo}
+          onChange={(e) => setIdNo(idType === "passport" ? e.target.value.toUpperCase() : e.target.value.replace(/[^\d\s]/g, ""))} placeholder={idType === "passport" ? "VD: M12345678" : "12 chữ số"} /></label>
         <div className="row" style={{ alignItems: "flex-start" }}>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Ngày cấp</span><input id="t-iddate" className="input" type="date" value={idDate} onChange={(e) => setIdDate(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Nơi cấp</span><input id="t-idplace" className="input" value={idPlace} onChange={(e) => setIdPlace(e.target.value)} placeholder="VD: Cục CSQLHC về TTXH" /></label>
         </div>
-        <label className="field"><span>Địa chỉ trên CCCD (để xuất hoá đơn)</span><input id="t-idaddr" className="input" value={idAddr} onChange={(e) => setIdAddr(e.target.value)} placeholder="Nơi thường trú ghi trên CCCD" /></label>
+        <label className="field"><span>{idType === "passport" ? "Địa chỉ (nơi ở / địa chỉ nước ngoài, để xuất hoá đơn)" : "Địa chỉ trên CCCD (để xuất hoá đơn)"}</span><input id="t-idaddr" className="input" value={idAddr} onChange={(e) => setIdAddr(e.target.value)} placeholder={idType === "passport" ? "VD: địa chỉ phòng đang thuê" : "Nơi thường trú ghi trên CCCD"} /></label>
         <label className="field"><span>Quê quán / thường trú</span><input id="t-home" className="input" value={home} onChange={(e) => setHome(e.target.value)} /></label>
 
         <div className="field"><span>Đánh dấu khách</span>
@@ -172,16 +186,16 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
           {flag ? <input id="t-flagnote" className="input" value={flagNote} onChange={(e) => setFlagNote(e.target.value)} placeholder={flag === "luu_y" ? "VD: hay trả tiền trễ, ồn ào" : "VD: thuê lại lần 3"} /> : null}
         </div>
 
-        <div className="field"><span>Đồng ý lưu CCCD</span>
+        <div className="field"><span>Đồng ý lưu {ID_NAME[idType]}</span>
           <label className="row" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
             <input id="t-consent" type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 4 }} />
-            <span className="small">Khách đã được thông báo và đồng ý để công ty lưu số CCCD và ảnh CCCD nhằm quản lý lưu trú, lập hợp đồng. Dữ liệu chỉ Quản lý và Giám sát của toà xem được.</span>
+            <span className="small">Khách đã được thông báo và đồng ý để công ty lưu số và ảnh {ID_NAME[idType]} nhằm quản lý lưu trú, khai báo tạm trú, lập hợp đồng. Dữ liệu chỉ Quản lý và Giám sát của toà xem được.</span>
           </label>
           {consent ? (
             <select id="t-consentnote" className="input" value={consentNote} onChange={(e) => setConsentNote(e.target.value)}>
               {CONSENT_NOTES.map((c) => <option key={c}>{c}</option>)}
             </select>
-          ) : <small className="muted">Chưa tích thì chưa tải được ảnh CCCD lên.</small>}
+          ) : <small className="muted">Chưa tích thì chưa tải được ảnh {ID_NAME[idType]} lên.</small>}
         </div>
 
         <label className="field"><span>Ghi chú</span><textarea id="t-note" className="input" style={{ minHeight: 56 }} value={note} onChange={(e) => setNote(e.target.value)} /></label>
@@ -218,7 +232,7 @@ export function TenantDetail() {
   if (missing) return (<><TopBar title="Khách thuê" back /><main className="main"><Empty title="Không tìm thấy khách này">Có thể bạn không có quyền xem toà của khách.</Empty></main></>);
   if (!t) return (<><TopBar title="Khách thuê" back /><div className="loading">Đang tải…</div></>);
   const building = buildings.find((b) => b.id === t.building_id);
-  const maskId = (s: string) => (showId ? s : s.replace(/\d(?=\d{3})/g, "•"));
+  const maskId = (s: string) => (showId ? s : s.replace(/[A-Za-z0-9](?=[A-Za-z0-9]{3})/g, "•"));
 
   return (
     <>
@@ -235,11 +249,12 @@ export function TenantDetail() {
             {t.phone ? <><dt>Điện thoại</dt><dd><a href={`tel:${t.phone}`}>{t.phone}</a></dd></> : null}
             {t.date_of_birth ? <><dt>Ngày sinh</dt><dd>{ddmmyyyy(t.date_of_birth)}</dd></> : null}
             {t.hometown ? <><dt>Quê quán</dt><dd>{t.hometown}</dd></> : null}
+            {t.id_type === "passport" ? <><dt>Quốc tịch</dt><dd>{t.nationality ?? "—"} <span className="tag">Khách nước ngoài</span></dd></> : null}
             {canManage && priv?.id_number ? (
-              <><dt>Số CCCD</dt><dd className="num">{maskId(priv.id_number)} <button className="btn ghost sm" onClick={() => setShowId(!showId)}>{showId ? "Ẩn" : "Hiện"}</button></dd></>
+              <><dt>Số {ID_NAME[t.id_type ?? "cccd"]}</dt><dd className="num">{maskId(priv.id_number)} <button className="btn ghost sm" onClick={() => setShowId(!showId)}>{showId ? "Ẩn" : "Hiện"}</button></dd></>
             ) : null}
             {canManage && priv?.id_issued_date ? <><dt>Ngày cấp</dt><dd>{ddmmyyyy(priv.id_issued_date)}{priv.id_issued_place ? ` · ${priv.id_issued_place}` : ""}</dd></> : null}
-            {canManage && priv?.id_address ? <><dt>Địa chỉ CCCD</dt><dd>{priv.id_address}</dd></> : null}
+            {canManage && priv?.id_address ? <><dt>{t.id_type === "passport" ? "Địa chỉ" : "Địa chỉ CCCD"}</dt><dd>{priv.id_address}</dd></> : null}
             {t.note ? <><dt>Ghi chú</dt><dd>{t.note}</dd></> : null}
           </dl>
         </section>
@@ -247,14 +262,14 @@ export function TenantDetail() {
         {canManage ? (
           t.cccd_consent_at ? (
             <>
-              <FileGallery owner={{ kind: "cccd", buildingId: t.building_id, tenantId: t.id }} title="Ảnh CCCD" canUpload canDelete pdf={false}
-                slots={[{ label: "truoc", text: "Mặt trước" }, { label: "sau", text: "Mặt sau" }]}
+              <FileGallery owner={{ kind: "cccd", buildingId: t.building_id, tenantId: t.id }} title={`Ảnh ${ID_NAME[t.id_type ?? "cccd"]}`} canUpload canDelete pdf={false}
+                slots={ID_PHOTOS[t.id_type ?? "cccd"].map((p) => ({ label: p.label, text: p.required ? p.text : `${p.text} (nếu có)` }))}
                 hint={`Khách đồng ý lưu ngày ${ddmmyyyy(t.cccd_consent_at)}${t.cccd_consent_note ? ` · ${t.cccd_consent_note}` : ""}. Chỉ Quản lý và Giám sát toà này xem được.`} />
             </>
           ) : (
             <section className="card" style={{ padding: "14px 16px" }}>
-              <b>Ảnh CCCD</b>
-              <p className="muted small">Cần ghi nhận khách đồng ý cho lưu CCCD trước khi tải ảnh lên (quy định bảo vệ dữ liệu cá nhân).</p>
+              <b>Ảnh {ID_NAME[t.id_type ?? "cccd"]}</b>
+              <p className="muted small">Cần ghi nhận khách đồng ý cho lưu {ID_NAME[t.id_type ?? "cccd"]} trước khi tải ảnh lên (quy định bảo vệ dữ liệu cá nhân).</p>
               <button className="btn secondary sm" onClick={() => setEditing(true)}>Ghi nhận đồng ý</button>
             </section>
           )

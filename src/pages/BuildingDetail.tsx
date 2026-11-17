@@ -9,6 +9,7 @@ import { naturalCompare, parseMoney, vnd, vndShort } from "../lib/money";
 import { todayVN } from "../lib/dates";
 import { copyText, Empty, Sheet, tempPassword, TopBar } from "../components/ui";
 import { credText } from "./Customers";
+import { accountIdError, ID_NAME, ID_PHOTOS, ID_TYPES, idError, normId, type IdType } from "../lib/idDoc";
 import { googleDirections } from "../lib/geo";
 import { BuildingSheet } from "./Buildings";
 import FileGallery from "../components/FileGallery";
@@ -288,9 +289,9 @@ function MoneyInput({ id, value, onChange, placeholder }: { id: string; value: s
   );
 }
 
-type Person = { key: string; name: string; phone: string; idNo: string; front: File | null; back: File | null };
+type Person = { key: string; name: string; phone: string; idType: IdType; nationality: string; idNo: string; photos: Record<string, File | null> };
 let personSeq = 0;
-const newPerson = (): Person => ({ key: `p${++personSeq}`, name: "", phone: "", idNo: "", front: null, back: null });
+const newPerson = (): Person => ({ key: `p${++personSeq}`, name: "", phone: "", idType: "cccd", nationality: "", idNo: "", photos: {} });
 
 function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved }: {
   room: Partial<Room>; building: Building; canManage: boolean; canEdit: boolean; types: RoomType[]; onClose: () => void; onSaved: (msg: string) => void;
@@ -343,7 +344,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
   const [tConsent, setTConsent] = useState(false);
   const [cred, setCred] = useState<{ text: string; tenantId: string; msg: string } | null>(null);
   // Bước đã xong (bấm Lưu lại sau lỗi thì không tạo trùng khách / hợp đồng)
-  const done = useRef<{ tenants: Record<string, { id: string; truoc?: boolean; sau?: boolean }>; contract?: string; occ: Set<string>; files: Set<File>; acc?: boolean }>({ tenants: {}, occ: new Set(), files: new Set() });
+  const done = useRef<{ tenants: Record<string, { id: string; up: Set<string> }>; contract?: string; occ: Set<string>; files: Set<File>; acc?: boolean }>({ tenants: {}, occ: new Set(), files: new Set() });
   const maxPeople = maxOcc ? Number(maxOcc) : null;
   const setPerson = (key: string, patch: Partial<Person>) => setPeople((ps) => ps.map((x) => (x.key === key ? { ...x, ...patch } : x)));
   function removePerson(key: string) {
@@ -369,19 +370,23 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
       const seen = new Set<string>();
       for (const [i, x] of people.entries()) {
         const who = `Người ở ${i + 1}`;
-        const id = x.idNo.replace(/\s/g, "");
-        if (!x.name.trim()) { setErr(`${who}: nhập họ tên.`); return; }
-        if (!/^(\d{9}|\d{12})$/.test(id)) { setErr(`${who} (${x.name.trim()}): số CCCD phải đủ 12 số (CMND cũ 9 số).`); return; }
-        if (seen.has(id)) { setErr(`${who} (${x.name.trim()}): số CCCD bị trùng với người khác trong phòng.`); return; }
+        const id = normId(x.idType, x.idNo), nm = x.name.trim(), doc = ID_NAME[x.idType];
+        if (!nm) { setErr(`${who}: nhập họ tên.`); return; }
+        const bad = idError(x.idType, id);
+        if (bad) { setErr(`${who} (${nm}): ${bad}.`); return; }
+        if (x.idType === "passport" && !x.nationality.trim()) { setErr(`${who} (${nm}): nhập quốc tịch.`); return; }
+        if (seen.has(id)) { setErr(`${who} (${nm}): số ${doc} bị trùng với người khác trong phòng.`); return; }
         seen.add(id);
-        if (!x.front || !x.back) { setErr(`${who} (${x.name.trim()}): cần ảnh CCCD cả mặt trước và mặt sau.`); return; }
+        const miss = ID_PHOTOS[x.idType].filter((p) => p.required && !x.photos[p.label]);
+        if (miss.length) { setErr(`${who} (${nm}): cần ảnh ${doc} – ${miss.map((p) => p.text.toLowerCase()).join(", ")}.`); return; }
       }
       if (makeAcc) {
         if (!/^0\d{9}$/.test(normPhone(rep.phone))) { setErr(`Khách đại diện ${rep.name.trim()}: cần số điện thoại 10 số để tạo tài khoản app.`); return; }
-        if (rep.idNo.replace(/\s/g, "").length !== 12) { setErr(`Khách đại diện ${rep.name.trim()}: tài khoản app cần CCCD 12 số (CMND 9 số không tạo được).`); return; }
+        const accBad = accountIdError(rep.idType, normId(rep.idType, rep.idNo));
+        if (accBad) { setErr(`Khách đại diện ${rep.name.trim()}: ${accBad}.`); return; }
         if (accPw.length < 6) { setErr("Mật khẩu tạm cần ít nhất 6 ký tự."); return; }
       }
-      if (!tConsent) { setErr("Cần tích xác nhận tất cả khách đồng ý cho lưu CCCD."); return; }
+      if (!tConsent) { setErr("Cần tích xác nhận tất cả khách đồng ý cho lưu CCCD / hộ chiếu."); return; }
       if (r == null) { setErr("Nhập giá thuê tháng của hợp đồng."); return; }
       if (d == null) { setErr("Tiền cọc chưa đúng."); return; }
       if (!fContract.length) { setErr("Cần tải lên ít nhất một ảnh hoặc file PDF hợp đồng."); return; }
@@ -404,17 +409,19 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
       for (const x of people) {
         if (!D.tenants[x.key]) {
           const t = await supabase.from("tenants").insert({
-            building_id: bid, full_name: x.name.trim(), phone: x.phone.trim() || null, id_number: x.idNo.replace(/\s/g, ""),
+            building_id: bid, full_name: x.name.trim(), phone: x.phone.trim() || null, id_number: normId(x.idType, x.idNo),
+            id_type: x.idType, nationality: x.idType === "passport" ? x.nationality.trim() || null : null,
             cccd_consent_at: new Date().toISOString(), cccd_consent_note: "Khách đồng ý trực tiếp",
           }).select("id").single();
           if (t.error) return stop(`Chưa thêm được khách ${x.name.trim()}: ${friendlyError(t.error)}`);
-          D.tenants[x.key] = { id: t.data.id };
+          D.tenants[x.key] = { id: t.data.id, up: new Set() };
         }
         const T = D.tenants[x.key];
-        for (const [f, label] of [[x.front!, "truoc"], [x.back!, "sau"]] as [File, "truoc" | "sau"][]) {
-          if (T[label]) continue;
-          try { await uploadFile({ kind: "cccd", buildingId: bid, tenantId: T.id }, f, { label }); T[label] = true; }
-          catch (e2) { return stop(`Chưa tải được ảnh CCCD ${label === "truoc" ? "mặt trước" : "mặt sau"} của ${x.name.trim()}: ${friendlyError(e2)}. Bấm Lưu để thử lại.`); }
+        for (const ph of ID_PHOTOS[x.idType]) {
+          const f = x.photos[ph.label];
+          if (!f || T.up.has(ph.label)) continue;
+          try { await uploadFile({ kind: "cccd", buildingId: bid, tenantId: T.id }, f, { label: ph.label }); T.up.add(ph.label); }
+          catch (e2) { return stop(`Chưa tải được ảnh ${ID_NAME[x.idType]} (${ph.text.toLowerCase()}) của ${x.name.trim()}: ${friendlyError(e2)}. Bấm Lưu để thử lại.`); }
         }
       }
       const repId = D.tenants[rep.key].id;
@@ -443,7 +450,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
       if (makeAcc && !D.acc) {
         const p = normPhone(rep.phone);
         try {
-          const r = await callAccountFn<{ id: string }>({ action: "create_customer", full_name: rep.name.trim(), phone: p, cccd: rep.idNo.replace(/\s/g, ""), password: accPw });
+          const r = await callAccountFn<{ id: string }>({ action: "create_customer", full_name: rep.name.trim(), phone: p, cccd: normId(rep.idType, rep.idNo), id_type: rep.idType, password: accPw });
           const { error } = await supabase.rpc("customer_assign_room", { p_customer: r.id, p_room: room.id! });
           if (error) failed.push(`Gán phòng cho tài khoản app: ${friendlyError(error)}`);
           text = credText(rep.name.trim(), p, accPw);
@@ -453,7 +460,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
       const n = people.length;
       const msg = failed.length
         ? `Đã lưu ${n} người ở và hợp đồng phòng ${room.code}, nhưng: ${failed.join("; ")}.`
-        : `Đã lưu ${n} người ở (đủ CCCD), hợp đồng phòng ${room.code}${text ? " và tài khoản app cho khách đại diện" : ""}.`;
+        : `Đã lưu ${n} người ở (đủ giấy tờ), hợp đồng phòng ${room.code}${text ? " và tài khoản app cho khách đại diện" : ""}.`;
       setBusy(false);
       if (text || failed.length) { setCred({ text, tenantId: repId, msg }); return; }
       onSaved(msg);
@@ -545,13 +552,13 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
               <button type="button" key={s} className={`st-${s}`} aria-pressed={status === s} onClick={() => setStatus(s)}>{ROOM_STATUS[s]}</button>
             ))}
           </div>
-          {isNew && status === "dang_o" ? <small className="muted">Lưu phòng trước, rồi mở lại phòng để nhập khách đang ở, CCCD và hợp đồng.</small> : null}
+          {isNew && status === "dang_o" ? <small className="muted">Lưu phòng trước, rồi mở lại phòng để nhập khách đang ở, CCCD / hộ chiếu và hợp đồng.</small> : null}
           {!canEdit && status === "dang_o" && room.status !== "dang_o" ? <small style={{ color: "var(--danger)" }}>Chỉ sale phụ trách toà, Giám sát hoặc Quản lý lập hợp đồng để chuyển phòng sang "Đang cho thuê".</small> : null}
         </div>
         {needTenant ? (
           <section className="fg" aria-label="Khách đang ở">
             <b>Người ở và hợp đồng</b>
-            <p className="muted small" style={{ margin: 0 }}>Phòng ở bao nhiêu người thì đăng ký đủ bấy nhiêu người, mỗi người đủ số CCCD và ảnh CCCD 2 mặt. Tiền nước tính theo số người đăng ký.{maxPeople != null ? ` Phòng này tối đa ${maxPeople} người.` : ""}</p>
+            <p className="muted small" style={{ margin: 0 }}>Phòng ở bao nhiêu người thì đăng ký đủ bấy nhiêu người, mỗi người đủ giấy tờ: CCCD (số + ảnh 2 mặt) hoặc hộ chiếu với khách nước ngoài (số, quốc tịch + ảnh trang thông tin). Tiền nước tính theo số người đăng ký.{maxPeople != null ? ` Phòng này tối đa ${maxPeople} người.` : ""}</p>
             {people.map((x, i) => (
               <fieldset key={x.key} className="occ-person stack">
                 <legend className="row" style={{ justifyContent: "space-between", width: "100%", flexWrap: "nowrap" }}>
@@ -563,17 +570,25 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
                   <span className="small">Khách đại diện: đứng tên hợp đồng{makeAcc ? ", được tạo tài khoản app" : ""}</span>
                 </label>
                 <label className="field"><span>Họ tên *</span><input className="input" value={x.name} onChange={(e) => setPerson(x.key, { name: e.target.value })} /></label>
+                <label className="field"><span>Số điện thoại{x.key === repKey && makeAcc ? " * (đăng nhập app)" : ""}</span><input className="input" inputMode="tel" value={x.phone} onChange={(e) => setPerson(x.key, { phone: e.target.value })} /></label>
+                <div className="field"><span>Giấy tờ</span>
+                  <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label={`Giấy tờ người ở ${i + 1}`}>
+                    {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={x.idType === k} disabled={!!done.current.tenants[x.key]}
+                      onClick={() => setPerson(x.key, { idType: k, idNo: "", photos: {} })}>{l}</button>)}
+                  </div></div>
                 <div className="row" style={{ alignItems: "flex-start" }}>
-                  <label className="field" style={{ flex: "1 1 150px" }}><span>Số điện thoại{x.key === repKey && makeAcc ? " * (đăng nhập app)" : ""}</span><input className="input" inputMode="tel" value={x.phone} onChange={(e) => setPerson(x.key, { phone: e.target.value })} /></label>
-                  <label className="field" style={{ flex: "1 1 150px" }}><span>Số CCCD *</span><input className="input num" inputMode="numeric" value={x.idNo} onChange={(e) => setPerson(x.key, { idNo: e.target.value.replace(/[^\d\s]/g, "") })} placeholder="12 chữ số" /></label>
+                  {x.idType === "passport" ? <label className="field" style={{ flex: "1 1 150px" }}><span>Quốc tịch *</span><input className="input" value={x.nationality} onChange={(e) => setPerson(x.key, { nationality: e.target.value })} placeholder="VD: Hàn Quốc" /></label> : null}
+                  <label className="field" style={{ flex: "1 1 150px" }}><span>Số {ID_NAME[x.idType]} *</span>
+                    <input className="input num" inputMode={x.idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" value={x.idNo}
+                      onChange={(e) => setPerson(x.key, { idNo: x.idType === "passport" ? e.target.value.toUpperCase() : e.target.value.replace(/[^\d\s]/g, "") })}
+                      placeholder={x.idType === "passport" ? "VD: M12345678" : "12 chữ số"} /></label>
                 </div>
                 <div className="row" style={{ alignItems: "flex-start" }}>
-                  <label className="field" style={{ flex: "1 1 150px" }}><span>Ảnh CCCD mặt trước *</span>
-                    <input className="input" type="file" accept="image/*" onChange={(e) => setPerson(x.key, { front: e.target.files?.[0] ?? null })} />
-                    {x.front ? <small className="muted">{x.front.name}</small> : null}</label>
-                  <label className="field" style={{ flex: "1 1 150px" }}><span>Ảnh CCCD mặt sau *</span>
-                    <input className="input" type="file" accept="image/*" onChange={(e) => setPerson(x.key, { back: e.target.files?.[0] ?? null })} />
-                    {x.back ? <small className="muted">{x.back.name}</small> : null}</label>
+                  {ID_PHOTOS[x.idType].map((ph) => (
+                    <label key={ph.label} className="field" style={{ flex: "1 1 150px" }}><span>Ảnh {ph.text.toLowerCase()}{ph.required ? " *" : " (nếu có)"}</span>
+                      <input className="input" type="file" accept="image/*" onChange={(e) => setPerson(x.key, { photos: { ...x.photos, [ph.label]: e.target.files?.[0] ?? null } })} />
+                      {x.photos[ph.label] ? <small className="muted">{x.photos[ph.label]!.name}</small> : null}</label>
+                  ))}
                 </div>
               </fieldset>
             ))}
@@ -594,7 +609,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
             ) : null}
             <label className="row" style={{ flexWrap: "nowrap", alignItems: "flex-start" }}>
               <input id="r-tconsent" type="checkbox" checked={tConsent} onChange={(e) => setTConsent(e.target.checked)} style={{ marginTop: 4 }} />
-              <span className="small">Tất cả khách trong phòng đã được thông báo và đồng ý để công ty lưu số CCCD và ảnh CCCD nhằm quản lý lưu trú, lập hợp đồng.</span>
+              <span className="small">Tất cả khách trong phòng đã được thông báo và đồng ý để công ty lưu số và ảnh CCCD / hộ chiếu nhằm quản lý lưu trú, khai báo tạm trú, lập hợp đồng.</span>
             </label>
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: "1 1 150px" }}><span>Hợp đồng bắt đầu *</span><input id="r-cstart" className="input" type="date" value={cStart} onChange={(e) => setCStart(e.target.value)} /></label>

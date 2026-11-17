@@ -200,6 +200,7 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 .detail-head h2 { font-size: 20px; }
 .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .seg button { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 9px 4px; font-size: 13.5px; font-weight: 600; cursor: pointer; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 .seg button[aria-pressed="true"].chua_lam { background: var(--s-todo-bg); color: var(--s-todo); border-color: var(--s-todo); }
 .seg button[aria-pressed="true"].dang_lam { background: var(--s-doing-bg); color: var(--s-doing); border-color: var(--s-doing); }
 .seg button[aria-pressed="true"].vuong { background: var(--s-block-bg); color: var(--s-block); border-color: var(--s-block); }

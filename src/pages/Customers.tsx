@@ -5,6 +5,7 @@ import { useSession } from "../lib/session";
 import { timeAgo } from "../lib/dates";
 import { copyText, Empty, Sheet, tempPassword, TopBar } from "../components/ui";
 import { FB_STATUS, type Thread } from "./Feedback";
+import { accountIdError, ID_NAME, ID_TYPES, normId, type IdType } from "../lib/idDoc";
 import "../feedback.css";
 
 type Cust = { id: string; full_name: string; phone: string | null; cccd: string; is_active: boolean; created_at: string; created_by_name: string | null; open_threads: number; building_code: string | null; room_id: string | null; room_code: string | null };
@@ -93,14 +94,14 @@ export default function Customers() {
           <>
             <input className="input" placeholder="Tìm tên hoặc số điện thoại" value={q} onChange={(e) => setQ(e.target.value)} />
             {custs === null ? <div className="loading">Đang tải…</div> : shown.length === 0 ? (
-              <Empty title="Chưa có tài khoản khách hàng">Bấm "Tạo tài khoản". Mỗi CCCD chỉ đăng ký một tài khoản.</Empty>
+              <Empty title="Chưa có tài khoản khách hàng">Bấm "Tạo tài khoản". Mỗi CCCD / hộ chiếu chỉ đăng ký một tài khoản.</Empty>
             ) : (
               <section className="card">
                 {shown.map((c) => (
                   <div key={c.id} className="list-row" onClick={() => { setRoom(""); setPwFor(c); }}>
                     <div className="grow">
                       <div className="name">{c.full_name}{c.is_active ? "" : " · Đã khoá"}</div>
-                      <div className="sub">{c.phone} · CCCD {c.cccd} · {c.building_code ? `${c.building_code}${c.room_code ? " · P." + c.room_code : ""}` : "Chưa gán phòng"}{c.created_by_name ? ` · Tạo bởi ${c.created_by_name}` : ""}{c.open_threads ? ` · ${c.open_threads} phản ánh đang mở` : ""}</div>
+                      <div className="sub">{c.phone} · {/^\d{12}$/.test(c.cccd) ? "CCCD" : /[A-Z]/.test(c.cccd) ? "HC" : "CCCD/HC"} {c.cccd} · {c.building_code ? `${c.building_code}${c.room_code ? " · P." + c.room_code : ""}` : "Chưa gán phòng"}{c.created_by_name ? ` · Tạo bởi ${c.created_by_name}` : ""}{c.open_threads ? ` · ${c.open_threads} phản ánh đang mở` : ""}</div>
                     </div>›
                   </div>
                 ))}
@@ -127,7 +128,7 @@ export default function Customers() {
       <Sheet open={!!pwFor} onClose={() => setPwFor(null)} title={pwFor?.full_name ?? ""}>
         {pwFor ? (
           <div className="stack">
-            <p className="muted small" style={{ margin: 0 }}>{pwFor.phone} · CCCD {pwFor.cccd}{isManager ? "" : " (chỉ Quản lý xem đủ số)"}</p>
+            <p className="muted small" style={{ margin: 0 }}>{pwFor.phone} · CCCD/HC {pwFor.cccd}{isManager ? "" : " (chỉ Quản lý xem đủ số)"}</p>
             <button className="btn block" onClick={() => nav(`/khach-hang/${pwFor.id}`)}>Xem thông tin, số điện nước, phiếu thu</button>
             <RoomPicker value={room} onChange={setRoom} />
             <button className="btn block" disabled={!room} onClick={() => assign(pwFor)}>Lưu phòng của khách</button>
@@ -152,6 +153,7 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [cccd, setCccd] = useState("");
+  const [idType, setIdType] = useState<IdType>("cccd");
   const [room, setRoom] = useState("");
   const [pw, setPw] = useState(tempPassword());
   const [busy, setBusy] = useState(false);
@@ -162,12 +164,13 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
     e.preventDefault();
     setErr(null);
     const p = normPhone(phone);
-    const c = cccd.replace(/\D/g, "");
+    const c = normId(idType, cccd);
     if (!/^0\d{9}$/.test(p)) { setErr("Số điện thoại phải có 10 số, bắt đầu bằng 0."); return; }
-    if (c.length !== 12) { setErr("CCCD phải đủ 12 số."); return; }
+    const bad = accountIdError(idType, c);
+    if (bad) { setErr(bad.charAt(0).toUpperCase() + bad.slice(1) + "."); return; }
     setBusy(true);
     try {
-      const r = await callAccountFn<{ id: string }>({ action: "create_customer", full_name: name.trim(), phone: p, cccd: c, password: pw });
+      const r = await callAccountFn<{ id: string }>({ action: "create_customer", full_name: name.trim(), phone: p, cccd: c, id_type: idType, password: pw });
       if (room) {
         const { error } = await supabase.rpc("customer_assign_room", { p_customer: r.id, p_room: room });
         if (error) toast("Đã tạo tài khoản nhưng chưa gán được phòng: " + error.message);
@@ -181,7 +184,13 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
       <form className="stack" onSubmit={submit}>
         <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></label>
         <label className="field"><span>Số điện thoại (ID đăng nhập) *</span><input className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required /></label>
-        <label className="field"><span>Số CCCD (12 số, mỗi CCCD chỉ đăng ký một lần) *</span><input className="input" inputMode="numeric" maxLength={14} value={cccd} onChange={(e) => setCccd(e.target.value)} required /></label>
+        <div className="field"><span>Giấy tờ</span>
+          <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label="Loại giấy tờ">
+            {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={idType === k} onClick={() => { setIdType(k); setCccd(""); }}>{l}</button>)}
+          </div></div>
+        <label className="field"><span>Số {ID_NAME[idType]} ({idType === "passport" ? "6–20 chữ và số" : "12 số"}, mỗi giấy tờ chỉ đăng ký một lần) *</span>
+          <input className="input" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" maxLength={idType === "passport" ? 24 : 14} value={cccd}
+            onChange={(e) => setCccd(idType === "passport" ? e.target.value.toUpperCase() : e.target.value)} required /></label>
         <RoomPicker value={room} onChange={setRoom} />
         <label className="field"><span>Mật khẩu tạm</span>
           <div className="row" style={{ flexWrap: "nowrap" }}>

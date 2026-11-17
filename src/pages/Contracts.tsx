@@ -10,6 +10,7 @@ import FileGallery from "../components/FileGallery";
 import ContractQR from "../components/ContractQR";
 import { uploadFile } from "../lib/files";
 import type { Room } from "./BuildingDetail";
+import { ID_NAME, ID_PHOTOS, ID_TYPES, idError, normId, type IdType } from "../lib/idDoc";
 import "../files.css";
 
 type Contract = {
@@ -290,7 +291,7 @@ function EditContract({ c, onClose, onSaved }: { c: Contract; onClose: () => voi
   );
 }
 
-/* ---------- Người ở trong phòng: mỗi người phải đủ CCCD (số, đồng ý lưu, ảnh 2 mặt) ---------- */
+/* ---------- Người ở trong phòng: mỗi người phải đủ giấy tờ (CCCD: số + ảnh 2 mặt; hộ chiếu: số + ảnh trang thông tin) ---------- */
 type Occ = { id: string; tenant_id: string; move_in: string; move_out: string | null; tenants: { full_name: string; phone: string | null } | null };
 
 function OccupantsPanel({ c, canEdit }: { c: Contract; canEdit: boolean }) {
@@ -327,14 +328,14 @@ function OccupantsPanel({ c, canEdit }: { c: Contract; canEdit: boolean }) {
         <b>Người ở ({list.length}{max ? `/${max}` : ""} người)</b>
         {canEdit && c.status === "hieu_luc" && !full ? <button type="button" className="btn secondary sm" onClick={() => setAdding(true)}>+ Người ở cùng</button> : null}
       </div>
-      <p className="muted small" style={{ margin: 0 }}>Mỗi người ở phải đủ CCCD: số CCCD, xác nhận đồng ý lưu, ảnh mặt trước và mặt sau. Tiền nước khoán tính theo số người ở.</p>
+      <p className="muted small" style={{ margin: 0 }}>Mỗi người ở phải đủ giấy tờ: CCCD (số + ảnh 2 mặt) hoặc hộ chiếu với khách nước ngoài (số + ảnh trang thông tin), kèm xác nhận đồng ý lưu. Tiền nước khoán tính theo số người ở.</p>
       {list.map((o) => (
         <div key={o.id} className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap", borderTop: "1px solid var(--line)", paddingTop: 6 }}>
           <span style={{ minWidth: 0 }}>
             <Link to={`/khach/${o.tenant_id}`}>{o.tenants?.full_name ?? "—"}</Link>
             {o.tenant_id === c.tenant_id ? <small className="muted"> · đứng tên</small> : null}
             <br /><small className={ok[o.tenant_id] ? "muted" : ""} style={ok[o.tenant_id] ? undefined : { color: "var(--danger)" }}>
-              {ok[o.tenant_id] ? "Đủ CCCD" : "Thiếu CCCD: mở hồ sơ để bổ sung"} · vào ở {ddmmyyyy(o.move_in)}</small>
+              {ok[o.tenant_id] ? "Đủ giấy tờ" : "Thiếu CCCD / hộ chiếu: mở hồ sơ để bổ sung"} · vào ở {ddmmyyyy(o.move_in)}</small>
           </span>
           {canEdit && o.tenant_id !== c.tenant_id ? <button type="button" className="btn ghost sm" disabled={busy === o.id} onClick={() => moveOut(o)}>Chuyển đi</button> : null}
         </div>
@@ -352,10 +353,11 @@ function AddOccupant({ c, taken, onClose, onSaved }: { c: Contract; taken: strin
   const [pick, setPick] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [idType, setIdType] = useState<IdType>("cccd");
+  const [nation, setNation] = useState("");
   const [idNo, setIdNo] = useState("");
   const [consent, setConsent] = useState(false);
-  const [front, setFront] = useState<File | null>(null);
-  const [back, setBack] = useState<File | null>(null);
+  const [photos, setPhotos] = useState<Record<string, File | null>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
@@ -373,26 +375,32 @@ function AddOccupant({ c, taken, onClose, onSaved }: { c: Contract; taken: strin
       if (!pick) { setErr("Chọn khách."); return; }
       setBusy(true);
       try { await link(pick); toast("Đã thêm người ở cùng."); onSaved(); }
-      catch (ex) { setErr(`${friendlyError(ex)} Mở hồ sơ khách để bổ sung CCCD.`); }
+      catch (ex) { setErr(`${friendlyError(ex)} Mở hồ sơ khách để bổ sung CCCD / hộ chiếu.`); }
       finally { setBusy(false); }
       return;
     }
-    const digits = idNo.replace(/\s/g, "");
+    const digits = normId(idType, idNo);
     if (!name.trim()) { setErr("Nhập họ tên."); return; }
-    if (!/^(\d{9}|\d{12})$/.test(digits)) { setErr("Nhập số CCCD (12 chữ số, CMND cũ 9 số)."); return; }
-    if (!consent) { setErr("Cần tích xác nhận khách đồng ý cho lưu CCCD."); return; }
-    if (!front || !back) { setErr("Cần ảnh CCCD mặt trước và mặt sau."); return; }
+    const bad = idError(idType, digits);
+    if (bad) { setErr(bad.charAt(0).toUpperCase() + bad.slice(1) + "."); return; }
+    if (idType === "passport" && !nation.trim()) { setErr("Nhập quốc tịch."); return; }
+    if (!consent) { setErr(`Cần tích xác nhận khách đồng ý cho lưu ${ID_NAME[idType]}.`); return; }
+    const miss = ID_PHOTOS[idType].filter((p) => p.required && !photos[p.label]);
+    if (miss.length) { setErr(`Cần ảnh ${ID_NAME[idType]}: ${miss.map((p) => p.text.toLowerCase()).join(", ")}.`); return; }
     setBusy(true);
     const t = await supabase.from("tenants").insert({
       building_id: c.building_id, full_name: name.trim(), phone: phone.trim() || null, id_number: digits,
+      id_type: idType, nationality: idType === "passport" ? nation.trim() : null,
       cccd_consent_at: new Date().toISOString(), cccd_consent_note: "Khách đồng ý trực tiếp",
     }).select("id").single();
     if (t.error) { setBusy(false); setErr(friendlyError(t.error)); return; }
     try {
-      await uploadFile({ kind: "cccd", buildingId: c.building_id, tenantId: t.data.id }, front, { label: "truoc" });
-      await uploadFile({ kind: "cccd", buildingId: c.building_id, tenantId: t.data.id }, back, { label: "sau" });
+      for (const ph of ID_PHOTOS[idType]) {
+        const f = photos[ph.label];
+        if (f) await uploadFile({ kind: "cccd", buildingId: c.building_id, tenantId: t.data.id }, f, { label: ph.label });
+      }
     } catch (ex) {
-      setBusy(false); setErr(`Đã lưu khách nhưng chưa tải được ảnh CCCD: ${friendlyError(ex)}. Mở hồ sơ khách tải lại, rồi thêm vào phòng.`); return;
+      setBusy(false); setErr(`Đã lưu khách nhưng chưa tải được ảnh ${ID_NAME[idType]}: ${friendlyError(ex)}. Mở hồ sơ khách tải lại, rồi thêm vào phòng.`); return;
     }
     try { await link(t.data.id); } catch (ex) { setBusy(false); setErr(friendlyError(ex)); return; }
     setBusy(false); toast(`Đã thêm ${name.trim()} vào phòng ${c.rooms?.code ?? ""}.`); onSaved();
@@ -410,16 +418,24 @@ function AddOccupant({ c, taken, onClose, onSaved }: { c: Contract; taken: strin
               <option value="">— Chọn khách —</option>
               {existing.map((t) => <option key={t.id} value={t.id}>{t.full_name}{t.phone ? ` · ${t.phone}` : ""}</option>)}
             </select>
-            <small className="muted">Khách phải đủ CCCD (số, đồng ý lưu, ảnh 2 mặt) mới thêm được.</small></label>
+            <small className="muted">Khách phải đủ giấy tờ (CCCD hoặc hộ chiếu, đồng ý lưu, ảnh) mới thêm được.</small></label>
         ) : (<>
           <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className="field"><span>Số điện thoại</span><input className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
-          <label className="field"><span>Số CCCD *</span><input className="input num" inputMode="numeric" value={idNo} onChange={(e) => setIdNo(e.target.value)} /></label>
-          <label className="field"><span>Ảnh CCCD mặt trước *</span><input className="input" type="file" accept="image/*" onChange={(e) => setFront(e.target.files?.[0] ?? null)} /></label>
-          <label className="field"><span>Ảnh CCCD mặt sau *</span><input className="input" type="file" accept="image/*" onChange={(e) => setBack(e.target.files?.[0] ?? null)} /></label>
+          <div className="field"><span>Giấy tờ</span>
+            <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label="Loại giấy tờ">
+              {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={idType === k} onClick={() => { setIdType(k); setIdNo(""); setPhotos({}); }}>{l}</button>)}
+            </div></div>
+          {idType === "passport" ? <label className="field"><span>Quốc tịch *</span><input className="input" value={nation} onChange={(e) => setNation(e.target.value)} placeholder="VD: Hàn Quốc" /></label> : null}
+          <label className="field"><span>Số {ID_NAME[idType]} *</span><input className="input num" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" value={idNo}
+            onChange={(e) => setIdNo(idType === "passport" ? e.target.value.toUpperCase() : e.target.value)} placeholder={idType === "passport" ? "VD: M12345678" : "12 chữ số"} /></label>
+          {ID_PHOTOS[idType].map((ph) => (
+            <label key={ph.label} className="field"><span>Ảnh {ph.text.toLowerCase()}{ph.required ? " *" : " (nếu có)"}</span>
+              <input className="input" type="file" accept="image/*" onChange={(e) => setPhotos({ ...photos, [ph.label]: e.target.files?.[0] ?? null })} /></label>
+          ))}
           <label className="row" style={{ flexWrap: "nowrap", alignItems: "flex-start", gap: 8 }}>
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span className="small">Khách đã đồng ý cho công ty lưu số và ảnh CCCD để đăng ký tạm trú, quản lý hợp đồng.</span>
+            <span className="small">Khách đã đồng ý cho công ty lưu số và ảnh {ID_NAME[idType]} để đăng ký / khai báo tạm trú, quản lý hợp đồng.</span>
           </label>
         </>)}
         {err ? <div className="error-box" role="alert">{err}</div> : null}

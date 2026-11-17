@@ -1,5 +1,6 @@
-// Edge Function: quản lý tài khoản nhân sự (chỉ Quản lý được gọi)
-// Hành động: create | reset_password | set_active | change_phone
+// Edge Function: quản lý tài khoản (Quản lý: mọi hành động; Quản lý/Giám sát/Sale: tạo tài khoản khách hàng)
+// Hành động: create | reset_password | set_active | change_phone | create_customer | reset_customer_password
+// create_customer: id_type = "cccd" (12 số, mặc định) | "passport" (khách nước ngoài, 6–20 chữ/số)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
@@ -20,6 +21,8 @@ const normPhone = (p: string) => {
 };
 const ROLES = ["quan_ly", "giam_sat", "nhan_vien", "cong_tac_vien"]; // khach_hang chỉ tạo qua create_customer
 const normCccd = (c: string) => String(c ?? "").replace(/\D/g, "");
+// Khách nước ngoài: số hộ chiếu 6–20 chữ/số, viết hoa
+const normPassport = (c: string) => String(c ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -84,15 +87,16 @@ Deno.serve(async (req) => {
       case "create_customer": {
         const phone = normPhone(String(body.phone));
         const full_name = String(body.full_name ?? "").trim();
-        const cccd = normCccd(String(body.cccd));
+        const isPassport = body.id_type === "passport";
+        const cccd = isPassport ? normPassport(String(body.cccd)) : normCccd(String(body.cccd));
         const password = String(body.password ?? "");
         if (!/^0\d{9}$/.test(phone)) return json({ error: "Số điện thoại phải có 10 số, bắt đầu bằng 0" }, 400);
         if (!full_name) return json({ error: "Thiếu họ tên khách" }, 400);
-        if (!/^\d{12}$/.test(cccd)) return json({ error: "CCCD phải đủ 12 số" }, 400);
+        if (isPassport ? !/^[A-Z0-9]{6,20}$/.test(cccd) : !/^\d{12}$/.test(cccd)) return json({ error: isPassport ? "Số hộ chiếu gồm 6–20 chữ và số" : "CCCD phải đủ 12 số" }, 400);
         if (password.length < 6) return json({ error: "Mật khẩu tạm cần ít nhất 6 ký tự" }, 400);
 
         const { data: dupC } = await admin.from("customer_profiles").select("id").eq("cccd", cccd).maybeSingle();
-        if (dupC) return json({ error: "CCCD này đã đăng ký tài khoản khách hàng. Mỗi CCCD chỉ đăng ký một lần" }, 409);
+        if (dupC) return json({ error: "Số CCCD / hộ chiếu này đã đăng ký tài khoản khách hàng. Mỗi giấy tờ chỉ đăng ký một lần" }, 409);
         const { data: dupP } = await admin.from("profiles").select("id").eq("phone", phone).maybeSingle();
         if (dupP) return json({ error: "Số điện thoại này đã có tài khoản" }, 409);
 
@@ -108,7 +112,7 @@ Deno.serve(async (req) => {
           .insert({ id: data.user.id, cccd, created_by: who.user.id });
         if (e2) {
           await admin.auth.admin.deleteUser(data.user.id); // hoàn tác, không để lại tài khoản dở dang
-          if ((e2 as { code?: string }).code === "23505") return json({ error: "CCCD này đã đăng ký tài khoản khách hàng. Mỗi CCCD chỉ đăng ký một lần" }, 409);
+          if ((e2 as { code?: string }).code === "23505") return json({ error: "Số CCCD / hộ chiếu này đã đăng ký tài khoản khách hàng. Mỗi giấy tờ chỉ đăng ký một lần" }, 409);
           throw e2;
         }
         return json({ id: data.user.id });

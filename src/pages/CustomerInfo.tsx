@@ -6,6 +6,7 @@ import { todayVN } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
 import { Sheet, TopBar } from "../components/ui";
 import { meterPhotoUrls, uploadMeterPhoto, type MeterPhoto, type MeterReading } from "../lib/files";
+import { ID_TYPES, type IdType } from "../lib/idDoc";
 import "../feedback.css";
 
 type Lease = {
@@ -119,12 +120,12 @@ export default function CustomerInfo() {
             <h2 className="small muted" style={{ margin: 0 }}>Người ở ({ov.occupant_count}{L?.max_occupants ? `/${L.max_occupants}` : ""})</h2>
             <button className="btn secondary sm" onClick={() => setSheet("occ")}>+ Thêm người ở</button>
           </div>
-          <p className="muted small" style={{ margin: "4px 0 8px" }}>Mọi người ở trong phòng đều phải đăng ký CCCD.</p>
-          <div className="row small" style={{ justifyContent: "space-between" }}><span>{ov.customer.full_name} (chủ tài khoản)</span><span className="muted">Đã đăng ký CCCD</span></div>
+          <p className="muted small" style={{ margin: "4px 0 8px" }}>Mọi người ở trong phòng đều phải đăng ký CCCD (khách nước ngoài: hộ chiếu).</p>
+          <div className="row small" style={{ justifyContent: "space-between" }}><span>{ov.customer.full_name} (chủ tài khoản)</span><span className="muted">Đã đăng ký giấy tờ</span></div>
           {occ.map((o) => (
             <div key={o.id} className="row small" style={{ justifyContent: "space-between", marginTop: 6, flexWrap: "nowrap" }}>
               <span>{o.full_name}{o.relation ? ` · ${o.relation}` : ""}</span>
-              <span className="muted num">CCCD {o.cccd}{staff ? <> <button className="btn ghost sm" onClick={() => delOcc(o)}>Xoá</button></> : null}</span>
+              <span className="muted num">{/^\d{12}$/.test(o.cccd) ? "CCCD" : "HC"} {o.cccd}{staff ? <> <button className="btn ghost sm" onClick={() => delOcc(o)}>Xoá</button></> : null}</span>
             </div>
           ))}
         </section>
@@ -175,10 +176,11 @@ export default function CustomerInfo() {
 function OccSheet({ open, onClose, customerId, onDone }: { open: boolean; onClose: () => void; customerId: string; onDone: () => void }) {
   const { toast } = useSession();
   const [name, setName] = useState(""); const [cccd, setCccd] = useState(""); const [rel, setRel] = useState("");
+  const [idType, setIdType] = useState<IdType>("cccd");
   const [busy, setBusy] = useState(false);
   async function submit(e: FormEvent) {
     e.preventDefault(); setBusy(true);
-    const { error } = await supabase.rpc("occupant_add", { p_customer: customerId, p_name: name, p_cccd: cccd, p_relation: rel });
+    const { error } = await supabase.rpc("occupant_add", { p_customer: customerId, p_name: name, p_cccd: cccd, p_relation: rel, p_type: idType });
     setBusy(false);
     if (error) { toast(error.message); return; }
     toast("Đã đăng ký người ở."); setName(""); setCccd(""); setRel(""); onDone();
@@ -187,7 +189,13 @@ function OccSheet({ open, onClose, customerId, onDone }: { open: boolean; onClos
     <Sheet open={open} onClose={onClose} title="Đăng ký người ở">
       <form className="stack" onSubmit={submit}>
         <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></label>
-        <label className="field"><span>Số CCCD (12 số) *</span><input className="input" inputMode="numeric" maxLength={14} value={cccd} onChange={(e) => setCccd(e.target.value)} required /></label>
+        <div className="field"><span>Giấy tờ / ID document</span>
+          <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label="Loại giấy tờ">
+            {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={idType === k} onClick={() => { setIdType(k); setCccd(""); }}>{k === "passport" ? "Hộ chiếu / Passport" : l}</button>)}
+          </div></div>
+        <label className="field"><span>{idType === "passport" ? "Số hộ chiếu / Passport No. *" : "Số CCCD (12 số) *"}</span>
+          <input className="input" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" maxLength={idType === "passport" ? 24 : 14} value={cccd}
+            onChange={(e) => setCccd(idType === "passport" ? e.target.value.toUpperCase() : e.target.value)} required /></label>
         <label className="field"><span>Quan hệ (vợ, chồng, con, bạn…)</span><input className="input" value={rel} onChange={(e) => setRel(e.target.value)} /></label>
         <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Đăng ký"}</button>
       </form>
