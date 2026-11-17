@@ -47,7 +47,7 @@ export default function Buildings() {
             ))}
           </section>
         )}
-        <p className="muted small">Bấm vào toà để xem, thêm, sửa phòng và giá thuê.{isManager ? "" : " Bạn sửa được toà và phòng mình phụ trách; xoá phòng, khách thuê, hợp đồng và hoa hồng do Quản lý / Giám sát toà làm."}</p>
+        <p className="muted small">Bấm vào toà để xem, thêm, sửa phòng và giá thuê.{isManager ? "" : " Sale phòng Kinh doanh sửa được toà và phòng mình phụ trách; phòng ban khác chỉ xem. Xoá phòng, khách thuê, hợp đồng và hoa hồng do Quản lý / Giám sát toà làm."}</p>
       </main>
       {editing ? (
         <BuildingSheet value={editing} onClose={() => setEditing(null)}

@@ -37,7 +37,15 @@ export default function BuildingDetail() {
   const { buildings, isManager, isSupervisor, myBuildingIds, reloadBase, toast } = useSession();
   const building = buildings.find((b) => b.id === id);
   const canManage = isManager || (isSupervisor && !!id && myBuildingIds.includes(id));      // xoá phòng, khách thuê, hợp đồng
-  const canEdit = canManage || (!!id && myBuildingIds.includes(id));                          // người phụ trách toà: sửa toà, phòng, chính sách (khớp can_edit_building)
+  // Sale (phòng Kinh doanh) phụ trách toà: sửa toà, phòng, chính sách. Hỏi CSDL (can_edit_building) để khớp quyền thật.
+  const [saleEdit, setSaleEdit] = useState(false);
+  useEffect(() => {
+    if (!id || canManage || !myBuildingIds.includes(id)) { setSaleEdit(false); return; }
+    let live = true;
+    supabase.rpc("can_edit_building", { b: id }).then(({ data }) => { if (live) setSaleEdit(!!data); });
+    return () => { live = false; };
+  }, [id, canManage, myBuildingIds]);
+  const canEdit = canManage || saleEdit;
   const [rooms, setRooms] = useState<Room[]>([]);
   const [types, setTypes] = useState<RoomType[]>([]);
   const [typesOpen, setTypesOpen] = useState(false);
@@ -187,7 +195,7 @@ export default function BuildingDetail() {
         ) : null}
 
         {loading ? <div className="loading">Đang tải…</div> : rooms.length === 0 ? (
-          <Empty title="Toà này chưa có phòng">{canEdit ? "Bấm \"Tạo nhanh nhiều phòng\" để tạo cả toà trong một lần, hoặc \"+ Phòng\" để thêm từng phòng." : "Giám sát hoặc quản lý sẽ thêm phòng cho toà."}</Empty>
+          <Empty title="Toà này chưa có phòng">{canEdit ? "Bấm \"Tạo nhanh nhiều phòng\" để tạo cả toà trong một lần, hoặc \"+ Phòng\" để thêm từng phòng." : "Sale phụ trách toà, Giám sát hoặc Quản lý sẽ thêm phòng cho toà."}</Empty>
         ) : floors.map(([label, list]) => (
           <section key={label} className="floor">
             <div className="floor-label"><span>{label}</span>
@@ -450,7 +458,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
         )}
         {!isNew ? (
           <FileGallery owner={{ kind: "anh_phong", buildingId: building.id, roomId: room.id! }} title="Ảnh phòng" pdf={false} cover
-            hint={'Ảnh có nhãn "Đại diện" dùng làm ảnh chính của phòng.'} canUpload canDelete={canEdit} />
+            hint={'Ảnh có nhãn "Đại diện" dùng làm ảnh chính của phòng.'} canUpload={canEdit} canDelete={canEdit} />
         ) : null}
         <div className="field"><span>Trạng thái</span>
           <div className="seg seg-room" role="group">
@@ -496,7 +504,8 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
           <textarea id="r-note" className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} />
           {canManage ? <small className="muted">Phòng công ty cho nhân viên ở: ghi HOME ở đầu ghi chú để không phải nhập khách và hợp đồng.</small> : null}</label>
         {err ? <div className="error-box" role="alert">{err}</div> : null}
-        <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : isNew ? "Thêm phòng" : "Lưu"}</button>
+        {canEdit ? <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : isNew ? "Thêm phòng" : "Lưu"}</button>
+          : <p className="muted small" style={{ margin: 0 }}>Bạn chỉ xem. Sale phòng Kinh doanh phụ trách toà, Giám sát hoặc Quản lý mới cập nhật phòng.</p>}
         {!isNew && canManage ? (
           confirmDel ? (
             <div className="row">
