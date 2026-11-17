@@ -9,7 +9,7 @@ type FeeRow = { label: string; amount: string; unit: string };
 type TermRow = { months: string; pct: string };
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
-export default function PolicyEditSheet({ p, onClose, onSaved }: { p: Policy; onClose: () => void; onSaved: () => void }) {
+export default function PolicyEditSheet({ p, onClose, onSaved, canCommission = true }: { p: Policy; onClose: () => void; onSaved: () => void; canCommission?: boolean }) {
   const [fees, setFees] = useState<FeeRow[]>(p.fees.map((f) => ({ label: f.label, amount: new Intl.NumberFormat("vi-VN").format(f.amount), unit: f.unit })));
   const [amenities, setAmenities] = useState(p.amenities.join("\n"));
   const [furn, setFurn] = useState(p.furniture.join("\n"));
@@ -76,7 +76,8 @@ export default function PolicyEditSheet({ p, onClose, onSaved }: { p: Policy; on
         <label className="field"><span>Ký hợp đồng: đặt cọc, kỳ hợp đồng (mỗi dòng một ý)</span>
           <textarea className="input" style={{ minHeight: 110 }} value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
 
-        <section className="stack">
+        {canCommission ? null : <p className="muted small" style={{ margin: 0 }}>Hoa hồng Cộng tác viên và hoa hồng bỏ cọc do Quản lý cập nhật.</p>}
+        {canCommission ? <section className="stack">
           <b>Hoa hồng Cộng tác viên</b>
           <small className="muted">Hợp đồng thành công: tỷ lệ % tiền thuê tháng đầu theo kỳ hợp đồng.</small>
           {terms.map((t, i) => (
@@ -95,7 +96,7 @@ export default function PolicyEditSheet({ p, onClose, onSaved }: { p: Policy; on
             <label className="field" style={{ flex: "1 1 110px" }}><span>Hoa hồng bỏ cọc (%)</span>
               <input className="input num" inputMode="decimal" placeholder="30" value={fPct} onChange={(e) => setFPct(e.target.value)} /></label>
           </div>
-        </section>
+        </section> : null}
 
         <label className="field"><span>Ghi chú</span>
           <textarea className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} /></label>

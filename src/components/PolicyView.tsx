@@ -102,7 +102,7 @@ export function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManag
 /** Chính sách một toà, tự tải; dùng trong trang toà và cửa sổ nhỏ ở Phòng trống. Có công tắc Khách xem. canEdit (Quản lý): nút Sửa ngay tại đây. */
 export function PolicyPanel({ buildingId, canEdit = false }: { buildingId: string; canEdit?: boolean }) {
   const [p, setP] = useState<Policy | null | undefined>(undefined);
-  const { isCustomer } = useSession();
+  const { isCustomer, isManager } = useSession();
   const [guestToggle, setGuest] = useState(false);
   const guest = isCustomer || guestToggle; // khách hàng luôn ở chế độ khách (máy chủ cũng đã bỏ hoa hồng)
   const [editing, setEditing] = useState(false);
@@ -129,7 +129,7 @@ export function PolicyPanel({ buildingId, canEdit = false }: { buildingId: strin
         </div>
       ) : null}
       <PolicyView p={p} isManager={canEdit} guest={guest} onEdit={() => setEditing(true)} />
-      {editing ? <PolicyEditSheet p={p} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setTick((n) => n + 1); }} /> : null}
+      {editing ? <PolicyEditSheet p={p} canCommission={isManager} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setTick((n) => n + 1); }} /> : null}
     </div>
   );
 }

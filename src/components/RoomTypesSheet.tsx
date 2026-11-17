@@ -18,8 +18,10 @@ const toDraft = (t: RoomType | null, building: Building): Draft => t
   : { id: null, name: "", area: "", mode: building.kind === "khach_san" ? "dem" : "thang", price: "", max: "", furniture: "", description: "", color: "", apply: true };
 
 /** Danh sách và biểu mẫu loại phòng của một toà (dành cho Quản lý / Giám sát toà) */
-export default function RoomTypesSheet({ open, building, types, roomCounts, onClose, onChanged }: {
+export default function RoomTypesSheet({ open, building, types, roomCounts, onClose, onChanged, canDelete = true }: {
   open: boolean; building: Building; types: RoomType[]; roomCounts: Record<string, number>; onClose: () => void; onChanged: (msg?: string) => void;
+  /** Xoá loại phòng: Quản lý / Giám sát toà */
+  canDelete?: boolean;
 }) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
@@ -134,7 +136,7 @@ export default function RoomTypesSheet({ open, building, types, roomCounts, onCl
                 <button type="button" className="btn secondary sm" onClick={() => setConfirmDel(false)}>Giữ lại</button>
                 <button type="button" className="btn danger sm" disabled={busy} onClick={remove}>Xoá</button>
               </div>
-            ) : <button type="button" className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setConfirmDel(true)}>Xoá loại phòng</button>
+            ) : canDelete ? <button type="button" className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setConfirmDel(true)}>Xoá loại phòng</button> : null
           ) : null}
         </form>
       ) : (

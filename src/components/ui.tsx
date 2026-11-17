@@ -186,7 +186,7 @@ export function AppHeader() {
     ] },
     { title: "Quản lý toà nhà", items: [
       { to: "/ban-do", label: "Bản đồ", icon: Icon.map },
-      ...(isManager ? [{ to: "/quan-tri/toa-nha", label: "Toà nhà & phòng", icon: Icon.building }] : []),
+      { to: "/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
       { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
       { to: "/thu-tien-khach", label: "Thu tiền", icon: Icon.money },
       ...(isManager ? [{ to: "/quan-tri/thu-tien", label: "Tài khoản nhận tiền", icon: Icon.money }] : []),

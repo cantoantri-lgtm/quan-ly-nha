@@ -8,7 +8,7 @@ import BuildingBank from "../components/BuildingBank";
 import { currentPosition, googlePlace, parseLatLng, round6 } from "../lib/geo";
 
 export default function Buildings() {
-  const { buildings, reloadBase, toast } = useSession();
+  const { buildings, reloadBase, toast, isManager } = useSession();
   const [editing, setEditing] = useState<Partial<Building> | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [roomCounts, setRoomCounts] = useState<Record<string, number>>({});
@@ -29,10 +29,10 @@ export default function Buildings() {
 
   return (
     <>
-      <TopBar title="Toà nhà" back="/quan-tri" action={<button className="tb-action" onClick={() => setEditing({ kind: "hon_hop" })}>+ Thêm</button>} />
+      <TopBar title="Toà nhà & phòng" action={isManager ? <button className="tb-action" onClick={() => setEditing({ kind: "hon_hop" })}>+ Thêm</button> : undefined} />
       <main className="main stack">
         {buildings.length === 0 ? (
-          <Empty title="Chưa có toà nhà nào">Thêm toà để gán nhân sự và gắn công việc theo toà.</Empty>
+          <Empty title={isManager ? "Chưa có toà nhà nào" : "Bạn chưa được gán phụ trách toà nào"}>{isManager ? "Thêm toà để gán nhân sự và gắn công việc theo toà." : "Nhờ Quản lý gán toà cho bạn ở Quản trị → Nhân sự."}</Empty>
         ) : (
           <section className="card">
             {buildings.map((b) => (
@@ -47,7 +47,7 @@ export default function Buildings() {
             ))}
           </section>
         )}
-        <p className="muted small">Bấm vào toà để xem và thêm phòng, giá thuê. Khách thuê và hợp đồng sẽ có ở module Cho thuê.</p>
+        <p className="muted small">Bấm vào toà để xem, thêm, sửa phòng và giá thuê.{isManager ? "" : " Bạn sửa được toà và phòng mình phụ trách; xoá phòng, khách thuê, hợp đồng và hoa hồng do Quản lý / Giám sát toà làm."}</p>
       </main>
       {editing ? (
         <BuildingSheet value={editing} onClose={() => setEditing(null)}
@@ -57,8 +57,10 @@ export default function Buildings() {
   );
 }
 
-export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }: {
+export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount, limited = false }: {
   value: Partial<Building>; onClose: () => void; onSaved: (msg: string) => void; onDeleted?: (msg: string) => void; roomCount?: number;
+  /** Nhân viên phụ trách toà: không đổi mã toà, loại hình (khớp tg_buildings_guard) */
+  limited?: boolean;
 }) {
   const [code, setCode] = useState(value.code ?? "");
   const [name, setName] = useState(value.name ?? "");
@@ -130,7 +132,7 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
       <form className="stack" onSubmit={submit}>
         <div className="row" style={{ alignItems: "flex-start" }}>
           <label className="field" style={{ flex: "1 1 120px" }}><span>Mã toà *</span>
-            <input id="b-code" className="input" value={code} onChange={(e) => setCode(e.target.value)} placeholder="89CMT8" required /></label>
+            <input id="b-code" className="input" value={code} onChange={(e) => setCode(e.target.value)} placeholder="89CMT8" required disabled={limited} title={limited ? "Chỉ Quản lý đổi mã toà" : undefined} /></label>
           <label className="field" style={{ flex: "1 1 120px" }}><span>Số tầng</span>
             <input id="b-floors" className="input" inputMode="numeric" value={floors} onChange={(e) => setFloors(e.target.value.replace(/\D/g, ""))} /></label>
         </div>
@@ -159,7 +161,7 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount }:
           </div>
         </div>
         <label className="field"><span>Loại hình</span>
-          <select id="b-kind" className="input" value={kind} onChange={(e) => setKind(e.target.value)}>
+          <select id="b-kind" className="input" value={kind} onChange={(e) => setKind(e.target.value)} disabled={limited}>
             {Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select></label>
         {err ? <div className="error-box" role="alert">{err}</div> : null}

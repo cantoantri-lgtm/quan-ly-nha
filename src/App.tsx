@@ -162,6 +162,7 @@ export default function App() {
         <Route element={<MoneyOnly />}>
           <Route path="hoa-don-gtgt" element={<VatDaily />} />
         </Route>
+        <Route path="toa-nha" element={<Buildings />} />
         <Route path="khach-hang" element={<Customers />} />
         <Route path="khach-hang/:id" element={<CustomerInfo />} />
         <Route path="thu-tien-khach" element={<StaffPayments />} />

@@ -36,7 +36,8 @@ export default function BuildingDetail() {
   const { id } = useParams();
   const { buildings, isManager, isSupervisor, myBuildingIds, reloadBase, toast } = useSession();
   const building = buildings.find((b) => b.id === id);
-  const canManage = isManager || (isSupervisor && !!id && myBuildingIds.includes(id));
+  const canManage = isManager || (isSupervisor && !!id && myBuildingIds.includes(id));      // xoá phòng, khách thuê, hợp đồng
+  const canEdit = canManage || (!!id && myBuildingIds.includes(id));                          // người phụ trách toà: sửa toà, phòng, chính sách (khớp can_edit_building)
   const [rooms, setRooms] = useState<Room[]>([]);
   const [types, setTypes] = useState<RoomType[]>([]);
   const [typesOpen, setTypesOpen] = useState(false);
@@ -120,7 +121,7 @@ export default function BuildingDetail() {
   return (
     <>
       <TopBar title={building.code} back
-        action={canManage ? <button className="tb-action" onClick={() => setEditing({ rent_mode: "thang", status: "trong" })}>+ Phòng</button> : null} />
+        action={canEdit ? <button className="tb-action" onClick={() => setEditing({ rent_mode: "thang", status: "trong" })}>+ Phòng</button> : null} />
       <main className="main stack">
         <section className="card building-head">
           <div>
@@ -133,13 +134,15 @@ export default function BuildingDetail() {
               </p>
             ) : isManager ? (
               <p className="small" style={{ marginTop: 6 }}><Link to={`/ban-do?toa=${building.id}`}>Đặt vị trí trên bản đồ</Link></p>
+            ) : canEdit ? (
+              <p className="small" style={{ marginTop: 6 }}><button type="button" className="btn ghost sm" onClick={() => setEditBuilding(true)}>Nhập vị trí toà</button></p>
             ) : null}
           </div>
-          {isManager ? <button className="btn ghost sm" onClick={() => setEditBuilding(true)}>Sửa toà</button> : null}
+          {canEdit ? <button className="btn ghost sm" onClick={() => setEditBuilding(true)}>Sửa toà</button> : null}
         </section>
 
         <FileGallery owner={{ kind: "anh_toa", buildingId: building.id }} title="Ảnh toà nhà" pdf={false} cover
-          hint={'Ảnh có nhãn "Đại diện" hiện trên bản đồ cho cả nhân viên và cộng tác viên.'} canUpload={canManage} canDelete={canManage} />
+          hint={'Ảnh có nhãn "Đại diện" hiện trên bản đồ cho cả nhân viên và cộng tác viên.'} canUpload={canEdit} canDelete={canEdit} />
 
         <section className="room-stats">
           <div className="stat"><b className="num">{rooms.length}</b><span>phòng</span></div>
@@ -163,16 +166,16 @@ export default function BuildingDetail() {
         </div>
         {polOpen ? (
           <section className="card stack">
-            <PolicyPanel buildingId={building.id} canEdit={isManager} />
+            <PolicyPanel buildingId={building.id} canEdit={canEdit} />
           </section>
         ) : null}
 
-        {canManage ? (
+        {canEdit ? (
           <div className="row">
             <button className="btn secondary sm" onClick={() => setTypesOpen(true)}>Loại phòng{types.length ? ` (${types.length})` : ""}</button>
             <button className="btn secondary sm" onClick={() => setBulk(true)}>Tạo nhanh nhiều phòng</button>
             <button className="btn secondary sm" onClick={() => setPaste(true)}>Dán danh sách từ Excel</button>
-            {rooms.length && !selecting ? <button className="btn ghost sm" style={{ color: "var(--danger)" }} onClick={() => setSelecting(true)}>Chọn phòng để xoá</button> : null}
+            {canManage && rooms.length && !selecting ? <button className="btn ghost sm" style={{ color: "var(--danger)" }} onClick={() => setSelecting(true)}>Chọn phòng để xoá</button> : null}
           </div>
         ) : null}
 
@@ -184,7 +187,7 @@ export default function BuildingDetail() {
         ) : null}
 
         {loading ? <div className="loading">Đang tải…</div> : rooms.length === 0 ? (
-          <Empty title="Toà này chưa có phòng">{canManage ? "Bấm \"Tạo nhanh nhiều phòng\" để tạo cả toà trong một lần, hoặc \"+ Phòng\" để thêm từng phòng." : "Giám sát hoặc quản lý sẽ thêm phòng cho toà."}</Empty>
+          <Empty title="Toà này chưa có phòng">{canEdit ? "Bấm \"Tạo nhanh nhiều phòng\" để tạo cả toà trong một lần, hoặc \"+ Phòng\" để thêm từng phòng." : "Giám sát hoặc quản lý sẽ thêm phòng cho toà."}</Empty>
         ) : floors.map(([label, list]) => (
           <section key={label} className="floor">
             <div className="floor-label"><span>{label}</span>
@@ -250,19 +253,19 @@ export default function BuildingDetail() {
       ) : null}
 
       {editing ? (
-        <RoomSheet room={editing} building={building} canManage={canManage} types={types}
+        <RoomSheet room={editing} building={building} canManage={canManage} canEdit={canEdit} types={types}
           onClose={() => setEditing(null)} onSaved={(msg) => { setEditing(null); load(); toast(msg); }} />
       ) : null}
-      <RoomTypesSheet open={typesOpen} building={building} types={types} roomCounts={roomCounts}
+      <RoomTypesSheet open={typesOpen} building={building} types={types} roomCounts={roomCounts} canDelete={canManage}
         onClose={() => setTypesOpen(false)} onChanged={(msg) => { load(); if (msg) toast(msg); }} />
       <BulkSheet open={bulk} building={building} existing={rooms} types={types} onClose={() => setBulk(false)}
         onSaved={(msg) => { setBulk(false); load(); toast(msg); }} />
       <PasteSheet open={paste} building={building} types={types} onClose={() => setPaste(false)}
         onSaved={(msg) => { setPaste(false); load(); toast(msg); }} />
       {editBuilding ? (
-        <BuildingSheet value={building} roomCount={rooms.length} onClose={() => setEditBuilding(false)}
+        <BuildingSheet value={building} roomCount={rooms.length} onClose={() => setEditBuilding(false)} limited={!isManager}
           onSaved={async (msg) => { setEditBuilding(false); await reloadBase(); toast(msg); }}
-          onDeleted={async (msg) => { setEditBuilding(false); await reloadBase(); toast(msg); nav("/quan-tri/toa-nha", { replace: true }); }} />
+          onDeleted={!isManager ? undefined : async (msg) => { setEditBuilding(false); await reloadBase(); toast(msg); nav("/toa-nha", { replace: true }); }} />
       ) : null}
     </>
   );
@@ -278,8 +281,8 @@ function MoneyInput({ id, value, onChange, placeholder }: { id: string; value: s
   );
 }
 
-function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
-  room: Partial<Room>; building: Building; canManage: boolean; types: RoomType[]; onClose: () => void; onSaved: (msg: string) => void;
+function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved }: {
+  room: Partial<Room>; building: Building; canManage: boolean; canEdit: boolean; types: RoomType[]; onClose: () => void; onSaved: (msg: string) => void;
 }) {
   const isNew = !room.id;
   const [code, setCode] = useState(room.code ?? "");
@@ -351,7 +354,7 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
     setBusy(true);
     // Khi cần lập hợp đồng: lưu phòng trước với trạng thái cũ, hợp đồng sẽ tự chuyển phòng sang "Đang cho thuê"
     const saveStatus = needTenant ? (room.status === "dang_o" ? "dang_o" : (room.status ?? "trong")) : status;
-    const row = canManage
+    const row = canEdit
       ? { building_id: building.id, code: code.trim().toUpperCase(), floor: floor ? Number(floor) : guessFloor(code),
           room_type_id: typeId || null, room_type: curType?.name ?? (room.room_type_id ? null : room.room_type ?? null),
           rent_mode: mode, list_price: p, max_occupants: maxOcc ? Number(maxOcc) : null, status: saveStatus, note: note.trim() || null,
@@ -398,7 +401,7 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
   return (
     <Sheet open onClose={onClose} title={isNew ? `Thêm phòng · ${building.code}` : `Phòng ${room.code}`}>
       <form className="stack" onSubmit={submit}>
-        {canManage ? (
+        {canEdit ? (
           <>
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: "1 1 110px" }}><span>Số phòng *</span>
@@ -447,7 +450,7 @@ function RoomSheet({ room, building, canManage, types, onClose, onSaved }: {
         )}
         {!isNew ? (
           <FileGallery owner={{ kind: "anh_phong", buildingId: building.id, roomId: room.id! }} title="Ảnh phòng" pdf={false} cover
-            hint={'Ảnh có nhãn "Đại diện" dùng làm ảnh chính của phòng.'} canUpload canDelete={canManage} />
+            hint={'Ảnh có nhãn "Đại diện" dùng làm ảnh chính của phòng.'} canUpload canDelete={canEdit} />
         ) : null}
         <div className="field"><span>Trạng thái</span>
           <div className="seg seg-room" role="group">
