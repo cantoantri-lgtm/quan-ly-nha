@@ -88,6 +88,8 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 
 /* ---------- Trang chủ: Chờ bạn duyệt + Bàn làm việc ---------- */
 .home-grid { display: grid; gap: 16px; align-items: start; }
+.home-main { min-width: 0; }
+.dt tr.todo-late td:first-child { box-shadow: inset 3px 0 0 var(--late); }
 @media (min-width: 1100px) { .home-grid { grid-template-columns: minmax(0, 1fr) 340px; } }
 .bench { display: grid; gap: 16px; }
 .bench .card { padding: 16px; }

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { ddmmyyyy, todayVN } from "../lib/dates";
+import { ddmmyyyy, dueInfo, todayVN } from "../lib/dates";
+import { PRIORITY_LABEL, STATUS_LABEL, type Priority, type TaskStatus } from "../lib/labels";
 import { KINDS, kindLabel, summary, type Req, type ReqKind } from "../lib/office";
 import { Icon } from "../components/ui";
 import DecideSheet, { type DecideMode } from "../components/DecideSheet";
@@ -11,7 +12,8 @@ import { KIND_ICON } from "./Office";
 import "../office.css";
 import "../table.css";
 
-type TaskLite = { id: string; title: string; due_date: string | null; assignee_id: string | null; created_by: string | null };
+type TaskLite = { id: string; title: string; due_date: string | null; assignee_id: string | null; created_by: string | null;
+  status: TaskStatus; priority: Priority; building_id: string | null };
 
 /** Trang chủ: danh sách phiếu chờ tôi duyệt (bảng) + Bàn làm việc + lịch */
 export default function Home() {
@@ -45,10 +47,10 @@ export default function Home() {
       supabase.from("requests").select("id", { count: "exact", head: true }).eq("requester_id", profile.id).in("status", ["tra_lai", "tu_choi"]),
       (async () => {
         const mine = (((await supabase.from("task_assignees").select("task_id").eq("user_id", profile.id)).data ?? []) as { task_id: string }[]).map((x) => x.task_id);
-        const q = supabase.from("tasks").select("id,title,due_date,assignee_id,created_by").is("parent_id", null).neq("status", "xong").limit(300);
+        const q = supabase.from("tasks").select("id,title,due_date,assignee_id,created_by,status,priority,building_id").is("parent_id", null).neq("status", "xong").limit(300);
         return mine.length ? q.or(`assignee_id.eq.${profile.id},id.in.(${mine.join(",")})`) : q.eq("assignee_id", profile.id);
       })(),
-      supabase.from("tasks").select("id,title,due_date,assignee_id,created_by").is("parent_id", null).neq("status", "xong")
+      supabase.from("tasks").select("id,title,due_date,assignee_id,created_by,status,priority,building_id").is("parent_id", null).neq("status", "xong")
         .eq("created_by", profile.id).or(`assignee_id.is.null,assignee_id.neq.${profile.id}`).limit(300),
     ]);
     setFixN(fx.count ?? 0);
@@ -88,6 +90,7 @@ export default function Home() {
     <>
       <main className="main main-full">
         <div className="home-grid">
+          <div className="stack home-main">
           <section className="pg-card" aria-label="Chờ bạn duyệt">
             <div className="pg-head">
               <span className="pg-ico">{Icon.bell}</span>
@@ -142,6 +145,8 @@ export default function Home() {
             )}
             {shown.length ? <Pager p={paging} /> : null}
           </section>
+          <TodoCard mine={tasks} given={given} name={name} />
+          </div>
 
           <aside className="bench" aria-label="Bàn làm việc">
             <section className="card">
@@ -226,6 +231,75 @@ function Calendar({ tasks, given, name }: { tasks: TaskLite[]; given: TaskLite[]
         </div>
       </div>
       <div className="cal-legend"><span><i className="in" />Việc được giao</span><span><i className="out" />Việc đã giao</span></div>
+    </section>
+  );
+}
+
+type TodoFilter = "" | "chua_lam" | "dang_lam" | "vuong" | "gap" | "tre";
+const PRIO_RANK: Record<Priority, number> = { gap: 0, cao: 1, binh_thuong: 2, thap: 3 };
+
+/** Việc chưa xong ngay trên Trang chủ: chưa làm, đang làm, vướng, gấp, trễ hạn. Gấp và trễ hạn lên đầu. */
+function TodoCard({ mine, given, name }: { mine: TaskLite[]; given: TaskLite[]; name: (id: string) => string }) {
+  const { buildings } = useSession();
+  const [who, setWho] = useState<"mine" | "given">("mine");
+  const [f, setF] = useState<TodoFilter>("");
+  const today = todayVN();
+  const list = who === "mine" ? mine : given;
+  const late = (t: TaskLite) => !!t.due_date && t.due_date < today;
+  const count = (k: TodoFilter) => list.filter((t) => match(t, k)).length;
+  function match(t: TaskLite, k: TodoFilter) {
+    if (!k) return true;
+    if (k === "gap") return t.priority === "gap" || t.priority === "cao";
+    if (k === "tre") return late(t);
+    return t.status === k;
+  }
+  const rows = useMemo(() => list.filter((t) => match(t, f)).sort((a, b) =>
+    Number(late(b)) - Number(late(a)) || PRIO_RANK[a.priority] - PRIO_RANK[b.priority]
+    || (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999")), [list, f]); // eslint-disable-line react-hooks/exhaustive-deps
+  const paging = usePaging(rows, 10);
+  useEffect(() => { paging.setPage(1); }, [f, who]); // eslint-disable-line react-hooks/exhaustive-deps
+  const code = (id: string | null) => buildings.find((b) => b.id === id)?.code;
+  const chips: [TodoFilter, string][] = [["", "Tất cả"], ["chua_lam", "Chưa làm"], ["dang_lam", "Đang làm"], ["vuong", "Vướng"], ["gap", "Gấp, cao"], ["tre", "Trễ hạn"]];
+  return (
+    <section className="pg-card" aria-label="Việc cần làm">
+      <div className="pg-head">
+        <span className="pg-ico">{Icon.tasks}</span>
+        <div className="grow"><h2>Việc cần làm</h2><p>Việc chưa xong: gấp và trễ hạn xếp lên đầu</p></div>
+        <select className="input" aria-label="Việc của ai" value={who} onChange={(e) => setWho(e.target.value as "mine" | "given")}>
+          <option value="mine">Việc được giao cho tôi</option>
+          <option value="given">Việc tôi đã giao</option>
+        </select>
+      </div>
+      <div className="tiles" role="group" aria-label="Lọc việc">
+        {chips.map(([k, l]) => (
+          <button key={k} className="tile" aria-pressed={f === k} onClick={() => setF(f === k ? "" : k)}><b>{count(k)}</b> {l}</button>
+        ))}
+      </div>
+      {rows.length === 0 ? (
+        <div className="dt-empty"><b>{list.length ? "Không có việc nào ở mục này" : who === "mine" ? "Bạn không còn việc nào chưa xong" : "Không có việc bạn giao còn dang dở"}</b></div>
+      ) : (
+        <div className="dt-wrap">
+          <table className="dt cards">
+            <thead><tr><th>Việc</th><th>Hạn</th><th>Trạng thái</th><th>Ưu tiên</th><th>{who === "mine" ? "Người giao" : "Người làm"}</th></tr></thead>
+            <tbody>
+              {paging.slice.map((t) => {
+                const d = dueInfo(t.due_date, false);
+                const b = code(t.building_id);
+                return (
+                  <tr key={t.id} className={late(t) ? "todo-late" : undefined}>
+                    <td data-label="Việc"><Link to={`/viec/${t.id}`} className="dt-link">{t.title}</Link>{b ? <div className="t2">{b}</div> : null}</td>
+                    <td data-label="Hạn">{d ? <span className={`due ${d.tone}`}>{d.text}</span> : <span className="muted">Không hạn</span>}</td>
+                    <td data-label="Trạng thái"><span className={`pill ${t.status}`}>{STATUS_LABEL[t.status]}</span></td>
+                    <td data-label="Ưu tiên">{t.priority === "gap" || t.priority === "cao" ? <span className="prio">{PRIORITY_LABEL[t.priority]}</span> : <span className="muted">{PRIORITY_LABEL[t.priority]}</span>}</td>
+                    <td data-label={who === "mine" ? "Người giao" : "Người làm"}>{who === "mine" ? (t.created_by ? name(t.created_by) : "—") : (t.assignee_id ? name(t.assignee_id) : "Chưa có người")}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {rows.length ? <Pager p={paging} /> : null}
     </section>
   );
 }
