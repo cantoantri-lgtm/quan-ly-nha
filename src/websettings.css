@@ -20,3 +20,10 @@
 .ws-frame { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); margin: 0 auto; width: 100%; }
 .ws-frame.dt { max-width: 390px; }
 .ws-frame iframe { display: block; width: 100%; height: min(78vh, 900px); border: 0; }
+.ws-media { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ws-media li { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface-2); }
+.ws-media img, .ws-media video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--grid-head); }
+.ws-media-n { position: absolute; top: 6px; left: 6px; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--surface); color: var(--ink); }
+.ws-media-acts { display: flex; justify-content: flex-end; gap: 4px; padding: 6px; }
+.ws-media-acts .ico-btn { width: 32px; height: 32px; }
+.btn.disabled { opacity: .6; pointer-events: none; }

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { vnd } from "../lib/money";
 import { floorText, perText, shortAddr, typeGroup, usePhotoUrls, useWebRooms, webCfg, webShow, webText, type WebRoomRow } from "./webApi";
 import { WebFooter, WebHeader, WebIcon, zaloHref } from "./WebShell";
+import { HeroSlides } from "./HeroSlides";
 
 type Filter = { building: string; group: string; price: string; mode: string };
 const PRICES: [string, string, (n: number) => boolean][] = [
@@ -72,7 +73,8 @@ export default function WebHome() {
     <div className="web">
       {cfg.notice_on && cfg.notice ? <div className="web-notice" role="note">{cfg.notice}</div> : null}
       <section className="web-hero">
-        {heroUrl ? <img className="web-hero-img" src={heroUrl} alt="" /> : (
+        {cfg.hero_media?.length ? <HeroSlides items={cfg.hero_media} seconds={cfg.hero_interval ?? 5} />
+          : heroUrl ? <img className="web-hero-img" src={heroUrl} alt="" /> : (
           <svg className="web-skyline" aria-hidden="true" viewBox="0 0 1440 640" preserveAspectRatio="xMidYMax slice">
             <path d="M0 640 V390 H120 V330 H220 V430 H300 V270 H420 V380 H520 V230 H640 V350 H720 V300 H860 V420 H940 V250 H1080 V370 H1160 V310 H1300 V410 H1440 V640 Z" fill="var(--web-hero-2)" />
             <path d="M0 640 V500 H180 V450 H340 V530 H500 V470 H700 V550 H900 V490 H1100 V540 H1280 V480 H1440 V640 Z" fill="var(--web-hero-3)" />

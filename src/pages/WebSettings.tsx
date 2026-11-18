@@ -3,6 +3,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { Icon } from "../components/ui";
 import { WEB_DEFAULTS, type WebConfig } from "../web/webApi";
+import { heroMediaUrl, removeHeroMedia, uploadHeroMedia, type HeroMedia } from "../lib/files";
 import "../table.css";
 import "../office.css";
 import "../websettings.css";
@@ -49,6 +50,8 @@ export default function WebSettings() {
   const [device, setDevice] = useState<"pc" | "dt">("pc");
   const [frameKey, setFrameKey] = useState(0);
   const frame = useRef<HTMLIFrameElement>(null);
+  const [upl, setUpl] = useState<{ done: number; total: number } | null>(null);
+  const [uplErr, setUplErr] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setErr(null);
@@ -98,10 +101,34 @@ export default function WebSettings() {
     const { error } = await supabase.rpc("web_settings_save", { p_data: cfg });
     setBusy(false);
     if (error) { setErr(friendlyError(error)); return; }
+    const keep = new Set((cfg.hero_media ?? []).map((m) => m.path));
+    removeHeroMedia((saved?.hero_media ?? []).map((m) => m.path).filter((p) => !keep.has(p))).catch(() => {});
     toast("Đã lưu. Website đổi ngay cho khách.");
     await load();
     setFrameKey((n) => n + 1);   // tải lại khung xem trước để áp dụng toà / phòng bị ẩn
   }
+
+  async function addMedia(files: FileList | null) {
+    const list = [...(files ?? [])];
+    if (!list.length) return;
+    const room = 12 - (cfg.hero_media?.length ?? 0);
+    const take = list.slice(0, Math.max(0, room));
+    const errs: string[] = list.length > take.length ? [`Tối đa 12 ảnh / clip, bỏ qua ${list.length - take.length} tệp.`] : [];
+    setUplErr([]); setUpl({ done: 0, total: take.length });
+    const added: HeroMedia[] = [];
+    for (const f of take) {
+      try { added.push(await uploadHeroMedia(f)); } catch (e) { errs.push(e instanceof Error ? e.message : String(e)); }
+      setUpl((u) => (u ? { ...u, done: u.done + 1 } : u));
+    }
+    setUpl(null); setUplErr(errs);
+    if (added.length) setCfg((c) => ({ ...c, hero_media: [...(c.hero_media ?? []), ...added] }));
+  }
+  const moveMedia = (k: number, d: -1 | 1) => setCfg((c) => {
+    const a = [...(c.hero_media ?? [])]; const j = k + d;
+    if (j < 0 || j >= a.length) return c;
+    [a[k], a[j]] = [a[j], a[k]]; return { ...c, hero_media: a };
+  });
+  const dropMedia = (k: number) => setCfg((c) => ({ ...c, hero_media: (c.hero_media ?? []).filter((_, x) => x !== k) }));
 
   const byBuilding = useMemo(() => {
     const m = new Map<string, RoomLite[]>();
@@ -152,13 +179,49 @@ export default function WebSettings() {
           <section className="card ws-sec">
             <h3>Đầu trang chủ</h3>
             {HERO.map(textInput)}
-            <label className="field"><span>Ảnh nền đầu trang</span>
+            <label className="field"><span>Ảnh toà dùng khi chưa có trình chiếu</span>
               <select className="input" value={cfg.hero_building ?? ""} onChange={(e) => set("hero_building", e.target.value || undefined)}>
                 <option value="">Tự chọn (toà có ảnh và nhiều phòng trống nhất)</option>
                 {buildings.map((b) => <option key={b.id} value={b.id}>Ảnh toà {b.code} · {b.name}</option>)}
               </select>
               <small className="muted">Dùng ảnh toà đã tải lên trong màn Toà nhà. Toà chưa có ảnh thì website tự chọn toà khác.</small>
             </label>
+          </section>
+
+          <section className="card ws-sec">
+            <h3>Ảnh và clip đầu trang (trình chiếu)</h3>
+            <p className="muted small" style={{ margin: 0 }}>Thêm nhiều ảnh hoặc clip, website tự chuyển lần lượt. Nên dùng ảnh ngang từ 1920px; clip ngắn 10–20 giây, không cần tiếng, dưới 50 MB (MP4). Chưa có ảnh nào thì dùng ảnh toà bên dưới.</p>
+            {cfg.hero_media?.length ? (
+              <ul className="ws-media">
+                {cfg.hero_media.map((m, k) => (
+                  <li key={m.path}>
+                    {m.kind === "video"
+                      ? <video src={heroMediaUrl(m.path)} muted playsInline preload="metadata" aria-label={`Clip ${k + 1}`} />
+                      : <img src={heroMediaUrl(m.path)} alt={`Ảnh ${k + 1}`} loading="lazy" />}
+                    <span className="ws-media-n">{k + 1}{m.kind === "video" ? " · Clip" : ""}</span>
+                    <div className="ws-media-acts">
+                      <button type="button" className="ico-btn" aria-label="Đưa lên trước" disabled={k === 0} onClick={() => moveMedia(k, -1)}>{Icon.back}</button>
+                      <button type="button" className="ico-btn" aria-label="Đưa ra sau" disabled={k === cfg.hero_media!.length - 1} onClick={() => moveMedia(k, 1)}><span style={{ display: "inline-flex", transform: "rotate(180deg)" }}>{Icon.back}</span></button>
+                      <button type="button" className="ico-btn no" aria-label="Bỏ khỏi trình chiếu" onClick={() => dropMedia(k)}>{Icon.trash}</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="row">
+              <label className={`btn secondary sm${upl ? " disabled" : ""}`} aria-disabled={!!upl}>
+                {Icon.plus}{upl ? `Đang tải ${upl.done}/${upl.total}…` : "Thêm ảnh / clip"}
+                <input type="file" multiple hidden disabled={!!upl} accept="image/jpeg,image/png,image/webp,image/heic,video/mp4,video/webm"
+                  onChange={(e) => { addMedia(e.target.files); e.target.value = ""; }} />
+              </label>
+              <label className="row small" style={{ gap: 6 }}>Chuyển sau
+                <select className="input" style={{ width: 96, minHeight: 36, padding: "4px 8px" }} value={cfg.hero_interval ?? 5}
+                  onChange={(e) => set("hero_interval", Number(e.target.value))}>
+                  {[3, 4, 5, 6, 8, 10, 15].map((x) => <option key={x} value={x}>{x} giây</option>)}
+                </select>
+              </label>
+            </div>
+            {uplErr.length ? <div className="error-box">{uplErr.map((m) => <div key={m}>{m}</div>)}</div> : null}
           </section>
 
           <section className="card ws-sec">

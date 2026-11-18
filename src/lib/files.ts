@@ -361,3 +361,37 @@ export function meterPhotoUrls(list: MeterReading[], size: "thumb" | "full"): Pr
   // Dữ liệu mẫu không có ảnh thật (đường dẫn không nằm trong dong-ho/)
   return fileUrls(list.filter((m) => m.photo_path.startsWith("dong-ho/")).map((m) => ({ id: m.id, path: m.photo_path, store: m.photo_store, thumb: m.photo_thumb } as StoredFile)), size);
 }
+
+// ---------- Ảnh / clip trình chiếu đầu trang website (kho công khai web-media, migration 066) ----------
+export const WEB_MEDIA_BUCKET = "web-media";
+export const WEB_VIDEO_MAX = 50 * 1024 * 1024;
+export type HeroMedia = { path: string; kind: "image" | "video" };
+
+/** Tải một ảnh (thu về cạnh dài 2400px, JPEG 0,82) hoặc clip MP4 / WebM (tối đa 50 MB) lên kho web-media. Chỉ Quản lý được ghi. */
+export async function uploadHeroMedia(raw: File): Promise<HeroMedia> {
+  const id = crypto.randomUUID();
+  if (raw.type.startsWith("video/")) {
+    const ext = raw.type === "video/webm" ? "webm" : raw.type === "video/mp4" ? "mp4" : null;
+    if (!ext) throw new Error(`${raw.name}: chỉ nhận clip MP4 hoặc WebM.`);
+    if (raw.size > WEB_VIDEO_MAX) throw new Error(`${raw.name}: clip nặng ${(raw.size / 1048576).toFixed(0)} MB, tối đa 50 MB. Hãy cắt ngắn hoặc nén lại.`);
+    const path = `hero/${id}.${ext}`;
+    const { error } = await supabase.storage.from(WEB_MEDIA_BUCKET).upload(path, raw, { contentType: raw.type, cacheControl: "31536000", upsert: false });
+    if (error) throw new Error(`${raw.name}: ${error.message}`);
+    return { path, kind: "video" };
+  }
+  if (!raw.type.startsWith("image/")) throw new Error(`${raw.name}: chỉ nhận ảnh hoặc clip.`);
+  let file: Blob = raw;
+  try { const b = await renderJpeg(raw, 2400, 0.82); if (b) file = b; } catch { /* giữ nguyên nếu trình duyệt không đọc được */ }
+  if (file.size > 10 * 1024 * 1024) throw new Error(`${raw.name}: ảnh quá nặng.`);
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `hero/${id}.${ext}`;
+  const { error } = await supabase.storage.from(WEB_MEDIA_BUCKET).upload(path, file, { contentType: file.type || "image/jpeg", cacheControl: "31536000", upsert: false });
+  if (error) throw new Error(`${raw.name}: ${error.message}`);
+  return { path, kind: "image" };
+}
+
+export const heroMediaUrl = (path: string) => supabase.storage.from(WEB_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
+
+export async function removeHeroMedia(paths: string[]): Promise<void> {
+  if (paths.length) await supabase.storage.from(WEB_MEDIA_BUCKET).remove(paths);
+}

@@ -22,6 +22,7 @@ export type WebRoomDetail = {
 // ---------- Nội dung website do Quản lý sửa trong app (Quản trị › Cài đặt website, migration 065) ----------
 export type WebConfig = {
   eyebrow?: string; title1?: string; title2?: string; subtitle?: string; hero_building?: string;
+  hero_media?: { path: string; kind: "image" | "video" }[]; hero_interval?: number;   // trình chiếu đầu trang
   notice_on?: boolean; notice?: string;
   hotline?: string; zalo?: string; email?: string; address?: string; hours?: string; footer_note?: string;
   show_features?: boolean; show_buildings?: boolean; show_app?: boolean; show_brands?: boolean;
