@@ -26,6 +26,7 @@ import LoaForm from "./pages/LoaForm";
 import RequestDetail from "./pages/RequestDetail";
 import RequestPrint from "./pages/RequestPrint";
 import TripPrint from "./pages/TripPrint";
+import FlowSettings from "./pages/FlowSettings";
 import RequestList from "./pages/RequestList";
 import Org from "./pages/Org";
 import Tenants, { TenantDetail } from "./pages/Tenants";
@@ -162,6 +163,7 @@ export default function App() {
         <Route path="khach/:id" element={<TenantDetail />} />
         <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
         <Route path="van-phong" element={<Office />} />
+        <Route path="van-phong/luong-duyet" element={<FlowSettings />} />
         <Route path="van-phong/ds/:kind" element={<RequestList />} />
         <Route path="van-phong/moi/:kind" element={<RequestForm />} />
         <Route path="van-phong/loa/moi" element={<LoaForm />} />

@@ -1,0 +1,25 @@
+/* Luồng phê duyệt (cài đặt) */
+.fl-card { display: grid; gap: 12px; padding: 14px 16px; }
+.fl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.fl-head h2 { margin: 0; font-size: 16px; }
+.fl-tag { font-size: 12px; font-weight: 650; padding: 2px 9px; border-radius: 999px; background: var(--grid-zebra); color: var(--muted); border: 1px solid var(--line); }
+.fl-tag.custom { background: var(--brand-soft); color: var(--brand); border-color: var(--brand-line); }
+.fl-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fl-arrow-node { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.fl-node { display: inline-grid; gap: 1px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 13px; line-height: 1.25; }
+.fl-node small { color: var(--muted); font-size: 12px; }
+.fl-node.me { background: var(--brand-soft); border-color: var(--brand-line); font-weight: 650; }
+.fl-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.fl-steps li { display: grid; grid-template-columns: 28px 1fr; gap: 6px 10px; align-items: start; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.fl-steps li .field { grid-column: 2; margin: 0; }
+.fl-no { grid-row: span 3; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: 13px; }
+.fl-acts { grid-column: 2; display: flex; gap: 4px; justify-content: flex-end; }
+.fl-acts .xls-btn:disabled { opacity: .35; cursor: default; }
+.fl-foot { flex-wrap: wrap; gap: 8px; }
+.fl-foot .grow { flex: 1; }
+@media (min-width: 760px) {
+  .fl-steps li { grid-template-columns: 28px minmax(160px, 220px) minmax(220px, 1fr) auto; align-items: end; }
+  .fl-steps li .field { grid-column: auto; }
+  .fl-no { grid-row: auto; align-self: center; }
+  .fl-acts { grid-column: auto; align-self: center; }
+}

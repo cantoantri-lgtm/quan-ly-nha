@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useSession } from "../lib/session";
 import { clock } from "../lib/dates";
 import { DUTY_LABEL, type ReqKind, type ReqStep } from "../lib/office";
 import type { Profile } from "../lib/labels";
@@ -42,6 +44,7 @@ type Prev = { step_no: number; duty: string; approver_id: string | null; approve
 
 /** Xem trước ai sẽ duyệt khi đang lập đề nghị */
 export function ChainPreview({ kind }: { kind: ReqKind }) {
+  const { isFlowAdmin } = useSession();
   const [rows, setRows] = useState<Prev[] | null>(null);
   useEffect(() => {
     let live = true;
@@ -66,6 +69,7 @@ export function ChainPreview({ kind }: { kind: ReqKind }) {
       </div>
       <p className="muted small" style={{ margin: 0 }}>
         {active.length ? "Bước chưa có người giữ sẽ tự bỏ qua; một người đứng nhiều bước chỉ duyệt một lần." : "Không có cấp nào cần duyệt: đề nghị được duyệt ngay khi gửi."}
+        {isFlowAdmin ? <> <Link to="/van-phong/luong-duyet">Chỉnh luồng duyệt</Link></> : null}
       </p>
     </section>
   );

@@ -167,7 +167,7 @@ export type AppItem = { to: string; label: string; icon: JSX.Element; n?: number
 
 /** Nhóm chức năng theo vai trò: dùng cho bảng Apps (điện thoại) và thanh menu xổ xuống (PC). Quyền thật vẫn chặn ở CSDL. */
 export function useMenuGroups(): { title: string; menu: string; items: AppItem[] }[] {
-  const { unread, pendingApprovals, isManager, isApprover, isLeadUp, isCollaborator, isCustomer, isAccountant } = useSession();
+  const { unread, pendingApprovals, isManager, isApprover, isLeadUp, isCollaborator, isCustomer, isAccountant, isFlowAdmin } = useSession();
   const apps: AppItem[] = isCustomer ? [
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
@@ -189,6 +189,7 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
       ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
       ...(isManager ? [{ to: "/quan-tri", label: "Tổng quan quản trị", icon: Icon.gear }] : []),
       ...(isManager ? [{ to: "/quan-tri/website", label: "Cài đặt website", icon: Icon.map }] : []),
+      ...(isFlowAdmin ? [{ to: "/van-phong/luong-duyet", label: "Luồng phê duyệt", icon: Icon.org }] : []),
     ] },
     { title: "Quản lý toà nhà", menu: "Toà nhà & khách", items: [
       { to: "/ban-do", label: "Bản đồ", icon: Icon.map },

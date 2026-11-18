@@ -117,7 +117,6 @@ const LEG_COLS: Col<LegDraft>[] = [
   { k: "to_place", label: "Nơi đến", w: 130 },
   { k: "content", label: "Nội dung", w: 220 },
   { k: "transport", label: "Phương tiện", w: 120 },
-  { k: "distance", label: "Độ dài chặng đường", w: 120 },
 ];
 const LEG_COLS_ACT: Col<LegDraft>[] = [...LEG_COLS, { k: "stay_reason", label: "Lý do lưu trú", w: 150 }];
 const COST_COLS: Col<CostDraft>[] = [
@@ -149,13 +148,13 @@ export function LegTable({ legs, people, actual }: { legs: TripLeg[]; people: Pe
   return (
     <div className="dt-wrap">
       <table className="dt">
-        <thead><tr><th>#</th><th>Người đi</th><th>Từ ngày</th><th>Đến ngày</th><th>Nơi đi</th><th>Nơi đến</th><th>Nội dung</th><th>Phương tiện</th><th>Độ dài chặng</th>{actual ? <th>Lý do lưu trú</th> : null}</tr></thead>
+        <thead><tr><th>#</th><th>Người đi</th><th>Từ ngày</th><th>Đến ngày</th><th>Nơi đi</th><th>Nơi đến</th><th>Nội dung</th><th>Phương tiện</th>{actual ? <th>Lý do lưu trú</th> : null}</tr></thead>
         <tbody>
           {legs.map((l) => (
             <tr key={l.id ?? l.line_no}>
               <td className="num">{l.line_no}</td><td>{name(l.staff_id)}</td><td className="num">{l.start_date ? ddmmyyyy(l.start_date) : ""}</td>
               <td className="num">{l.end_date ? ddmmyyyy(l.end_date) : ""}</td><td>{l.from_place}</td><td>{l.to_place}</td>
-              <td><div className="clip">{l.content}</div></td><td>{l.transport}</td><td>{l.distance}</td>{actual ? <td>{l.stay_reason}</td> : null}
+              <td><div className="clip">{l.content}</div></td><td>{l.transport}</td>{actual ? <td>{l.stay_reason}</td> : null}
             </tr>
           ))}
         </tbody>

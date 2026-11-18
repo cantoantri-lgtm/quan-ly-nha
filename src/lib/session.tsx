@@ -35,6 +35,8 @@ type Ctx = {
   isAccountant: boolean;
   /** Nhân viên phụ trách nhân sự (xác nhận ngày công tác) */
   isHr: boolean;
+  /** Người được cài đặt luồng phê duyệt (anh Trí). CSDL chặn thật trong approval_flow_save */
+  isFlowAdmin: boolean;
 };
 
 const SessionContext = createContext<Ctx | null>(null);
@@ -49,6 +51,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0);
   const [pendingApprovals, setPending] = useState(0);
   const [myStaff, setMyStaff] = useState<Staff | null>(null);
+  const [flowAdmin, setFlowAdmin] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<number>();
   const userRef = useRef<string | null>(null);   // người đang đăng nhập đã tải dữ liệu nền
@@ -69,13 +72,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const loadBase = useCallback(async (uid: string) => {
     userRef.current = uid;
-    const [p, b, ppl, mem, st] = await Promise.all([
+    const [p, b, ppl, mem, st, fa] = await Promise.all([
       supabase.from("profiles").select("id,full_name,phone,role,is_active,annual_leave_days").eq("id", uid).maybeSingle(),
       supabase.from("buildings").select("*").order("code"),
       supabase.from("profiles").select("id,full_name,phone,role,is_active,annual_leave_days").order("full_name"),
       supabase.from("building_members").select("building_id").eq("user_id", uid),
       supabase.from("org_staff").select("*").eq("profile_id", uid).maybeSingle(),
+      supabase.rpc("is_flow_admin"),
     ]);
+    setFlowAdmin(fa.data === true);
     setMyStaff((st.data as Staff) ?? null);
     setProfile((p.data as Profile) ?? null);
     setBuildings((b.data as Building[]) ?? []);
@@ -141,7 +146,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     isLeadUp: profile?.role === "quan_ly" || profile?.role === "giam_sat" || (!!myStaff && profile?.role === "nhan_vien" && (myStaff.is_leader || (myStaff.level ?? 0) >= 2)),
     isAccountant: myStaff?.duty === "ke_toan",
     isHr: myStaff?.duty === "nhan_su",
-  }), [session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff]);
+    isFlowAdmin: flowAdmin,
+  }), [session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff, flowAdmin]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

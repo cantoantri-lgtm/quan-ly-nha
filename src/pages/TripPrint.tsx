@@ -167,18 +167,18 @@ export default function TripPrint() {
               </tbody></table>
               <div className="pd-scroll"><table className="pd-grid">
                 <thead>
-                  <tr><th colSpan={2}>Địa điểm</th><th rowSpan={2}>Ngày</th><th rowSpan={2}>Phương tiện</th><th rowSpan={2}>Độ dài chặng đường</th><th rowSpan={2}>Số ngày công tác</th><th rowSpan={2}>Lý do lưu trú</th><th rowSpan={2}>Chứng nhận của nơi đến (ký, đóng dấu)</th></tr>
+                  <tr><th colSpan={2}>Địa điểm</th><th rowSpan={2}>Ngày</th><th rowSpan={2}>Phương tiện</th><th rowSpan={2}>Số ngày công tác</th><th rowSpan={2}>Lý do lưu trú</th><th rowSpan={2}>Chứng nhận của nơi đến (ký, đóng dấu)</th></tr>
                   <tr><th>Nơi đi</th><th>Nơi đến</th></tr>
                 </thead>
                 <tbody>
                   {legs.map((l) => (
                     <tr key={l.id ?? l.line_no} className="pd-tall">
                       <td>{l.from_place}</td><td>{l.to_place}</td><td>{d(l.start_date)}{l.end_date && l.end_date !== l.start_date ? ` – ${d(l.end_date)}` : ""}</td>
-                      <td>{l.transport}</td><td>{l.distance}</td>
+                      <td>{l.transport}</td>
                       <td className="r">{l.start_date && l.end_date ? daysBetween(l.start_date, l.end_date) + 1 : ""}</td><td>{l.stay_reason}</td><td />
                     </tr>
                   ))}
-                  {Array.from({ length: Math.max(0, 3 - legs.length) }).map((_, i) => <tr key={`b${i}`} className="pd-tall"><td /><td /><td /><td /><td /><td /><td /><td /></tr>)}
+                  {Array.from({ length: Math.max(0, 3 - legs.length) }).map((_, i) => <tr key={`b${i}`} className="pd-tall"><td /><td /><td /><td /><td /><td /><td /></tr>)}
                 </tbody>
               </table></div>
               <p className="pd-words">Số ngày công tác thực tế: <b>{actualDays ? fmtDays(actualDays) : "……"}</b>{r.actual_start ? ` (${d(r.actual_start)} – ${d(r.actual_end)})` : ""}</p>

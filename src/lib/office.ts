@@ -84,7 +84,7 @@ export type ReqStep = {
   decided_by: string | null; decided_at: string | null; note: string | null;
 };
 export const DUTY_LABEL: Record<string, string> = {
-  leader: "Leader", truong_phong: "Trưởng phòng", nhan_su: "Nhân sự", ke_toan: "Kế toán", giam_doc: "Giám đốc",
+  leader: "Leader", truong_phong: "Trưởng phòng", nhan_su: "Nhân sự", ke_toan: "Kế toán", giam_doc: "Giám đốc", khac: "Người duyệt",
 };
 /** Luồng duyệt theo loại đề nghị (mô tả cho người dùng) */
 export const FLOW_TEXT: Record<ReqKind, string> = {

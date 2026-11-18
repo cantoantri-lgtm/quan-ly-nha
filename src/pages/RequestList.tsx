@@ -63,6 +63,14 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   const [delReq, setDelReq] = useState<Req | null>(null);
   const [busy, setBusy] = useState(false);
   const [help, setHelp] = useState(false);
+  const [flowText, setFlowText] = useState<string | null>(null);
+  useEffect(() => {
+    if (!help) return;
+    supabase.rpc("approval_flow_list").then(({ data }) => {
+      const f = ((data ?? []) as { kind: string; steps: { duty: string; approver_name: string | null }[] }[]).find((x) => x.kind === kind);
+      if (f) setFlowText([loa ? "Người lập" : "Người đề nghị", ...f.steps.map((st) => `${DUTY_LABEL[st.duty] ?? st.duty}${st.approver_name ? ` (${st.approver_name})` : ""}`)].join(" → "));
+    });
+  }, [help, kind, loa]);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -408,7 +416,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
 
       <Sheet open={help} onClose={() => setHelp(false)} title={`Hướng dẫn · ${label}`}>
         <div className="stack">
-          <p style={{ margin: 0 }}><b>Luồng duyệt:</b> {FLOW_TEXT[kind]}. Bước chưa có người giữ tự bỏ qua; một người đứng nhiều bước chỉ duyệt một lần.</p>
+          <p style={{ margin: 0 }}><b>Luồng duyệt:</b> {flowText ?? FLOW_TEXT[kind]}. Bước chưa có người giữ tự bỏ qua; một người đứng nhiều bước chỉ duyệt một lần. <Link to="/van-phong/luong-duyet">Xem luồng duyệt các chức năng</Link>.</p>
           <p style={{ margin: 0 }}><b>Cấp duyệt có 3 lựa chọn:</b> Duyệt (sang cấp tiếp theo), Từ chối (kết thúc, phải ghi lý do), Trả lại (về người lập sửa, phải ghi lý do; gửi lại thì duyệt lại từ cấp đầu).</p>
           <p style={{ margin: 0 }}><b>Sửa / Xoá:</b> chỉ dùng được khi đề nghị bị trả lại, bị từ chối hoặc đã rút. Đang chờ duyệt hoặc đã duyệt xong thì hai nút bị khoá. Còn chờ duyệt mà muốn sửa: mở đề nghị, bấm “Rút lại”, rồi sửa và gửi lại.</p>
           <p style={{ margin: 0 }}><b>Thêm nhanh:</b> bấm “+ Thêm” hoặc phím F2. Bấm vào một dòng để xem {loa ? "dự toán" : "chi tiết hoá đơn"} và luồng duyệt ngay bên dưới.</p>
