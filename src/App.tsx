@@ -39,6 +39,7 @@ import { MyPayments, StaffPayments } from "./pages/CustomerPayments";
 import Feedback, { FeedbackInbox, FeedbackThread } from "./pages/Feedback";
 import Customers from "./pages/Customers";
 import Viewings from "./pages/Viewings";
+import WebSettings from "./pages/WebSettings";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
 const MapPage = lazy(() => import("./pages/MapPage"));
@@ -188,6 +189,7 @@ export default function App() {
           <Route path="nhan-su" element={<Staff />} />
           <Route path="toa-nha" element={<Buildings />} />
           <Route path="thu-tien" element={<PaymentSettingsPage />} />
+          <Route path="website" element={<WebSettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

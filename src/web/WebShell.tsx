@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useSession } from "../lib/session";
-import { CONTACT } from "./webApi";
+import { webCfg, webShow, webText } from "./webApi";
 
 export const WebIcon = {
   photo: (s = 40) => <svg aria-hidden="true" width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 15l5-5 4 4 3-3 6 6" /><circle cx="16" cy="8.5" r="1.5" /></svg>,
@@ -8,7 +8,8 @@ export const WebIcon = {
   check: <svg aria-hidden="true" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>,
 };
 
-export const zaloHref = () => (CONTACT.zalo ? `https://zalo.me/${CONTACT.zalo.replace(/\D/g, "")}` : null);
+export const zaloHref = () => { const z = webCfg().zalo; return z ? `https://zalo.me/${z.replace(/\D/g, "")}` : null; };
+export const telHref = () => { const h = webCfg().hotline; return h ? `tel:${h.replace(/[\s.]/g, "")}` : null; };
 
 export function WebLogo() {
   return (
@@ -26,11 +27,12 @@ export function WebHeader() {
       <WebLogo />
       <nav className="web-nav" aria-label="Menu chính">
         <a href="/phong#phong">Phòng trống</a>
-        <a href="/phong#toa">Toà nhà</a>
-        <a href="/phong#thuong-hieu">Hệ thương hiệu</a>
-        <a href="/phong#app">App người thuê</a>
+        {webShow("show_buildings") ? <a href="/phong#toa">Toà nhà</a> : null}
+        {webShow("show_brands") ? <a href="/phong#thuong-hieu">Hệ thương hiệu</a> : null}
+        {webShow("show_app") ? <a href="/phong#app">App người thuê</a> : null}
       </nav>
       <div className="web-head-end">
+        {telHref() ? <a className="web-pill" href={telHref()!}>Gọi<span className="web-hide-sm"> {webCfg().hotline}</span></a> : null}
         <a className="web-pill" href="/">{session ? "Vào app" : "Đăng nhập"}</a>
       </div>
     </header>
@@ -39,29 +41,32 @@ export function WebHeader() {
 
 export function WebFooter() {
   const zalo = zaloHref();
+  const c = webCfg();
   return (
     <footer className="web-foot">
       <div className="web-wrap web-foot-cols">
         <div>
           <img className="web-logo" src="/logo-next-living-ngang-trang.svg" alt="Next Living" />
-          <p style={{ marginTop: 12 }}>Phòng và căn hộ dịch vụ ở trung tâm TP.HCM.</p>
+          <p style={{ marginTop: 12 }}>{webText("footer_note")}</p>
+          {c.address ? <p>{c.address}</p> : null}
+          {c.hours ? <p>{c.hours}</p> : null}
         </div>
         <div>
           <b>Thuê phòng</b>
           <p><a href="/phong#phong">Phòng trống</a></p>
-          <p><a href="/phong#toa">Toà nhà</a></p>
+          {webShow("show_buildings") ? <p><a href="/phong#toa">Toà nhà</a></p> : null}
           <p><a href="/">Cộng tác viên đăng nhập</a></p>
         </div>
         <div>
           <b>Chính sách</b>
           <p><Link to="/phong/chinh-sach-du-lieu">Dữ liệu cá nhân</Link></p>
         </div>
-        {CONTACT.hotline || zalo || CONTACT.email ? (
+        {c.hotline || zalo || c.email ? (
           <div>
             <b>Liên hệ</b>
-            {CONTACT.hotline ? <p><a href={`tel:${CONTACT.hotline.replace(/\s/g, "")}`}>Hotline {CONTACT.hotline}</a></p> : null}
+            {c.hotline ? <p><a href={telHref()!}>Hotline {c.hotline}</a></p> : null}
             {zalo ? <p><a href={zalo} target="_blank" rel="noopener">Chat Zalo</a></p> : null}
-            {CONTACT.email ? <p><a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a></p> : null}
+            {c.email ? <p><a href={`mailto:${c.email}`}>{c.email}</a></p> : null}
           </div>
         ) : null}
       </div>

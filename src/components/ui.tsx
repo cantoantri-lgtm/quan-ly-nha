@@ -179,6 +179,7 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
       ...(isManager || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
       ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
       ...(isManager ? [{ to: "/quan-tri", label: "Tổng quan quản trị", icon: Icon.gear }] : []),
+      ...(isManager ? [{ to: "/quan-tri/website", label: "Cài đặt website", icon: Icon.map }] : []),
     ] },
     { title: "Quản lý toà nhà", menu: "Toà nhà & khách", items: [
       { to: "/ban-do", label: "Bản đồ", icon: Icon.map },

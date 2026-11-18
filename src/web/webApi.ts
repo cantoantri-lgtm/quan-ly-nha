@@ -19,8 +19,56 @@ export type WebRoomDetail = {
   others: { room_id: string; type_name: string; floor: number | null; list_price: number; photo: WebPhoto }[];
 };
 
-/** Liên hệ hiện trên web. Để trống thì không hiện nút đó. Sửa ở đây khi công ty có số hotline / Zalo / email. */
-export const CONTACT = { hotline: "", zalo: "", email: "" };
+// ---------- Nội dung website do Quản lý sửa trong app (Quản trị › Cài đặt website, migration 065) ----------
+export type WebConfig = {
+  eyebrow?: string; title1?: string; title2?: string; subtitle?: string; hero_building?: string;
+  notice_on?: boolean; notice?: string;
+  hotline?: string; zalo?: string; email?: string; address?: string; hours?: string; footer_note?: string;
+  show_features?: boolean; show_buildings?: boolean; show_app?: boolean; show_brands?: boolean;
+  seo_title?: string; seo_desc?: string;
+  hidden_buildings?: string[]; hidden_rooms?: string[];   // chỉ có ở trang cài đặt, web công khai không nhận
+};
+/** Chữ mặc định khi Quản lý để trống */
+export const WEB_DEFAULTS = {
+  eyebrow: "Căn hộ dịch vụ · TP.HCM",
+  title1: "Sống tiện nghi,",
+  title2: "dọn vào là ở.",
+  subtitle: "Phòng và căn hộ dịch vụ ở trung tâm TP.HCM. Trống thật, cập nhật theo giờ.",
+  footer_note: "Phòng và căn hộ dịch vụ ở trung tâm TP.HCM.",
+  seo_title: "Next Living · Phòng và căn hộ dịch vụ TP.HCM",
+  seo_desc: "Xem phòng trống, giá thuê, ảnh phòng và đặt lịch xem phòng Next Living tại TP.HCM.",
+};
+type TextKey = keyof typeof WEB_DEFAULTS;
+
+let cfg: WebConfig = {};
+let loaded: Promise<void> | null = null;
+const subs = new Set<() => void>();
+const emit = () => subs.forEach((f) => f());
+/** Đọc nội dung hiện tại (dùng trong component con; WebApp gọi useWebConfig để vẽ lại khi đổi) */
+export const webCfg = () => cfg;
+export const webText = (k: TextKey) => cfg[k] || WEB_DEFAULTS[k];
+export const webShow = (k: "show_features" | "show_buildings" | "show_app" | "show_brands") => cfg[k] !== false;
+
+/** Tải nội dung website một lần. Trong khung xem trước của trang cài đặt (?xem=thu), nhận bản nháp từ trang cha. */
+export function useWebConfig(): WebConfig {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const f = () => force((n) => n + 1);
+    subs.add(f);
+    loaded ??= Promise.resolve(supabase.rpc("web_config")).then(({ data }) => {
+      if (data && typeof data === "object" && !Object.keys(cfg).length) { cfg = data as WebConfig; emit(); }
+    }).catch(() => {});
+    const preview = window.parent !== window && new URLSearchParams(location.search).get("xem") === "thu";
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== location.origin || e.source !== window.parent) return;
+      const d = e.data as { type?: string; cfg?: WebConfig };
+      if (d?.type === "nl-web-preview" && d.cfg && typeof d.cfg === "object") { cfg = d.cfg; emit(); }
+    };
+    if (preview) { window.addEventListener("message", onMsg); window.parent.postMessage({ type: "nl-web-ready" }, location.origin); }
+    return () => { subs.delete(f); if (preview) window.removeEventListener("message", onMsg); };
+  }, []);
+  return cfg;
+}
 
 export function useWebRooms() {
   const [rooms, setRooms] = useState<WebRoomRow[] | null>(null);

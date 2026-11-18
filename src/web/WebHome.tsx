@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { vnd } from "../lib/money";
-import { floorText, perText, shortAddr, typeGroup, usePhotoUrls, useWebRooms, type WebRoomRow } from "./webApi";
+import { floorText, perText, shortAddr, typeGroup, usePhotoUrls, useWebRooms, webCfg, webShow, webText, type WebRoomRow } from "./webApi";
 import { WebFooter, WebHeader, WebIcon, zaloHref } from "./WebShell";
 
 type Filter = { building: string; group: string; price: string; mode: string };
@@ -52,7 +52,9 @@ export default function WebHome() {
     return out;
   }, [rooms, buildings]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const heroPhoto = buildings.find((b) => b.photo)?.photo ?? null;
+  const cfg = webCfg();
+  const heroPhoto = (cfg.hero_building ? buildings.find((b) => b.id === cfg.hero_building && b.photo)?.photo : null)
+    ?? buildings.find((b) => b.photo)?.photo ?? null;
   const [heroUrl] = usePhotoUrls(heroPhoto ? [heroPhoto] : null, "full");
   const featureUrls = usePhotoUrls(features.map((x) => x.photo), "full");
   const buildingUrls = usePhotoUrls(buildings.map((b) => b.photo), "thumb");
@@ -68,6 +70,7 @@ export default function WebHome() {
 
   return (
     <div className="web">
+      {cfg.notice_on && cfg.notice ? <div className="web-notice" role="note">{cfg.notice}</div> : null}
       <section className="web-hero">
         {heroUrl ? <img className="web-hero-img" src={heroUrl} alt="" /> : (
           <svg className="web-skyline" aria-hidden="true" viewBox="0 0 1440 640" preserveAspectRatio="xMidYMax slice">
@@ -78,9 +81,9 @@ export default function WebHome() {
         <div className="web-hero-shade" aria-hidden="true" />
         <div style={{ position: "relative" }}><WebHeader /></div>
         <div className="web-wrap web-hero-text">
-          <span className="web-eyebrow">Căn hộ dịch vụ · TP.HCM</span>
-          <h1>Sống tiện nghi,<br /><em>dọn vào là ở.</em></h1>
-          <p>Phòng và căn hộ dịch vụ ở trung tâm TP.HCM. Trống thật, cập nhật theo giờ.</p>
+          <span className="web-eyebrow">{webText("eyebrow")}</span>
+          <h1>{webText("title1")}<br /><em>{webText("title2")}</em></h1>
+          <p>{webText("subtitle")}</p>
         </div>
       </section>
 
@@ -116,7 +119,7 @@ export default function WebHome() {
 
       {err ? <div className="web-wrap web-sec"><div className="web-err" role="alert">{err}</div></div> : null}
 
-      {features.length ? (
+      {webShow("show_features") && features.length ? (
         <section className="web-wrap web-sec" aria-labelledby="kham-pha">
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><span className="web-eyebrow">Gợi ý từ phòng đang trống</span><h2 id="kham-pha">Khám phá mới</h2></div>
           <div className="web-grid">
@@ -132,6 +135,7 @@ export default function WebHome() {
         </section>
       ) : null}
 
+      {webShow("show_buildings") ? (
       <section id="toa" className="web-wrap web-sec" aria-labelledby="toa-h">
         <div className="web-sec-head">
           <div><span className="web-eyebrow">Toà nhà</span><h2 id="toa-h">Chọn nơi bạn muốn ở</h2></div>
@@ -148,6 +152,7 @@ export default function WebHome() {
           ))}
         </div>
       </section>
+      ) : null}
 
       <section id="phong" className="web-wrap web-sec" aria-labelledby="phong-h" style={{ scrollMarginTop: 12 }}>
         <div className="web-sec-head">
@@ -179,6 +184,7 @@ export default function WebHome() {
         </div>
       </section>
 
+      {webShow("show_app") ? (
       <section id="app" className="web-wrap web-sec">
         <div className="web-app">
           <div style={{ flex: "1 1 420px", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -193,7 +199,9 @@ export default function WebHome() {
           </div>
         </div>
       </section>
+      ) : null}
 
+      {webShow("show_brands") ? (
       <section id="thuong-hieu" className="web-wrap web-sec" aria-labelledby="th-h">
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><span className="web-eyebrow">Next Vision</span><h2 id="th-h">Hệ thương hiệu</h2></div>
         <div className="web-grid">
@@ -202,6 +210,7 @@ export default function WebHome() {
           <div className="web-brand"><b style={{ color: "var(--web-title)" }}>Next Stay</b><span className="web-muted">Khách sạn, lưu trú ngắn ngày.</span></div>
         </div>
       </section>
+      ) : null}
 
       <WebFooter />
       {zalo ? <a className="web-fab" href={zalo} target="_blank" rel="noopener" aria-label="Chat Zalo với Next Living">{WebIcon.chat}</a> : null}
