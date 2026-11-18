@@ -78,7 +78,8 @@ export default function WebHome() {
         <div className="web-hero-shade" aria-hidden="true" />
         <div style={{ position: "relative" }}><WebHeader /></div>
         <div className="web-wrap web-hero-text">
-          <h1>Sống tiện.<br />Dọn vào là ở.</h1>
+          <span className="web-eyebrow">Căn hộ dịch vụ · TP.HCM</span>
+          <h1>Sống tiện.<br /><em>Dọn vào là ở.</em></h1>
           <p>Phòng và căn hộ dịch vụ ở trung tâm TP.HCM. Trống thật, cập nhật theo giờ.</p>
         </div>
       </section>
@@ -117,7 +118,7 @@ export default function WebHome() {
 
       {features.length ? (
         <section className="web-wrap web-sec" aria-labelledby="kham-pha">
-          <h2 id="kham-pha">Khám phá mới</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><span className="web-eyebrow">Gợi ý từ phòng đang trống</span><h2 id="kham-pha">Khám phá mới</h2></div>
           <div className="web-grid">
             {features.map((x, i) => (
               <button key={x.tag} type="button" className="web-feature" style={{ background: `var(--web-card-${i + 1})` }} onClick={x.go}>
@@ -133,7 +134,7 @@ export default function WebHome() {
 
       <section id="toa" className="web-wrap web-sec" aria-labelledby="toa-h">
         <div className="web-sec-head">
-          <h2 id="toa-h">Toà nhà đang có phòng trống</h2>
+          <div><span className="web-eyebrow">Toà nhà</span><h2 id="toa-h">Chọn nơi bạn muốn ở</h2></div>
           {f.building ? <button type="button" className="web-pill" onClick={() => apply({ ...f, building: "" })}>Xem tất cả toà</button> : null}
         </div>
         <div className="web-grid sm">
@@ -142,7 +143,7 @@ export default function WebHome() {
               <div className="web-ph">{buildingUrls[i] ? <img src={buildingUrls[i]!} alt="" /> : WebIcon.photo(36)}</div>
               <h3>{b.name}</h3>
               <span className="web-muted" style={{ fontSize: 14 }}>{shortAddr(b.address)}</span>
-              <span style={{ fontSize: 15 }}><b style={{ color: "var(--web-green)" }}>từ {trieu(b.min)}</b> · {b.n} phòng trống</span>
+              <span style={{ fontSize: 15 }}><span style={{ color: "var(--web-green)", fontWeight: 500 }}>từ {trieu(b.min)}</span> · {b.n} phòng trống</span>
             </button>
           ))}
         </div>
@@ -151,6 +152,7 @@ export default function WebHome() {
       <section id="phong" className="web-wrap web-sec" aria-labelledby="phong-h" style={{ scrollMarginTop: 12 }}>
         <div className="web-sec-head">
           <div>
+            <span className="web-eyebrow">Trống ngay</span>
             <h2 id="phong-h">Phòng đang trống</h2>
             <p className="web-muted" style={{ margin: "4px 0 0" }}>{rooms ? `${list.length} phòng${list.length !== rooms.length ? ` (trong ${rooms.length})` : ""}` : "Đang tải…"} · sale đổi trạng thái trong app là trang này đổi theo.</p>
           </div>
@@ -180,7 +182,7 @@ export default function WebHome() {
       <section id="app" className="web-wrap web-sec">
         <div className="web-app">
           <div style={{ flex: "1 1 420px", display: "flex", flexDirection: "column", gap: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", color: "var(--web-green)" }}>App người thuê Next Living</span>
+            <span className="web-eyebrow">App người thuê Next Living</span>
             <h2>Thuê xong là có tài khoản app.</h2>
             <ul>
               <li>Xem hoá đơn, số điện, tiền nước từng tháng</li>
@@ -193,10 +195,10 @@ export default function WebHome() {
       </section>
 
       <section id="thuong-hieu" className="web-wrap web-sec" aria-labelledby="th-h">
-        <h2 id="th-h">Hệ thương hiệu Next Vision</h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><span className="web-eyebrow">Next Vision</span><h2 id="th-h">Hệ thương hiệu</h2></div>
         <div className="web-grid">
           <div className="web-brand"><b style={{ color: "var(--web-green)" }}>Next Living</b><span className="web-muted">Phòng ở, căn hộ dịch vụ thuê theo tháng.</span></div>
-          <div className="web-brand"><b style={{ color: "var(--soon)" }}>Next Hub</b><span className="web-muted">Văn phòng cho thuê, phòng livestream.</span></div>
+          <div className="web-brand"><b style={{ color: "var(--web-title)" }}>Next Hub</b><span className="web-muted">Văn phòng cho thuê, phòng livestream.</span></div>
           <div className="web-brand"><b style={{ color: "var(--web-title)" }}>Next Stay</b><span className="web-muted">Khách sạn, lưu trú ngắn ngày.</span></div>
         </div>
       </section>

@@ -81,9 +81,10 @@ export default function WebRoom() {
                 {room.area_m2 ? <span className="web-chip" style={{ display: "inline-flex", alignItems: "center" }}>{room.area_m2} m²</span> : null}
                 {room.max_occupants ? <span className="web-chip" style={{ display: "inline-flex", alignItems: "center" }}>Tối đa {room.max_occupants} người</span> : null}
               </div>
-              <h1 style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, color: "var(--web-title)" }}>{title}</h1>
-              <p className="web-muted" style={{ margin: 0 }}>{room.building.name}{room.building.address ? ` · ${room.building.address}` : ""}</p>
-              <p className="web-price" style={{ margin: "6px 0 0", fontSize: 32 }}>{vnd(room.list_price)}<small>{perText(room.rent_mode)} · đã gồm VAT</small></p>
+              <span className="web-eyebrow">{room.building.name}</span>
+              <h1 style={{ fontSize: "clamp(36px, 5vw, 56px)", color: "var(--web-title)" }}>{title}</h1>
+              <p className="web-muted" style={{ margin: 0 }}>{room.building.address ?? room.building.name}</p>
+              <p className="web-price" style={{ margin: "8px 0 0", fontSize: 28 }}>{vnd(room.list_price)}<small>{perText(room.rent_mode)} · đã gồm VAT</small></p>
             </div>
 
             {room.fees.length ? (
@@ -158,7 +159,7 @@ export default function WebRoom() {
       {vacant ? (
         <div className="web-sticky">
           <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            <strong style={{ color: "var(--web-green)", fontSize: 17 }}>{vnd(room.list_price)}</strong>
+            <strong style={{ color: "var(--web-green)", fontSize: 17, fontWeight: 500 }}>{vnd(room.list_price)}</strong>
             <span className="web-muted" style={{ fontSize: 12 }}>{monthly ? "mỗi tháng" : "mỗi đêm"}</span>
           </div>
           {zalo ? <a className="web-pill" href={zalo} target="_blank" rel="noopener" aria-label="Chat Zalo" style={{ width: 48, padding: 0 }}>{WebIcon.chat}</a> : null}
@@ -200,7 +201,7 @@ function BookForm({ room, title }: { room: WebRoomDetail; title: string }) {
     return (
       <div className="web-card web-ok" role="status">
         <span className="tick">{WebIcon.check}</span>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--web-title)" }}>Đã gửi lịch hẹn</h2>
+        <h2 style={{ color: "var(--web-title)" }}>Đã gửi lịch hẹn</h2>
         <p style={{ margin: 0 }}>Sale phụ trách {room.building.name} sẽ gọi số {phone} để xác nhận giờ xem.</p>
         <div className="web-table" style={{ alignSelf: "stretch", textAlign: "left" }}>
           <div><span>Phòng</span><strong>{title}</strong></div>
@@ -215,7 +216,7 @@ function BookForm({ room, title }: { room: WebRoomDetail; title: string }) {
 
   return (
     <form className="web-card" onSubmit={submit} noValidate>
-      <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--web-title)" }}>Đặt lịch xem phòng</h2>
+      <h2 style={{ color: "var(--web-title)" }}>Đặt lịch xem phòng</h2>
       <label className="web-field">Họ tên<input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} /></label>
       <label className="web-field">Số điện thoại<input type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="VD: 0901 234 567" /></label>
       <fieldset style={{ border: 0, margin: 0, padding: 0 }}>
@@ -243,8 +244,8 @@ function BookForm({ room, title }: { room: WebRoomDetail; title: string }) {
         <span>Tôi đồng ý cho Next Living dùng số điện thoại này để liên hệ hẹn xem phòng, theo <Link to="/phong/chinh-sach-du-lieu" target="_blank">chính sách dữ liệu cá nhân</Link>.</span>
       </label>
       {err ? <div className="web-err" role="alert">{err}</div> : null}
-      <button className="web-pill solid" disabled={busy} style={{ height: 54, fontSize: 17, borderRadius: 14 }}>{busy ? "Đang gửi…" : "Gửi lịch hẹn"}</button>
-      {zalo ? <a className="web-pill" href={zalo} target="_blank" rel="noopener" style={{ borderRadius: 14 }}>Hỏi nhanh qua Zalo</a> : null}
+      <button className="web-pill solid" disabled={busy} style={{ height: 56, fontSize: 16 }}>{busy ? "Đang gửi…" : "Gửi lịch hẹn"}</button>
+      {zalo ? <a className="web-pill" href={zalo} target="_blank" rel="noopener">Hỏi nhanh qua Zalo</a> : null}
       <p className="web-muted" style={{ margin: 0, fontSize: 13 }}>Sale phụ trách toà nhận lịch hẹn trong app và gọi lại để xác nhận giờ xem.</p>
     </form>
   );

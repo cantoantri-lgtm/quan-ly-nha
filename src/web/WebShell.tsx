@@ -75,7 +75,7 @@ export function WebPolicy() {
     <div className="web">
       <div className="web-bar"><WebHeader /></div>
       <main className="web-wrap web-sec" style={{ maxWidth: 760 }}>
-        <h1 style={{ fontSize: 32, fontWeight: 800, color: "var(--web-title)" }}>Chính sách dữ liệu cá nhân</h1>
+        <h1 style={{ fontSize: 44, color: "var(--web-title)" }}>Chính sách dữ liệu cá nhân</h1>
         <p>Khi anh chị đặt lịch xem phòng trên trang này, Next Living (Công ty Next Vision) nhận họ tên, số điện thoại, ngày giờ muốn xem và ghi chú anh chị nhập.</p>
         <p>Chúng tôi chỉ dùng các thông tin đó để gọi điện, nhắn tin hẹn giờ xem phòng và tư vấn phòng phù hợp. Chỉ nhân viên phụ trách toà nhà và quản lý công ty xem được. Chúng tôi không bán hay chia sẻ thông tin này cho bên khác.</p>
         <p>Anh chị có thể yêu cầu xem, sửa hoặc xoá thông tin của mình bằng cách liên hệ nhân viên đã gọi cho anh chị.</p>
