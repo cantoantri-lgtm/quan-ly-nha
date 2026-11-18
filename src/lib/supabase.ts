@@ -4,8 +4,15 @@ import { createClient } from "@supabase/supabase-js";
 const URL = import.meta.env.VITE_SUPABASE_URL ?? "https://nbxnupvceeyqqwrabjfc.supabase.co";
 const KEY = import.meta.env.VITE_SUPABASE_KEY ?? "sb_publishable_hETTG4G-xty-xj1rm2B3NQ_fILjnDux";
 
+// Khung xem trước website trong trang Cài đặt website (/phong?xem=thu trong iframe): không dùng chung phiên đăng nhập,
+// để iframe không ghi vào kho đăng nhập của tab chính (gây tab chính tải lại liên tục).
+const isPreviewFrame = typeof window !== "undefined" && window.parent !== window
+  && window.location.pathname.startsWith("/phong") && new URLSearchParams(window.location.search).get("xem") === "thu";
+
 export const supabase = createClient(URL, KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, storageKey: "neo-nestly-auth" },
+  auth: isPreviewFrame
+    ? { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "neo-nestly-preview" }
+    : { persistSession: true, autoRefreshToken: true, storageKey: "neo-nestly-auth" },
 });
 
 export const EMAIL_DOMAIN = "neonestly.app";

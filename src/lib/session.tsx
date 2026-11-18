@@ -49,6 +49,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [myStaff, setMyStaff] = useState<Staff | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<number>();
+  const userRef = useRef<string | null>(null);   // người đang đăng nhập đã tải dữ liệu nền
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -65,6 +66,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loadBase = useCallback(async (uid: string) => {
+    userRef.current = uid;
     const [p, b, ppl, mem, st] = await Promise.all([
       supabase.from("profiles").select("id,full_name,phone,role,is_active,annual_leave_days").eq("id", uid).maybeSingle(),
       supabase.from("buildings").select("*").order("code"),
@@ -91,11 +93,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      if (event === "SIGNED_IN" && s) {
+      // SIGNED_IN còn bắn lại khi quay lại tab hoặc khi tab khác làm mới phiên: chỉ tải lại khi đổi sang người khác,
+      // không che cả app bằng màn "Đang tải" (trang đang mở bị dựng lại, mất dữ liệu đang nhập)
+      if (event === "SIGNED_IN" && s && s.user.id !== userRef.current) {
         setLoading(true);
         loadBase(s.user.id).finally(() => setLoading(false));
       }
       if (event === "SIGNED_OUT") {
+        userRef.current = null;
         setProfile(null); setBuildings([]); setPeople([]); setMyBuildingIds([]); setUnread(0); setPending(0);
       }
     });
