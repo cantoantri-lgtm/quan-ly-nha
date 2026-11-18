@@ -79,7 +79,7 @@ export default function WebHome() {
         <div style={{ position: "relative" }}><WebHeader /></div>
         <div className="web-wrap web-hero-text">
           <span className="web-eyebrow">Căn hộ dịch vụ · TP.HCM</span>
-          <h1>Sống tiện.<br /><em>Dọn vào là ở.</em></h1>
+          <h1>Sống tiện nghi,<br /><em>dọn vào là ở.</em></h1>
           <p>Phòng và căn hộ dịch vụ ở trung tâm TP.HCM. Trống thật, cập nhật theo giờ.</p>
         </div>
       </section>
