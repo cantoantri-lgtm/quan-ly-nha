@@ -33,6 +33,8 @@ type Ctx = {
   /** Lead Sale trở lên: Quản lý, Giám sát, hoặc Leader / cấp L2+ trong sơ đồ công ty. Xem được báo cáo */
   isLeadUp: boolean;
   isAccountant: boolean;
+  /** Nhân viên phụ trách nhân sự (xác nhận ngày công tác) */
+  isHr: boolean;
 };
 
 const SessionContext = createContext<Ctx | null>(null);
@@ -138,6 +140,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     isApprover: !!myStaff && (myStaff.is_leader || !!myStaff.duty || (myStaff.level ?? 0) >= 3),
     isLeadUp: profile?.role === "quan_ly" || profile?.role === "giam_sat" || (!!myStaff && profile?.role === "nhan_vien" && (myStaff.is_leader || (myStaff.level ?? 0) >= 2)),
     isAccountant: myStaff?.duty === "ke_toan",
+    isHr: myStaff?.duty === "nhan_su",
   }), [session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

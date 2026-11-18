@@ -49,3 +49,13 @@
 /* Tờ trình (LOA) */
 .pd-conf { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--danger); }
 .pd-pre { white-space: pre-wrap; }
+
+/* Bản in công tác (mẫu CT-01 … CT-04) */
+.pd-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.pd-tabs a { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-weight: 600; font-size: 13px; text-decoration: none; background: var(--surface); }
+.pd-tabs a[aria-current="page"] { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+.pd-box { border: 1px solid currentColor; padding: 8px 10px; margin-top: 14px; }
+.pd-box p { margin: 6px 0 0; }
+.pd-grid tr.pd-tall td { height: 46px; }
+.pd-warn { font-size: 12.5px; font-style: italic; margin: 6px 0; }
+@media print { .pd-tabs { display: none !important; } }

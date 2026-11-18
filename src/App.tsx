@@ -25,6 +25,7 @@ import RequestForm from "./pages/RequestForm";
 import LoaForm from "./pages/LoaForm";
 import RequestDetail from "./pages/RequestDetail";
 import RequestPrint from "./pages/RequestPrint";
+import TripPrint from "./pages/TripPrint";
 import RequestList from "./pages/RequestList";
 import Org from "./pages/Org";
 import Tenants, { TenantDetail } from "./pages/Tenants";
@@ -168,6 +169,7 @@ export default function App() {
         <Route path="van-phong/:id" element={<RequestDetail />} />
         <Route path="van-phong/:id/sua" element={<RequestForm />} />
         <Route path="van-phong/:id/in" element={<RequestPrint />} />
+        <Route path="van-phong/:id/in-cong-tac/:mau" element={<TripPrint />} />
         <Route path="to-chuc" element={<Org />} />
         <Route element={<LeadOnly />}>
           <Route path="bao-cao" element={<Reports />} />

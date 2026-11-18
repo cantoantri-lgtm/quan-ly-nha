@@ -9,10 +9,13 @@ import { DUTY_LABEL, EDIT_LOCK_TIP, FLOW_TEXT, KINDS, PAUSED_TIP, usePausedKinds
 import { Icon, Sheet } from "../components/ui";
 import { Pager, usePaging } from "../components/Pager";
 import { RelatedPanel } from "../components/RelatedPanel";
+import DecideSheet, { type DecideMode } from "../components/DecideSheet";
+import { CostTable, LegTable } from "../components/TripGrids";
+import { loadTrip, type TripCost, type TripLeg } from "../lib/trip";
 import "../office.css";
 import "../table.css";
 
-type Tab = "tat_ca" | "duyet" | "xu_ly" | "can_sua" | "hoan_tat";
+type Tab = "tat_ca" | "cua_toi" | "duyet" | "xu_ly" | "can_sua" | "xac_nhan" | "hoan_tat";
 
 const csvCell = (v: string | number | null | undefined) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
@@ -31,6 +34,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   const tab = (params.get("tab") as Tab) || "tat_ca";
   const money = kind === "thanh_toan" || kind === "tam_ung";
   const loa = kind === "loa";
+  const trip = kind === "cong_tac";
   const noun = loa ? "tờ trình" : "đề nghị";
   const newUrl = loa ? "/van-phong/loa/moi" : `/van-phong/moi/${kind}`;
   const { paused } = usePausedKinds();
@@ -52,8 +56,10 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   const [lines, setLines] = useState<ReqLine[]>([]);
   const [loaLines, setLoaLines] = useState<LoaLine[]>([]);
   const [coEdit, setCoEdit] = useState<Set<string>>(new Set());   // tờ trình mình là người cùng soạn
-  const hasPanel = kind === "thanh_toan" || loa;
-  const [panel, setPanel] = useState<"ct" | "duyet" | "lk">(hasPanel ? "ct" : "duyet");
+  const [tripData, setTripData] = useState<{ legs: TripLeg[]; costs: TripCost[]; act: boolean } | null>(null);
+  const [decide, setDecide] = useState<DecideMode | null>(null);
+  const hasPanel = kind === "thanh_toan" || loa || trip;
+  const [panel, setPanel] = useState<"ct" | "cp" | "duyet" | "lk">(hasPanel ? "ct" : "duyet");
   const [delReq, setDelReq] = useState<Req | null>(null);
   const [busy, setBusy] = useState(false);
   const [help, setHelp] = useState(false);
@@ -108,16 +114,18 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
       if (from && m < from) return false;
       if (to && m > to) return false;
       if (!kw) return true;
-      return [r.doc_no, r.reason, r.payee, r.location, name(r.requester_id)].some((v) => (v ?? "").toLowerCase().includes(kw));
+      return [r.doc_no, r.reason, r.payee, r.location, name(r.requester_id), name(r.traveler_id ?? null)].some((v) => (v ?? "").toLowerCase().includes(kw));
     });
   }, [rows, from, to, applied, people]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inTab = useCallback((r: Req, t: Tab) =>
     t === "tat_ca" ? true
+    : t === "cua_toi" ? r.requester_id === profile?.id || r.traveler_id === profile?.id
+    : t === "xac_nhan" ? r.status === "hoan_tat" && !r.hr_confirmed_at
     : t === "duyet" ? queue.has(r.id)
     : t === "xu_ly" ? (r.status === "cho_duyet" || (r.status === "da_duyet" && !isFinished(r))) || r.status === "tra_lai"
     : t === "can_sua" ? isEditableStatus(r.status) && r.status !== "da_huy"
-    : isFinished(r), [queue]);
+    : isFinished(r), [queue, profile?.id]);
   const shown = useMemo(() => base.filter((r) => inTab(r, tab)), [base, tab, inTab]);
   const n = (t: Tab) => base.filter((r) => inTab(r, t)).length;
   const paging = usePaging(shown);
@@ -129,8 +137,12 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   // Chi tiết dòng đang chọn
   const sel = rows.find((r) => r.id === selId) ?? null;
   useEffect(() => {
-    setLines([]); setLoaLines([]);
+    setLines([]); setLoaLines([]); setTripData(null);
     if (!sel) return;
+    if (kind === "cong_tac") loadTrip(sel.id).then((t) => {
+      const act = sel.status === "hoan_tat" && (t.actLegs.length > 0 || t.actCosts.length > 0);
+      setTripData({ legs: act && t.actLegs.length ? t.actLegs : t.planLegs, costs: act && t.actCosts.length ? t.actCosts : t.planCosts, act });
+    });
     if (kind === "thanh_toan") supabase.from("request_lines").select("*").eq("request_id", sel.id).order("line_no").then(({ data }) => setLines((data ?? []) as ReqLine[]));
     if (kind === "loa") supabase.from("loa_lines").select("*").eq("request_id", sel.id).order("line_no").then(({ data }) => setLoaLines((data ?? []) as LoaLine[]));
   }, [sel?.id, kind]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -141,11 +153,16 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
     const head = loa ? ["Số LOA", "Ngày", "Người trình", "Tiêu đề", "Số tiền", "Loại tiền", "Trạng thái"]
       : money
       ? ["Số chứng từ", "Ngày", "Người đề nghị", "Nội dung", "Đơn vị nhận", "Số tiền", "Trạng thái"]
+      : trip
+      ? ["Số đăng ký", "Ngày gửi", "Người đề nghị", "Người đi", "Nơi công tác", "Kế hoạch", "Nội dung", "Dự trù", "Thực tế từ", "Thực tế đến", "Chi phí thực tế", "Nhân sự xác nhận", "Trạng thái"]
       : ["Ngày gửi", "Người đề nghị", "Thời gian", "Lý do", "Trạng thái"];
     const lines = shown.map((r) => loa
       ? [r.doc_no, ddmmyyyy(r.doc_date ?? vnDate(r.created_at)), name(r.requester_id), r.reason, r.amount, r.currency, statusLabel(r)]
       : money
       ? [r.doc_no, ddmmyyyy(r.doc_date ?? r.created_at), name(r.requester_id), r.reason, r.payee, r.amount, statusLabel(r)]
+      : trip
+      ? [r.doc_no, ddmmyyyy(vnDate(r.created_at)), name(r.requester_id), name(r.traveler_id ?? r.requester_id), r.location, summary(r), r.reason, r.amount,
+         r.actual_start ? ddmmyyyy(r.actual_start) : "", r.actual_end ? ddmmyyyy(r.actual_end) : "", r.actual_cost, r.hr_confirmed_at ? "Đã xác nhận" : "", statusLabel(r)]
       : [ddmmyyyy(vnDate(r.created_at)), name(r.requester_id), summary(r), r.reason, statusLabel(r)]);
     const csv = "﻿" + [head, ...lines].map((l) => l.map(csvCell).join(",")).join("\r\n");
     const a = document.createElement("a");
@@ -172,7 +189,10 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   const canDel = (r: Req) => (mine(r) || isManager) && isEditableStatus(r.status);
   const lockTip = (r: Req, what: string) => (isEditableStatus(r.status) ? (what === "sửa" ? (loa ? "Chỉ người lập và người cùng soạn mới sửa được" : "Chỉ người lập đề nghị mới sửa được") : "Chỉ người lập hoặc Quản lý mới xoá được") : EDIT_LOCK_TIP);
 
-  const tiles: [Tab, string][] = [["tat_ca", "Tất cả"], ["duyet", "Chờ bạn duyệt"], ["xu_ly", "Đang xử lý"], ["can_sua", loa ? "Nháp / cần sửa" : "Cần sửa"], ["hoan_tat", "Đã hoàn tất"]];
+  const tiles: [Tab, string][] = trip
+    ? [["tat_ca", "Tất cả"], ["cua_toi", "Đăng ký của tôi"], ["duyet", "Chờ bạn duyệt"], ["xu_ly", "Đang xử lý"], ["can_sua", "Cần sửa"], ["xac_nhan", "Chờ nhân sự xác nhận"], ["hoan_tat", "Đã hoàn tất"]]
+    : [["tat_ca", "Tất cả"], ["duyet", "Chờ bạn duyệt"], ["xu_ly", "Đang xử lý"], ["can_sua", loa ? "Nháp / cần sửa" : "Cần sửa"], ["hoan_tat", "Đã hoàn tất"]];
+  const canDecideSel = !!sel && queue.has(sel.id) && sel.status === "cho_duyet";
   const dateRange = (r: Req) => summary(r);
 
   return (
@@ -214,6 +234,13 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
           <button type="button" className="rb" disabled={!sel} title={sel ? `Xem ${noun} đang chọn` : "Chọn một dòng trước"} onClick={() => sel && nav(`/van-phong/${sel.id}`)}>{Icon.eye}Xem</button>
           <button type="button" className="rb" disabled={!sel || !canEdit(sel)} title={!sel ? "Chọn một dòng trước" : canEdit(sel) ? `Sửa ${noun}` : lockTip(sel, "sửa")} onClick={() => sel && nav(editUrl(sel))}>{Icon.edit}Sửa</button>
           <button type="button" className="rb" disabled={!sel || !canDel(sel)} title={!sel ? "Chọn một dòng trước" : canDel(sel) ? `Xoá ${noun}` : lockTip(sel, "xoá")} onClick={() => sel && setDelReq(sel)}>{Icon.trash}Xoá</button>
+          {trip ? <button type="button" className="rb" disabled={!sel || closed} title={sel ? "Tạo phiếu mới chép từ phiếu đang chọn" : "Chọn một dòng trước"} onClick={() => sel && nav(`/van-phong/moi/cong_tac?tu=${sel.id}`)}>{Icon.copy}Nhân bản</button> : null}
+          {trip ? <>
+            <span className="rb-sep" aria-hidden="true" />
+            <button type="button" className="rb" disabled={!canDecideSel} title={canDecideSel ? "Duyệt phiếu đang chọn" : "Chọn phiếu đang chờ bạn duyệt"} onClick={() => setDecide("da_duyet")}>{Icon.check}Duyệt</button>
+            <button type="button" className="rb" disabled={!canDecideSel} title="Trả lại để người lập sửa" onClick={() => setDecide("tra_lai")}>{Icon.undo}Trả lại</button>
+            <button type="button" className="rb" disabled={!canDecideSel} title="Từ chối phiếu" onClick={() => setDecide("tu_choi")}>{Icon.x}Từ chối</button>
+          </> : null}
           <span className="rb-sep" aria-hidden="true" />
           <button type="button" className="rb" title="In danh sách" onClick={() => window.print()}>{Icon.print}In</button>
           <button type="button" className="rb" title="Tải danh sách dạng CSV, mở bằng Excel" disabled={!shown.length} onClick={exportCsv}>{Icon.download}Xuất Excel</button>
@@ -233,10 +260,12 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
               <thead>
                 <tr>
                   <th>Thao tác</th>
-                  {loa ? <><th>Số LOA</th><th>Ngày</th></> : money ? <><th>Số chứng từ</th><th>Ngày</th></> : <th>Ngày gửi</th>}
+                  {loa ? <><th>Số LOA</th><th>Ngày</th></> : money ? <><th>Số chứng từ</th><th>Ngày</th></> : trip ? <><th>Số đăng ký</th><th>Ngày gửi</th></> : <th>Ngày gửi</th>}
                   <th>{loa ? "Người trình" : "Người đề nghị"}</th>
                   {loa ? <><th>Tiêu đề</th><th className="r">Số tiền</th></>
-                    : money ? <><th>Nội dung</th><th>Đơn vị nhận</th><th className="r">Tiền đề nghị</th></> : <><th>Thời gian</th><th>Lý do</th></>}
+                    : money ? <><th>Nội dung</th><th>Đơn vị nhận</th><th className="r">Tiền đề nghị</th></>
+                    : trip ? <><th>Người đi</th><th>Nơi công tác</th><th>Kế hoạch</th><th>Nội dung</th><th className="r">Dự trù</th><th>Thực tế</th><th className="r">Chi phí TT</th><th>Nhân sự XN</th></>
+                    : <><th>Thời gian</th><th>Lý do</th></>}
                   <th>Trạng thái</th><th>Đang chờ</th>
                 </tr>
               </thead>
@@ -260,6 +289,9 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
                       </> : money ? <>
                         <td data-label="Số chứng từ" className="num"><Link to={`/van-phong/${r.id}`} className="dt-link">{r.doc_no ?? "—"}</Link></td>
                         <td data-label="Ngày" className="num">{ddmmyyyy(r.doc_date ?? r.created_at)}</td>
+                      </> : trip ? <>
+                        <td data-label="Số đăng ký" className="num"><Link to={`/van-phong/${r.id}`} className="dt-link">{r.doc_no ?? "—"}</Link></td>
+                        <td data-label="Ngày gửi" className="num">{ddmmyyyy(vnDate(r.created_at))}</td>
                       </> : <td data-label="Ngày gửi" className="num">{ddmmyyyy(vnDate(r.created_at))}</td>}
                       <td data-label={loa ? "Người trình" : "Người đề nghị"}>{name(r.requester_id)}</td>
                       {loa ? <>
@@ -269,6 +301,15 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
                         <td data-label="Nội dung"><div className="clip">{r.reason}</div></td>
                         <td data-label="Đơn vị nhận">{r.payee ?? "—"}</td>
                         <td data-label="Tiền đề nghị" className="r">{vnd(r.amount)}</td>
+                      </> : trip ? <>
+                        <td data-label="Người đi">{name(r.traveler_id ?? r.requester_id)}</td>
+                        <td data-label="Nơi công tác">{r.location}</td>
+                        <td data-label="Kế hoạch" className="num">{dateRange(r)}</td>
+                        <td data-label="Nội dung"><div className="clip">{r.reason}</div></td>
+                        <td data-label="Dự trù" className="r">{r.amount ? vnd(r.amount) : "—"}</td>
+                        <td data-label="Thực tế" className="num">{r.actual_start ? `${ddmmyyyy(r.actual_start)}${r.actual_end && r.actual_end !== r.actual_start ? " – " + ddmmyyyy(r.actual_end) : ""}` : ""}</td>
+                        <td data-label="Chi phí TT" className="r">{r.actual_cost != null ? vnd(r.actual_cost) : ""}</td>
+                        <td data-label="Nhân sự XN">{r.hr_confirmed_at ? <span className="ok-text">{Icon.check} Đã XN</span> : r.status === "hoan_tat" ? <span className="t2">Chờ XN</span> : ""}</td>
                       </> : <>
                         <td data-label="Thời gian" className="num"><Link to={`/van-phong/${r.id}`} className="dt-link">{dateRange(r)}</Link></td>
                         <td data-label="Lý do"><div className="clip">{r.reason}</div></td>
@@ -283,6 +324,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
                 })}
               </tbody>
               {money ? <tfoot><tr><td colSpan={6} style={{ textAlign: "right" }}>Tổng cộng ({shown.length} phiếu)</td><td className="r num">{vnd(total)}</td><td colSpan={2} /></tr></tfoot> : null}
+              {trip ? <tfoot><tr><td colSpan={8} style={{ textAlign: "right" }}>Tổng cộng ({shown.length} phiếu)</td><td className="r num">{vnd(total)}</td><td /><td className="r num">{vnd(shown.reduce((t, r) => t + Number(r.actual_cost ?? 0), 0))}</td><td colSpan={3} /></tr></tfoot> : null}
               {loa ? <tfoot><tr><td colSpan={5} style={{ textAlign: "right" }}>Tổng cộng VND ({shown.length} tờ trình)</td><td className="r num">{vnd(shown.reduce((t, r) => t + (r.currency === "VND" ? Number(r.amount ?? 0) : 0), 0))}</td><td colSpan={2} /></tr></tfoot> : null}
             </table>
           </div>
@@ -293,13 +335,16 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
       {sel ? (
         <section className="pg-card" aria-label="Chi tiết dòng đang chọn">
           <div className="sub-tabs" role="tablist">
-            {hasPanel ? <button role="tab" aria-selected={panel === "ct"} onClick={() => setPanel("ct")}>{loa ? "Dự toán ngân sách" : "Chi tiết hoá đơn"}</button> : null}
+            {hasPanel ? <button role="tab" aria-selected={panel === "ct"} onClick={() => setPanel("ct")}>{loa ? "Dự toán ngân sách" : trip ? (tripData?.act ? "Lộ trình thực tế" : "Kế hoạch công tác") : "Chi tiết hoá đơn"}</button> : null}
+            {trip ? <button role="tab" aria-selected={panel === "cp"} onClick={() => setPanel("cp")}>{tripData?.act ? "Bảng kê thanh toán" : "Thông tin chi phí"}</button> : null}
             <button role="tab" aria-selected={panel === "duyet" || (!hasPanel && panel !== "lk")} onClick={() => setPanel("duyet")}>Luồng duyệt</button>
             <button role="tab" aria-selected={panel === "lk"} onClick={() => setPanel("lk")}>Liên quan</button>
             <span className="grow" />
             <Link to={`/van-phong/${sel.id}`} className="dt-link" style={{ alignSelf: "center" }}>Mở {noun} →</Link>
           </div>
-          {panel === "lk" ? <RelatedPanel key={sel.id} type="request" id={sel.id} title="Mục liên quan" bare /> : (
+          {panel === "lk" ? <RelatedPanel key={sel.id} type="request" id={sel.id} title="Mục liên quan" bare />
+            : trip && panel === "ct" ? (tripData ? <LegTable legs={tripData.legs} people={people} actual={tripData.act} /> : <div className="dt-empty">Đang tải…</div>)
+            : trip && panel === "cp" ? (tripData ? <CostTable costs={tripData.costs} /> : <div className="dt-empty">Đang tải…</div>) : (
           <div className="dt-wrap">
             {loa && panel === "ct" ? (
               <table className="dt">
@@ -349,6 +394,8 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
         </section>
       ) : null}
 
+      <DecideSheet req={decide ? sel : null} mode={decide} onClose={() => setDecide(null)} onDone={() => { setDecide(null); load(); refreshUnread(); }} />
+
       <Sheet open={!!delReq} onClose={() => setDelReq(null)} title={`Xoá ${noun}?`}>
         <p className="muted" style={{ marginTop: 0 }}>
           {delReq ? `${kindLabel(delReq)}${delReq.doc_no ? ` · ${delReq.doc_no}` : ""} · ${summary(delReq)}. ` : ""}Xoá hẳn {noun} cùng tệp đính kèm, không khôi phục được.
@@ -367,6 +414,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
           <p style={{ margin: 0 }}><b>Thêm nhanh:</b> bấm “+ Thêm” hoặc phím F2. Bấm vào một dòng để xem {loa ? "dự toán" : "chi tiết hoá đơn"} và luồng duyệt ngay bên dưới.</p>
           {loa ? <p style={{ margin: 0 }}><b>Bản nháp:</b> tờ trình lưu nháp nhiều lần được, chỉ người lập và người cùng soạn nhìn thấy. Bấm “Trình duyệt” thì hệ thống cấp số LOA và bắt đầu luồng duyệt. LOA đã duyệt xong thì khoá.</p> : null}
           {loa ? <p style={{ margin: 0 }}><b>Dùng LOA:</b> đề nghị tạm ứng và đề nghị thanh toán có thể chọn một LOA chi tiền đã duyệt để tham chiếu và theo dõi dự toán (không bắt buộc). Người lập, người cùng soạn, người và phòng ban được xem của LOA đó mới chọn được.</p> : null}
+          {trip ? <p style={{ margin: 0 }}><b>Đi công tác:</b> lập phiếu với kế hoạch và chi phí dự trù, gửi duyệt. Duyệt xong thì in phiếu yêu cầu, kế hoạch, giấy đi đường; cần tiền trước thì lập đề nghị tạm ứng ngay trong phiếu. Về thì bấm “Nhập thực tế công tác”, nhập lộ trình và bảng kê chứng từ. Nhân sự xác nhận ngày đi, ngày về để tính công. Từ bảng kê bấm “Lập đề nghị thanh toán”.</p> : null}
           {money ? <p style={{ margin: 0 }}><b>Tờ trình (LOA):</b> không bắt buộc. Khoản chi thuộc một LOA đã duyệt thì chọn LOA đó để theo dõi dự toán.</p> : null}
         </div>
       </Sheet>

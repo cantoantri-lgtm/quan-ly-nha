@@ -53,6 +53,16 @@ export type Req = {
   contact_phone: string | null;
   transport: string | null;
   settle_due: string | null;
+  /** Công tác (migration 067) */
+  trip_type?: string | null;
+  trip_area?: string | null;
+  visa_type?: string | null;
+  traveler_id?: string | null;
+  hr_confirmed_at?: string | null;
+  hr_confirmed_by?: string | null;
+  hr_note?: string | null;
+  /** Đề nghị tạm ứng / thanh toán lập từ chuyến công tác */
+  trip_id?: string | null;
 };
 
 export type ReqLine = {

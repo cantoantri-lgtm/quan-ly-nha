@@ -277,3 +277,14 @@
 .main.main-form { max-width: 1500px; }
 @media (min-width: 900px) { .dn-erp .dn-submit { bottom: var(--status-h, 0px); } }
 .dn-sheet { display: grid; gap: 14px; min-width: 0; }
+
+/* Đi công tác */
+.ok-text { color: var(--s-done); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+.ok-text svg { width: 14px; height: 14px; }
+.trip-links { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.trip-links li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.trip-links li:last-child { border-bottom: 0; }
+.trip-links li > :first-child { flex: 1; font-weight: 600; }
+.trip-prints { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.trip-prints .btn { font-size: 13.5px; }
+@media (min-width: 900px) { .trip-prints { grid-template-columns: repeat(4, 1fr); } }

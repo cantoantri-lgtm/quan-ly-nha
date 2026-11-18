@@ -4,7 +4,7 @@ import { RelatedPanel } from "../components/RelatedPanel";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { clock, daysBetween, todayVN } from "../lib/dates";
-import { parseMoney, vnd, vndWords } from "../lib/money";
+import { vnd, vndWords } from "../lib/money";
 import { EDIT_LOCK_TIP, LEAVE_SPAN, LEAVE_TYPE, LOA_DOC_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, deleteRequest, fmtDays, fullDate, hhmm, isEditableStatus, kindLabel, statusLabel, summary, type LoaDetails, type Req, type ReqStep } from "../lib/office";
 import { Empty, Icon, Sheet, TopBar } from "../components/ui";
 import DecideSheet, { type DecideMode } from "../components/DecideSheet";
@@ -13,11 +13,13 @@ import DnttView from "../components/DnttView";
 import LoaView, { LoaBudget } from "../components/LoaView";
 import { ApprovalSteps } from "../components/ApprovalChain";
 import { KIND_ICON, LeaveBalance } from "./Office";
+import { CostGrid, CostTable, LegGrid, LegTable } from "../components/TripGrids";
+import { TRIP_TYPE, VISA_TYPE, costFilled, costFromRow, costTotal, emptyCost, emptyLeg, legFilled, legFromRow, loadTrip, saveTrip, type CostDraft, type LegDraft, type TripCost, type TripLeg } from "../lib/trip";
 import "../office.css";
 
 export default function RequestDetail() {
   const { id } = useParams();
-  const { profile, people, buildings, isManager, isAccountant, toast, refreshUnread } = useSession();
+  const { profile, people, buildings, isManager, isAccountant, isHr, toast, refreshUnread } = useSession();
   const nav = useNavigate();
   const [r, setR] = useState<Req | null>(null);
   const [steps, setSteps] = useState<ReqStep[]>([]);
@@ -28,7 +30,13 @@ export default function RequestDetail() {
   const [report, setReport] = useState(false);
   const [aStart, setAStart] = useState("");
   const [aEnd, setAEnd] = useState("");
-  const [aCost, setACost] = useState("");
+  const [trip, setTrip] = useState<{ planLegs: TripLeg[]; actLegs: TripLeg[]; planCosts: TripCost[]; actCosts: TripCost[] } | null>(null);
+  const [aLegs, setALegs] = useState<LegDraft[]>([]);
+  const [aCosts, setACosts] = useState<CostDraft[]>([]);
+  const [linked, setLinked] = useState<{ id: string; kind: string; doc_no: string | null; amount: number | null; status: string; created_at: string; can_open: boolean }[]>([]);
+  const [tripOf, setTripOf] = useState<Req | null>(null);   // chuyến công tác gốc của đề nghị tạm ứng / thanh toán
+  const [hrOpen, setHrOpen] = useState(false);
+  const [hrNote, setHrNote] = useState("");
   const [aNote, setANote] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [uncCount, setUncCount] = useState(0);
@@ -48,6 +56,15 @@ export default function RequestDetail() {
       ]);
       setLoa((d.data as LoaDetails | null) ?? null); setLoaCanEdit(!!can.data);
     } else { setLoa(null); setLoaCanEdit(false); }
+    const rq = data as Req;
+    if (rq.kind === "cong_tac") {
+      const [t, lk] = await Promise.all([loadTrip(rq.id), supabase.rpc("trip_linked", { p_trip: rq.id })]);
+      setTrip(t); setLinked((lk.data ?? []) as typeof linked);
+    } else { setTrip(null); setLinked([]); }
+    if (rq.trip_id) {
+      const { data: t } = await supabase.from("requests").select("*").eq("id", rq.trip_id).maybeSingle();
+      setTripOf((t as Req | null) ?? null);
+    } else setTripOf(null);
     setR(data as Req);
     setSteps((st.data ?? []) as ReqStep[]);
   }, [id]);
@@ -112,7 +129,10 @@ export default function RequestDetail() {
   function openReport() {
     setAStart(r!.actual_start ?? r!.start_date);
     setAEnd(r!.actual_end ?? r!.end_date ?? r!.start_date);
-    setACost(r!.actual_cost != null ? String(r!.actual_cost) : "");
+    const t = trip;
+    const me = r!.traveler_id ?? r!.requester_id;
+    setALegs(t?.actLegs.length ? t.actLegs.map(legFromRow) : t?.planLegs.length ? t.planLegs.map(legFromRow) : [emptyLeg(me)]);
+    setACosts(t?.actCosts.length ? t.actCosts.map(costFromRow) : t?.planCosts.length ? t.planCosts.map(costFromRow) : [emptyCost()]);
     setANote(r!.actual_note ?? "");
     setErr(null); setReport(true);
   }
@@ -120,19 +140,37 @@ export default function RequestDetail() {
   async function submitReport(e: FormEvent) {
     e.preventDefault();
     if (aEnd < aStart) { setErr("Ngày về phải sau ngày đi."); return; }
-    const cost = aCost ? parseMoney(aCost) : null;
-    if (aCost && cost == null) { setErr("Chi phí chưa đúng định dạng."); return; }
-    const ok = await update({ actual_start: aStart, actual_end: aEnd, actual_cost: cost, actual_note: aNote.trim() || null, status: "hoan_tat" },
-      r!.status === "hoan_tat" ? "Đã lưu báo cáo công tác." : "Đã gửi báo cáo thực tế công tác.");
-    if (ok) setReport(false);
+    const badCost = aCosts.findIndex((c) => costFilled(c) && !c.category.trim());
+    if (badCost >= 0) { setErr(`Bảng kê dòng ${badCost + 1}: nhập hạng mục.`); return; }
+    const locked = !!r!.hr_confirmed_at;
+    setBusy(true); setErr(null);
+    const te = await saveTrip(r!.id, "thuc_te", locked ? null : aLegs.filter(legFilled), aCosts.filter(costFilled));
+    setBusy(false);
+    if (te) { setErr(friendlyError({ message: te })); return; }
+    const patch: Partial<Req> = { actual_note: aNote.trim() || null, status: "hoan_tat" };
+    if (!locked) { patch.actual_start = aStart; patch.actual_end = aEnd; }
+    const ok = await update(patch, r!.status === "hoan_tat" ? "Đã lưu thực tế công tác và bảng kê." : "Đã gửi thực tế công tác. Nhân sự sẽ xác nhận ngày công.");
+    if (ok) { setReport(false); load(); }
   }
+
+  async function hrConfirm(ok: boolean) {
+    setBusy(true); setErr(null);
+    const { error } = await supabase.rpc("trip_hr_confirm", { p_request: r!.id, p_confirm: ok, p_note: hrNote.trim() || null });
+    setBusy(false);
+    if (error) { setErr(friendlyError(error)); return; }
+    setHrOpen(false); toast(ok ? "Đã xác nhận ngày công tác." : "Đã bỏ xác nhận."); load();
+  }
+  const isTrip = r.kind === "cong_tac";
+  const canHr = isTrip && r.status === "hoan_tat" && (isHr || isManager);
+  const tripOwner = isTrip && (mine || r.traveler_id === profile.id);
+  const LINK_STATUS: Record<string, string> = { nhap: "Nháp", cho_duyet: "Chờ duyệt", da_duyet: "Đã duyệt", tra_lai: "Trả lại", tu_choi: "Từ chối", da_huy: "Đã rút", hoan_tat: "Hoàn tất" };
 
   const actualDays = r.actual_start && r.actual_end ? daysBetween(r.actual_start, r.actual_end) + 1 : null;
 
   return (
     <>
       <TopBar title={kindLabel(r)} back={listUrl} />
-      <main className={`main stack${isMoney || isLoa ? " main-wide" : ""}`}>
+      <main className={`main stack${isMoney || isLoa || r.kind === "cong_tac" ? " main-wide" : ""}`}>
         <section className={`card rq-head k-${r.kind}`}>
           <div className="row" style={{ justifyContent: "space-between" }}>
             <span className="rq-ico" aria-hidden="true">{KIND_ICON[r.kind]}</span>
@@ -171,10 +209,15 @@ export default function RequestDetail() {
             {r.location ? (<><dt>Đi đâu</dt><dd>{r.location}</dd></>) : null}
           </>) : null}
           {r.kind === "cong_tac" ? (<>
+            {r.doc_no ? (<><dt>Số đăng ký</dt><dd className="num">{r.doc_no}</dd></>) : null}
+            <dt>Người đi</dt><dd>{name(r.traveler_id ?? r.requester_id)}</dd>
+            <dt>Loại công tác</dt><dd>{TRIP_TYPE[r.trip_type ?? "trong_nuoc"]}{r.trip_type === "nuoc_ngoai" && r.visa_type ? ` · ${VISA_TYPE[r.visa_type]}` : ""}</dd>
+            {r.trip_area ? (<><dt>Khu vực</dt><dd>{r.trip_area}</dd></>) : null}
             <dt>Nơi công tác</dt><dd>{r.location}{r.transport ? ` · ${r.transport}` : ""}</dd>
             <dt>Kế hoạch</dt><dd className="num">{fullDate(r.start_date)} – {fullDate(r.end_date)} ({fmtDays(r.days)})</dd>
             {r.amount ? (<><dt>Dự trù</dt><dd className="num">{vnd(r.amount)}</dd></>) : null}
           </>) : null}
+          {isMoney && tripOf ? (<><dt>Chuyến công tác</dt><dd><Link to={`/van-phong/${tripOf.id}`}>{tripOf.doc_no ? `${tripOf.doc_no} · ` : ""}{tripOf.location} ({fullDate(tripOf.actual_start ?? tripOf.start_date)})</Link></dd></>) : null}
           {isMoney ? (<>
             {r.doc_no ? (<><dt>Số chứng từ</dt><dd className="num">{r.doc_no}{r.doc_date ? ` · ${fullDate(r.doc_date)}` : ""}</dd></>) : null}
             <dt>Số tiền</dt><dd className="num"><b>{vnd(r.amount)}</b></dd>
@@ -193,6 +236,15 @@ export default function RequestDetail() {
         </dl>
         )}
 
+        {isTrip && trip ? (
+          <>
+            <div className="section-title">Kế hoạch công tác</div>
+            <LegTable legs={trip.planLegs} people={people} />
+            <div className="section-title">Chi phí dự trù</div>
+            <CostTable costs={trip.planCosts} />
+          </>
+        ) : null}
+
         {isMoney && r.loa_id ? <LoaBudget loaId={r.loa_id} loaNo={r.loa_no} refreshKey={r.updated_at} /> : null}
 
         {isLoa ? (
@@ -210,7 +262,40 @@ export default function RequestDetail() {
               <dt>Chi phí</dt><dd className="num">{r.actual_cost != null ? vnd(r.actual_cost) : "—"}
                 {r.actual_cost != null && r.amount ? <span className={`diff${r.actual_cost > r.amount ? " over" : ""}`}> {r.actual_cost > r.amount ? "vượt" : "dưới"} dự trù {vnd(Math.abs(r.actual_cost - r.amount))}</span> : null}</dd>
               {r.actual_note ? (<><dt>Kết quả</dt><dd className="desc">{r.actual_note}</dd></>) : null}
+              <dt>Nhân sự xác nhận</dt><dd>{r.hr_confirmed_at
+                ? <span className="ok-text">{Icon.check} {name(r.hr_confirmed_by ?? null)} · {clock(r.hr_confirmed_at)}{r.hr_note ? ` · ${r.hr_note}` : ""}</span>
+                : <span className="muted">Chờ nhân sự xác nhận ngày công</span>}</dd>
             </dl>
+            {trip?.actLegs.length ? (<><div className="section-title">Lộ trình thực tế</div><LegTable legs={trip.actLegs} people={people} actual /></>) : null}
+            <div className="section-title">Bảng kê chứng từ thanh toán</div>
+            <CostTable costs={trip?.actCosts ?? []} />
+          </>
+        ) : null}
+
+        {isTrip && (r.status === "da_duyet" || r.status === "hoan_tat") ? (
+          <>
+            <div className="section-title">Tạm ứng / thanh toán của chuyến này</div>
+            <div className="card stack">
+              {linked.length ? (
+                <ul className="trip-links">
+                  {linked.map((x) => (
+                    <li key={x.id}>
+                      {x.can_open ? <Link to={`/van-phong/${x.id}`}>{x.kind === "tam_ung" ? "Tạm ứng" : "Thanh toán"} {x.doc_no ?? ""}</Link> : <span>{x.kind === "tam_ung" ? "Tạm ứng" : "Thanh toán"} {x.doc_no ?? ""}</span>}
+                      <span className="num">{vnd(x.amount ?? 0)}</span><span className={`rq-pill ${x.status}`}>{LINK_STATUS[x.status] ?? x.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p className="muted small" style={{ margin: 0 }}>Chưa có đề nghị nào lập từ chuyến công tác này.</p>}
+              {tripOwner ? (
+                <div className="row">
+                  <Link className="btn secondary" style={{ flex: 1 }} to={`/van-phong/moi/tam_ung?trip=${r.id}`}>{Icon.plus}Lập đề nghị tạm ứng</Link>
+                  {r.status === "hoan_tat" && trip?.actCosts.length
+                    ? <Link className="btn" style={{ flex: 1 }} to={`/van-phong/moi/thanh_toan?trip=${r.id}`}>{Icon.plus}Lập đề nghị thanh toán từ bảng kê</Link>
+                    : null}
+                </div>
+              ) : null}
+              {tripOwner && r.status === "hoan_tat" && !trip?.actCosts.length ? <p className="muted small" style={{ margin: 0 }}>Nhập bảng kê chứng từ ở phần thực tế để lập đề nghị thanh toán.</p> : null}
+            </div>
           </>
         ) : null}
 
@@ -260,7 +345,7 @@ export default function RequestDetail() {
           {r.status === "da_huy" ? <li><b>{requester?.full_name}</b> rút lại {noun}<span>{clock(r.updated_at)}</span></li> : null}
         </ol>
 
-        {err && !decide && !report ? <div className="error-box" role="alert">{err}</div> : null}
+        {err && !decide && !report && !hrOpen ? <div className="error-box" role="alert">{err}</div> : null}
 
         <div className="stack rq-actions">
           {canDecide ? (
@@ -276,10 +361,22 @@ export default function RequestDetail() {
               {uncCount === 0 ? <p className="muted small" style={{ margin: 0 }}>Đính kèm UNC ở bước cuối phía trên để mở nút Kết thúc.</p> : null}
             </>
           ) : null}
-          <Link className="btn secondary block" to={`/van-phong/${r.id}/in`}>In / lưu PDF</Link>
+          {isTrip ? (
+            <div className="trip-prints">
+              <Link className="btn secondary" to={`/van-phong/${r.id}/in-cong-tac/phieu`}>In phiếu yêu cầu</Link>
+              <Link className="btn secondary" to={`/van-phong/${r.id}/in-cong-tac/ke-hoach`}>In kế hoạch công tác</Link>
+              <Link className="btn secondary" to={`/van-phong/${r.id}/in-cong-tac/di-duong`}>In giấy đi đường</Link>
+              <Link className="btn secondary" to={`/van-phong/${r.id}/in-cong-tac/bang-ke`}>In bảng kê thanh toán</Link>
+            </div>
+          ) : <Link className="btn secondary block" to={`/van-phong/${r.id}/in`}>In / lưu PDF</Link>}
+          {canHr ? (
+            <button className={`btn block${r.hr_confirmed_at ? " secondary" : ""}`} disabled={busy} onClick={() => { setHrNote(r.hr_note ?? ""); setErr(null); setHrOpen(true); }}>
+              {Icon.check}{r.hr_confirmed_at ? "Bỏ xác nhận ngày công tác" : "Nhân sự xác nhận ngày công tác"}
+            </button>
+          ) : null}
           {canReport ? (
             <button className={`btn block${r.status === "hoan_tat" ? " secondary" : ""}`} onClick={openReport}>
-              {r.status === "hoan_tat" ? "Sửa báo cáo thực tế" : "Nhập thực tế công tác"}
+              {r.status === "hoan_tat" ? "Sửa thực tế / bảng kê" : "Nhập thực tế công tác"}
             </button>
           ) : null}
           {mine || isManager || canEdit ? (
@@ -299,22 +396,35 @@ export default function RequestDetail() {
 
       <DecideSheet req={decide ? r : null} mode={decide} onClose={() => setDecide(null)} onDone={() => { setDecide(null); load(); }} />
 
-      <Sheet open={report} onClose={() => setReport(false)} title="Thực tế công tác">
-        <form className="stack" onSubmit={submitReport}>
+      <Sheet open={report} onClose={() => setReport(false)} title="Thực tế công tác" wide>
+        <form className="stack dn-erp" onSubmit={submitReport}>
+          {r.hr_confirmed_at ? <div className="ok-box">Nhân sự đã xác nhận ngày công nên ngày đi, ngày về và lộ trình đã khoá. Bảng kê chứng từ vẫn sửa được.</div> : null}
           <div className="row" style={{ alignItems: "flex-start" }}>
-            <label className="field" style={{ flex: "1 1 130px" }}><span>Ngày đi *</span>
-              <input id="ac-start" type="date" className="input" value={aStart} required onChange={(e) => setAStart(e.target.value)} /></label>
-            <label className="field" style={{ flex: "1 1 130px" }}><span>Ngày về *</span>
-              <input id="ac-end" type="date" className="input" value={aEnd} min={aStart} required onChange={(e) => setAEnd(e.target.value)} /></label>
+            <label className="field" style={{ flex: "1 1 130px" }}><span>Ngày đi thực tế *</span>
+              <input id="ac-start" type="date" className="input" value={aStart} required disabled={!!r.hr_confirmed_at} onChange={(e) => setAStart(e.target.value)} /></label>
+            <label className="field" style={{ flex: "1 1 130px" }}><span>Ngày về thực tế *</span>
+              <input id="ac-end" type="date" className="input" value={aEnd} min={aStart} required disabled={!!r.hr_confirmed_at} onChange={(e) => setAEnd(e.target.value)} /></label>
           </div>
-          <label className="field"><span>Chi phí thực tế</span>
-            <input id="ac-cost" className="input num" inputMode="decimal" value={aCost} onChange={(e) => setACost(e.target.value)} placeholder={r.amount ? `Dự trù ${vnd(r.amount)}` : "VD: 4tr2"} />
-            {aCost ? <small className={parseMoney(aCost) != null ? "muted" : "err-text"}>{parseMoney(aCost) != null ? vnd(parseMoney(aCost)) : "Chưa đọc được số tiền"}</small> : null}</label>
+          {r.hr_confirmed_at ? null : <LegGrid title="Lộ trình thực tế (giấy đi đường)" rows={aLegs} setRows={setALegs} people={people.filter((p) => p.is_active)} actual defaultStaff={r.traveler_id ?? r.requester_id} />}
+          <CostGrid title="Bảng kê chứng từ thanh toán" rows={aCosts} setRows={setACosts} />
+          <p className="muted small" style={{ margin: 0 }}>Tổng bảng kê {vnd(costTotal(aCosts.filter(costFilled)))}{r.amount ? ` · dự trù ${vnd(r.amount)}` : ""}. Chênh lệch với tạm ứng anh/chị tự ghi khi lập đề nghị thanh toán.</p>
           <label className="field"><span>Kết quả công tác</span>
             <textarea id="ac-note" className="input" value={aNote} onChange={(e) => setANote(e.target.value)} placeholder="Đã làm được gì, việc cần theo dõi tiếp…" /></label>
           {err ? <div className="error-box" role="alert">{err}</div> : null}
-          <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Gửi báo cáo"}</button>
+          <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : r.status === "hoan_tat" ? "Lưu thực tế" : "Gửi thực tế công tác"}</button>
         </form>
+      </Sheet>
+
+      <Sheet open={hrOpen} onClose={() => setHrOpen(false)} title={r.hr_confirmed_at ? "Bỏ xác nhận ngày công tác?" : "Xác nhận ngày công tác"}>
+        <div className="stack">
+          <p style={{ margin: 0 }}>{name(r.traveler_id ?? r.requester_id)} đi công tác thực tế <b className="num">{fullDate(r.actual_start)} – {fullDate(r.actual_end)}</b>{actualDays ? ` (${fmtDays(actualDays)})` : ""}.</p>
+          <label className="field"><span>Ghi chú</span>
+            <input id="hr-note" className="input" value={hrNote} onChange={(e) => setHrNote(e.target.value)} placeholder="VD: Khớp vé xe, tính công đủ" /></label>
+          {err ? <div className="error-box" role="alert">{err}</div> : null}
+          {r.hr_confirmed_at
+            ? <button className="btn danger block" disabled={busy} onClick={() => hrConfirm(false)}>Bỏ xác nhận để người đi sửa ngày</button>
+            : <button className="btn block" disabled={busy} onClick={() => hrConfirm(true)}>{Icon.check}Xác nhận để tính ngày công</button>}
+        </div>
       </Sheet>
 
       <Sheet open={!!confirm} onClose={() => setConfirm(null)} title={confirm === "chi" ? (r.kind === "thanh_toan" ? "Kết thúc đề nghị thanh toán?" : "Kết thúc đề nghị tạm ứng?") : confirm === "xoa" ? `Xoá ${noun}?` : `Rút lại ${noun}?`}>

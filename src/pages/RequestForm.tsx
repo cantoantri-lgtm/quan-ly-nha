@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { daysBetween, ddmmyyyy, todayVN, workDays } from "../lib/dates";
@@ -8,6 +8,8 @@ import { KINDS, PAUSED_TIP, usePausedKinds, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PA
 import { uploadFile } from "../lib/files";
 import DnttEditor, { advFromRow, calcLine, emptyLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
 import { LoaPicker } from "../components/LoaPicker";
+import { CostGrid, LegGrid } from "../components/TripGrids";
+import { TRIP_TYPE, VISA_TYPE, costFilled, costFromRow, costTotal, emptyCost, emptyLeg, legFromRow, loadTrip, saveTrip, type CostDraft, type LegDraft } from "../lib/trip";
 import { LEVEL_SHORT } from "../lib/org";
 import { Icon, TopBar } from "../components/ui";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
@@ -75,6 +77,19 @@ export default function RequestForm() {
   const [handover, setHandover] = useState("");
   const [phone, setPhone] = useState("");
   const [transport, setTransport] = useState("");
+  // Đi công tác (migration 067)
+  const [tripType, setTripType] = useState("trong_nuoc");
+  const [tripArea, setTripArea] = useState("");
+  const [visaType, setVisaType] = useState("khong_yeu_cau");
+  const [traveler, setTraveler] = useState("");
+  const [legs, setLegs] = useState<LegDraft[]>([]);
+  const [costs, setCosts] = useState<CostDraft[]>([]);
+  // Đề nghị tạm ứng / thanh toán lập từ một chuyến công tác (?trip=<id>); nhân bản phiếu công tác (?tu=<id>)
+  const [qs] = useSearchParams();
+  const tripParam = !id ? qs.get("trip") : null;
+  const copyParam = !id ? qs.get("tu") : null;
+  const [tripId, setTripId] = useState<string | null>(null);
+  const [tripLabel, setTripLabel] = useState<string | null>(null);
   const [settleDue, setSettleDue] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [advs, setAdvs] = useState<AdvDraft[]>([]);
@@ -87,6 +102,52 @@ export default function RequestForm() {
     supabase.from("departments").select("name").eq("id", myStaff.department_id).maybeSingle()
       .then(({ data }) => setDeptName((data as { name: string } | null)?.name ?? null));
   }, [myStaff?.department_id]);
+  // Phiếu công tác mới: một dòng kế hoạch, một dòng chi phí; nhân bản từ phiếu cũ nếu có ?tu=
+  useEffect(() => {
+    if (editing || kind !== "cong_tac" || !profile) return;
+    if (!copyParam) { setTraveler(profile.id); setLegs([emptyLeg(profile.id)]); setCosts([emptyCost()]); return; }
+    (async () => {
+      const { data } = await supabase.from("requests").select("*").eq("id", copyParam).maybeSingle();
+      const r = data as Req | null;
+      if (!r || r.kind !== "cong_tac") { setLegs([emptyLeg(profile.id)]); setCosts([emptyCost()]); return; }
+      setReason(r.reason); setLocation(r.location ?? ""); setTransport(r.transport ?? ""); setBuildingId(r.building_id ?? "");
+      setTripType(r.trip_type ?? "trong_nuoc"); setTripArea(r.trip_area ?? ""); setVisaType(r.visa_type ?? "khong_yeu_cau");
+      setTraveler(profile.id);
+      const t = await loadTrip(r.id);
+      setLegs(t.planLegs.length ? t.planLegs.map((l) => ({ ...legFromRow(l), start_date: "", end_date: "", staff_id: l.staff_id === r.requester_id ? profile.id : l.staff_id ?? "" })) : [emptyLeg(profile.id)]);
+      setCosts(t.planCosts.length ? t.planCosts.map(costFromRow) : [emptyCost()]);
+      toast("Đã nhân bản phiếu công tác. Chọn lại ngày đi, ngày về rồi gửi.");
+    })();
+  }, [editing, kind, copyParam, profile?.id]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!tripParam || editing || !(kind === "tam_ung" || kind === "thanh_toan")) return;
+    (async () => {
+      const { data } = await supabase.from("requests").select("*").eq("id", tripParam).maybeSingle();
+      const t = data as Req | null;
+      if (!t || t.kind !== "cong_tac") return;
+      const span = `${ddmmyyyy(t.actual_start ?? t.start_date)}${(t.actual_end ?? t.end_date) ? " – " + ddmmyyyy((t.actual_end ?? t.end_date)!) : ""}`;
+      setTripId(t.id); setTripLabel(`${t.location ?? "Công tác"} · ${span}`);
+      if (t.building_id) setBuildingId(t.building_id);
+      const tr = await loadTrip(t.id);
+      if (kind === "tam_ung") {
+        setReason(`Tạm ứng công tác ${t.location ?? ""} ${span}`.trim());
+        setStart(todayVN());
+        const plan = tr.planCosts.reduce((a, c) => a + Number(c.amount ?? 0), 0) || Number(t.amount ?? 0);
+        if (plan) setAmount(new Intl.NumberFormat("vi-VN").format(plan));
+      } else {
+        const src = tr.actCosts.length ? tr.actCosts : tr.planCosts;
+        setReason(`Thanh toán công tác phí ${t.location ?? ""} ${span}`.trim());
+        setPayType("khac"); setPayee(profile?.full_name ?? "");
+        const n = (x: number) => String(x).replace(".", ",");
+        if (src.length) setLines(src.map((c) => ({
+          ...emptyLine(),
+          description: `${c.category}${c.location ? " – " + c.location : ""} (${n(c.days)} ngày × ${n(c.persons)} người × ${new Intl.NumberFormat("vi-VN").format(c.unit_price)})`,
+          amount: new Intl.NumberFormat("vi-VN").format(Number(c.amount ?? 0)),
+        })));
+      }
+    })();
+  }, [tripParam, editing, kind]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   // Đề nghị thanh toán mới: mở sẵn một dòng chi tiết để gõ ngay
   useEffect(() => { if (!editing && kind === "thanh_toan" && lines.length === 0) setLines([emptyLine()]); }, [editing, kind]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -110,6 +171,16 @@ export default function RequestForm() {
       setLoaId(r.loa_id ?? ""); setOldLoaNo(r.loa_id ? null : r.loa_no); setVendorCode(r.vendor_code ?? ""); setContactName(r.contact_name ?? ""); setContactCode(r.contact_code ?? "");
       setDocNo(r.doc_no);
       setHandover(r.handover_to ?? ""); setPhone(r.contact_phone ?? ""); setTransport(r.transport ?? ""); setSettleDue(r.settle_due ?? "");
+      setTripId(r.trip_id ?? null);
+      if (r.kind === "cong_tac") {
+        setTripType(r.trip_type ?? "trong_nuoc"); setTripArea(r.trip_area ?? ""); setVisaType(r.visa_type ?? "khong_yeu_cau"); setTraveler(r.traveler_id ?? "");
+        loadTrip(r.id).then((t) => {
+          setLegs(t.planLegs.length ? t.planLegs.map(legFromRow) : [emptyLeg(r.traveler_id ?? r.requester_id)]);
+          setCosts(t.planCosts.length ? t.planCosts.map(costFromRow) : [emptyCost()]);
+          setLoaded(true);
+        });
+        return;
+      }
       if (r.kind === "thanh_toan") {
         Promise.all([
           supabase.from("request_lines").select("*").eq("request_id", r.id).order("line_no"),
@@ -163,6 +234,14 @@ export default function RequestForm() {
       for (let i = 0; i < advs.length; i++) if (!parseMoney(advs[i].amount)) { setErr(`Tạm ứng ${i + 1}: nhập số tiền.`); return; }
     }
     if (multiDay && end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
+    if (kind === "cong_tac") {
+      if (!location.trim()) { setErr("Nhập nơi công tác."); return; }
+      if (!transport.trim()) { setErr("Nhập phương tiện."); return; }
+      const badLeg = legs.findIndex((l) => l.start_date && l.end_date && l.end_date < l.start_date);
+      if (badLeg >= 0) { setErr(`Kế hoạch dòng ${badLeg + 1}: đến ngày phải sau từ ngày.`); return; }
+      const badCost = costs.findIndex((c) => costFilled(c) && !c.category.trim());
+      if (badCost >= 0) { setErr(`Chi phí dòng ${badCost + 1}: nhập hạng mục.`); return; }
+    }
     if (kind === "nghi_phep" && days === 0) { setErr("Chủ nhật công ty nghỉ, không cần xin nghỉ phép."); return; }
     if (kind === "ra_ngoai" && t1 && t2 && t2 <= t1) { setErr("Giờ về phải sau giờ đi."); return; }
     if (kind === "tam_ung" && settleDue && settleDue < start) { setErr("Hạn hoàn ứng phải sau ngày cần tiền."); return; }
@@ -176,7 +255,7 @@ export default function RequestForm() {
       end_time: kind === "ra_ngoai" && t2 && subType === "co_quay_lai" ? t2 : null,
       location: kind === "ra_ngoai" || kind === "cong_tac" ? location.trim() || null : null,
       reason: reason.trim(),
-      amount: isMoney || kind === "cong_tac" ? amt : null,
+      amount: kind === "cong_tac" ? (costTotal(costs.filter(costFilled)) || null) : isMoney ? amt : null,
       payee: isMoney ? payee.trim() || null : null,
       bank_info: isMoney ? bank.trim() || null : null,
       building_id: buildingId || null,
@@ -189,6 +268,11 @@ export default function RequestForm() {
       handover_to: absence ? handover || null : null,
       contact_phone: absence ? phone.trim() || null : null,
       transport: kind === "cong_tac" ? transport.trim() || null : null,
+      trip_type: kind === "cong_tac" ? tripType : null,
+      trip_area: kind === "cong_tac" ? tripArea.trim() || null : null,
+      visa_type: kind === "cong_tac" && tripType === "nuoc_ngoai" ? visaType : null,
+      traveler_id: kind === "cong_tac" ? traveler || null : null,
+      trip_id: isMoney ? tripId : null,
       settle_due: kind === "tam_ung" ? settleDue || null : null,
     };
     setBusy(true);
@@ -198,6 +282,10 @@ export default function RequestForm() {
     if (res.error) { setBusy(false); setErr(friendlyError(res.error)); return; }
     const rid = res.data.id as string;
     const problems: string[] = [];
+    if (kind === "cong_tac") {
+      const te = await saveTrip(rid, "ke_hoach", legs, costs);
+      if (te) problems.push(friendlyError({ message: te }));
+    }
     if (isPay) {
       // Xoá tạm ứng trước khoản chi để tổng không bao giờ âm giữa chừng
       if (editing) {
@@ -309,9 +397,10 @@ export default function RequestForm() {
       <TopBar title={editing ? `Sửa · ${meta.label}` : `Lập ${meta.label.charAt(0).toLowerCase()}${meta.label.slice(1)}`} back
         action={<button type="submit" form="dn-form" className="tb-action" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu và gửi lại" : "Gửi"}</button>} />
       <main className={`main ${isMoney ? "main-form" : "main-wide"}`}>
-        <form id="dn-form" className={`stack dn-form dn-erp${isMoney ? " money" : ""}`} onSubmit={submit}
+        <form id="dn-form" className={`stack dn-form dn-erp${isMoney || kind === "cong_tac" ? " money" : ""}`} onSubmit={submit}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault(); }}>
           <LinkFromNote from={link.from} info={link.info} />
+          {tripId && isMoney ? <p className="ok-box" style={{ margin: 0 }}>Lập từ chuyến công tác: <b>{tripLabel ?? "đã gắn"}</b>. {kind === "thanh_toan" ? "Các dòng chi phí đã điền sẵn từ bảng kê; nhập Cost center và tự thêm phần trừ tạm ứng nếu có." : "Số tiền lấy từ dự trù chi phí, sửa được."}</p> : null}
           <div className="dn-sheet">
 
           {/* ---------- Người đăng ký ---------- */}
@@ -327,7 +416,7 @@ export default function RequestForm() {
           </section>
 
           {/* ---------- Nghỉ phép / Ra ngoài / Công tác ---------- */}
-          {absence ? (
+          {absence && kind !== "cong_tac" ? (
             <section className="card dn-sec">
               <h2 className="dn-h">{kind === "nghi_phep" ? "Thời gian nghỉ" : kind === "ra_ngoai" ? "Thời gian ra ngoài" : "Thời gian công tác"}</h2>
               {kind === "nghi_phep" ? (
@@ -340,11 +429,11 @@ export default function RequestForm() {
                 <div className="field"><span>Hình thức</span><Options name="Hình thức" value={subType} options={OUT_TYPE} onChange={setSubType} /></div>
               ) : null}
               <div className="dn-fields">
-                <label className="field"><span>{multiDay ? (kind === "cong_tac" ? "Ngày đi *" : "Từ ngày *") : "Ngày *"}</span>
+                <label className="field"><span>{multiDay ? "Từ ngày *" : "Ngày *"}</span>
                   <input id="rq-start" type="date" className="input" value={start} required
                     onChange={(e) => { setStart(e.target.value); if (end < e.target.value) setEnd(e.target.value); }} /></label>
                 {multiDay ? (
-                  <label className="field"><span>{kind === "cong_tac" ? "Ngày về *" : "Đến ngày"}</span>
+                  <label className="field"><span>Đến ngày</span>
                     <input id="rq-end" type="date" className="input" value={end} min={start} required onChange={(e) => setEnd(e.target.value)} /></label>
                 ) : null}
                 {kind === "ra_ngoai" ? (
@@ -358,35 +447,78 @@ export default function RequestForm() {
                   </>
                 ) : null}
               </div>
-              {kind === "nghi_phep" || kind === "cong_tac" ? (
+              {kind === "nghi_phep" ? (
                 <div className="calc-line num">
-                  {days > 0 ? <>Tổng: <b>{fmtDays(days)}</b>{sundays ? ` (không tính ${sundays} Chủ nhật)` : ""}</> : kind === "nghi_phep" ? <span className="over">Chủ nhật công ty nghỉ</span> : null}
+                  {days > 0 ? <>Tổng: <b>{fmtDays(days)}</b>{sundays ? ` (không tính ${sundays} Chủ nhật)` : ""}</> : <span className="over">Chủ nhật công ty nghỉ</span>}
                   {leftAfter != null ? <span className={leftAfter < 0 ? "over" : ""}> · {leftAfter < 0 ? `vượt ${fmtDays(-leftAfter)} phép năm` : `còn ${fmtDays(leftAfter)} phép năm sau đơn này`}</span> : null}
                 </div>
               ) : null}
             </section>
           ) : null}
 
-          {absence ? (
+          {kind === "cong_tac" ? (
+            <>
+              <section className="card dn-sec">
+                <h2 className="dn-h">Thông tin phiếu</h2>
+                <div className="dn-fields">
+                  <label className="field dn-span2"><span>Người đi công tác</span>
+                    <select id="ct-traveler" className="input" value={traveler} onChange={(e) => setTraveler(e.target.value)}>
+                      {people.filter((p) => p.is_active).map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                    </select></label>
+                  <label className="field dn-span2"><span>Loại công tác</span>
+                    <select id="ct-type" className="input" value={tripType} onChange={(e) => setTripType(e.target.value)}>
+                      {Object.entries(TRIP_TYPE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                    </select></label>
+                  <ReadOnly label="Loại tiền" value="VND" />
+                  {tripType === "nuoc_ngoai" ? (
+                    <label className="field"><span>Loại visa</span>
+                      <select id="ct-visa" className="input" value={visaType} onChange={(e) => setVisaType(e.target.value)}>
+                        {Object.entries(VISA_TYPE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                      </select></label>
+                  ) : <ReadOnly label="Số đăng ký" value={docNo ?? "Tự cấp khi gửi"} num />}
+                  <label className="field dn-span2"><span>Khu vực quản lý</span>
+                    <input id="ct-area" className="input" value={tripArea} onChange={(e) => setTripArea(e.target.value)} placeholder="VD: Miền Đông" /></label>
+                  <label className="field dn-span2"><span>Nơi công tác <span className="req">*</span></span>
+                    <input id="rq-location" className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="VD: Bình Dương, Vĩnh Long" required /></label>
+                  <label className="field dn-span2"><span>Phương tiện <span className="req">*</span></span>
+                    <input id="rq-transport" className="input" value={transport} onChange={(e) => setTransport(e.target.value)} placeholder="VD: Xe khách, máy bay" required /></label>
+                  <label className="field"><span>Từ ngày <span className="req">*</span></span>
+                    <input id="rq-start" type="date" className="input" value={start} required
+                      onChange={(e) => { setStart(e.target.value); if (end < e.target.value) setEnd(e.target.value); }} /></label>
+                  <label className="field"><span>Đến ngày <span className="req">*</span></span>
+                    <input id="rq-end" type="date" className="input" value={end} min={start} required onChange={(e) => setEnd(e.target.value)} /></label>
+                  {BuildingSel}
+                  <label className="field dn-full"><span>Nội dung <span className="req">*</span></span>
+                    <input id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
+                      placeholder="VD: Tổ chức hội thảo, kiểm tra toà nhà, gặp chủ nhà" /></label>
+                </div>
+                <div className="calc-line num">Tổng: <b>{fmtDays(days)}</b> · Dự trù chi phí (tự cộng): <b>{vnd(costTotal(costs.filter(costFilled)))}</b></div>
+              </section>
+              <section className="card dn-sec">
+                <LegGrid title="Kế hoạch công tác" rows={legs} setRows={setLegs} people={people.filter((p) => p.is_active)} defaultStaff={traveler || profile?.id || ""} />
+              </section>
+              <section className="card dn-sec">
+                <CostGrid title="Thông tin chi phí (dự trù)" rows={costs} setRows={setCosts} />
+                <p className="muted small" style={{ margin: 0 }}>Công ty chưa có định mức công tác phí: nhập đơn giá thực tế dự kiến. Thành tiền = số ngày × số người × đơn giá.</p>
+              </section>
+              <section className="card dn-sec">
+                <h2 className="dn-h">Bàn giao khi vắng</h2>
+                <div className="dn-fields">{Handover}</div>
+              </section>
+            </>
+          ) : null}
+
+          {absence && kind !== "cong_tac" ? (
             <section className="card dn-sec">
-              <h2 className="dn-h">{kind === "cong_tac" ? "Nội dung công tác" : kind === "ra_ngoai" ? "Nội dung ra ngoài" : "Lý do nghỉ"}</h2>
+              <h2 className="dn-h">{kind === "ra_ngoai" ? "Nội dung ra ngoài" : "Lý do nghỉ"}</h2>
               <div className="dn-fields">
-                {kind === "cong_tac" ? (
-                  <label className="field"><span>Nơi công tác *</span>
-                    <input id="rq-location" className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="VD: Đà Lạt" required /></label>
-                ) : null}
-                {kind === "cong_tac" ? (
-                  <label className="field"><span>Phương tiện</span>
-                    <input id="rq-transport" className="input" value={transport} onChange={(e) => setTransport(e.target.value)} placeholder="VD: Xe công ty, máy bay" /></label>
-                ) : null}
                 {kind === "ra_ngoai" ? (
                   <label className="field dn-span2"><span>Đi đâu</span>
                     <input id="rq-location" className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="VD: Ngân hàng, toà 89CMT8, chủ nhà…" /></label>
                 ) : null}
-                {kind === "cong_tac" ? <MoneyInput id="rq-amount" label="Dự trù chi phí" value={amount} onChange={setAmount} /> : null}
                 {BuildingSel}
               </div>
-              <label className="field"><span>{kind === "cong_tac" ? "Mục đích công tác *" : kind === "ra_ngoai" ? "Công việc *" : "Lý do *"}</span>
+              <label className="field"><span>{kind === "ra_ngoai" ? "Công việc *" : "Lý do *"}</span>
                 <textarea id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
                   placeholder={kind === "nghi_phep" ? "VD: Việc gia đình" : ""} /></label>
               <div className="dn-fields">{Handover}</div>
