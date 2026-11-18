@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { useSession } from "./lib/session";
 import { supabase } from "./lib/supabase";
 import { AppHeader, BottomNav, Toast } from "./components/ui";
+import { OpenTabs, StatusBar } from "./components/DesktopShell";
 import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
 import Home from "./pages/Home";
@@ -48,7 +49,9 @@ function Shell() {
   return (
     <div className="app">
       <AppHeader />
+      <OpenTabs />
       <Outlet />
+      <StatusBar />
       <BottomNav />
       <Toast />
     </div>

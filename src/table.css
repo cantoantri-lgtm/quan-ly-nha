@@ -156,3 +156,40 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 
 .inv-lines th, .inv-lines td { padding: 8px 10px; font-size: 13.5px; }
 .inv-lines tfoot td { font-weight: 700; border-top: 1px solid var(--line); padding: 8px 10px; }
+
+/* ---------- Kiểu ERP trên PC: lưới dày, đầu bảng xanh nhạt, thanh công cụ nút lớn ---------- */
+.filterbar { background: var(--grid-head); }
+.toolbar { background: var(--surface); }
+.ribbon { gap: 2px; padding: 6px 10px; }
+.ribbon .rb {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 70px; min-height: 52px;
+  flex: none; padding: 5px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink);
+  font-size: 12.5px; font-weight: 600; cursor: pointer; text-decoration: none;
+}
+.ribbon .rb svg { width: 20px; height: 20px; color: var(--brand); }
+.ribbon .rb:hover:not(:disabled) { background: var(--brand-soft); border-color: var(--brand-line); }
+.ribbon .rb:disabled { opacity: .45; cursor: not-allowed; }
+.ribbon .rb.rb-main { background: var(--brand); color: var(--brand-ink); }
+.ribbon .rb.rb-main svg { color: var(--brand-ink); }
+.ribbon .rb.rb-main:hover:not(:disabled) { background: var(--brand); filter: brightness(1.08); }
+.ribbon .rb-sep { width: 1px; align-self: stretch; background: var(--line); margin: 4px 6px; }
+.ribbon .tl-title { margin-left: 8px; }
+@media (max-width: 719px) {
+  .ribbon .rb { min-width: 56px; min-height: 48px; font-size: 11.5px; }
+}
+@media (min-width: 720px) {
+  table.dt { font-size: 13.5px; }
+  table.dt thead th {
+    background: var(--grid-head); color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600;
+    padding: 9px 10px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
+  }
+  table.dt thead th:last-child, table.dt tbody td:last-child { border-right: 0; }
+  table.dt tbody td { padding: 8px 10px; border-right: 1px solid var(--line); }
+  table.dt tbody tr:nth-child(even) { background: var(--grid-zebra); }
+  table.dt tbody tr:hover { background: var(--brand-soft); }
+  table.dt tbody tr.sel, table.dt tbody tr.sel:hover { background: var(--brand-soft); box-shadow: inset 3px 0 0 var(--brand); }
+  table.dt tfoot td { background: var(--grid-head); }
+  table.dt .ico-btn { width: 30px; height: 30px; }
+  table.dt .ico-btn svg { width: 16px; height: 16px; }
+  .tile { border-radius: 8px; }
+}

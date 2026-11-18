@@ -207,11 +207,18 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
           <input className="input search" placeholder={loa ? "Tìm số LOA, tiêu đề, người trình…" : money ? "Tìm số chứng từ, đơn vị, nội dung…" : "Tìm người đề nghị, lý do…"} value={text} onChange={(e) => setText(e.target.value)} />
           <button className="btn secondary sm">Tìm</button>
         </form>
-        <div className="toolbar">
-          {closed ? <button type="button" className="btn sm" disabled title={PAUSED_TIP}>+ Thêm · tạm ngưng</button>
-            : <Link to={newUrl} className="btn sm" title={`Thêm ${noun} mới (F2)`}>+ Thêm (F2)</Link>}
-          <button type="button" className="ico-btn" title="In danh sách" aria-label="In danh sách" onClick={() => window.print()}>{Icon.print}</button>
-          <button type="button" className="ico-btn" title="Xuất CSV" aria-label="Xuất CSV" disabled={!shown.length} onClick={exportCsv}>{Icon.download}</button>
+        <div className="toolbar ribbon" role="toolbar" aria-label="Thao tác">
+          {closed ? <button type="button" className="rb rb-main" disabled title={PAUSED_TIP}>{Icon.plus}Thêm · tạm ngưng</button>
+            : <Link to={newUrl} className="rb rb-main" title={`Thêm ${noun} mới (F2)`}>{Icon.plus}Thêm (F2)</Link>}
+          <button type="button" className="rb" disabled={!sel} title={sel ? `Xem ${noun} đang chọn` : "Chọn một dòng trước"} onClick={() => sel && nav(`/van-phong/${sel.id}`)}>{Icon.eye}Xem</button>
+          <button type="button" className="rb" disabled={!sel || !canEdit(sel)} title={!sel ? "Chọn một dòng trước" : canEdit(sel) ? `Sửa ${noun}` : lockTip(sel, "sửa")} onClick={() => sel && nav(editUrl(sel))}>{Icon.edit}Sửa</button>
+          <button type="button" className="rb" disabled={!sel || !canDel(sel)} title={!sel ? "Chọn một dòng trước" : canDel(sel) ? `Xoá ${noun}` : lockTip(sel, "xoá")} onClick={() => sel && setDelReq(sel)}>{Icon.trash}Xoá</button>
+          <span className="rb-sep" aria-hidden="true" />
+          <button type="button" className="rb" title="In danh sách" onClick={() => window.print()}>{Icon.print}In</button>
+          <button type="button" className="rb" title="Tải danh sách dạng CSV, mở bằng Excel" disabled={!shown.length} onClick={exportCsv}>{Icon.download}Xuất Excel</button>
+          <button type="button" className="rb" title="Tải lại dữ liệu" onClick={() => { setLoading(true); load(); }}>{Icon.refresh}Làm mới</button>
+          <span className="rb-sep" aria-hidden="true" />
+          <button type="button" className="rb" onClick={() => setHelp(true)}>{Icon.help}Hướng dẫn</button>
           <span className="tl-title">{label}</span>
         </div>
 

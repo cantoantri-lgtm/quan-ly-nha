@@ -1,14 +1,19 @@
 /* Next Living (Next Vision) — giao diện ưu tiên điện thoại. Xanh rêu đậm + giấy kem, trạng thái màu riêng. */
 :root {
-  --bg: #F2F4F2;
+  --bg: #F2F6F1;
   --surface: #FFFFFF;
-  --surface-2: #F7F8F6;
-  --ink: #16211D;
-  --muted: #5E6B66;
-  --line: #DCE2DE;
-  --brand: #1F5C4F;
+  --surface-2: #F4F8F2;
+  --ink: #1B2A20;
+  --muted: #586A5D;
+  --line: #D5E2D1;
+  --brand: #3D7A4B;
   --brand-ink: #FFFFFF;
-  --brand-soft: #E1EEEA;
+  --brand-soft: #E0EFDC;
+  --brand-line: #B8D6B0;   /* viền nút / ô xanh nhạt */
+  --grid-head: #E6F1E2;    /* đầu bảng, thanh lọc kiểu ERP */
+  --grid-zebra: #F8FBF7;   /* dòng chẵn của bảng */
+  --menubar: #DCEDD7;      /* thanh menu trên cùng (PC) */
+  --menubar-ink: #22432C;
   --cream: #F4EBD9;
   --danger: #B3402F;
 
@@ -45,8 +50,9 @@
 :root[data-theme="light"] { color-scheme: light; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0F1513; --surface: #161E1B; --surface-2: #1B2420; --ink: #E4ECE8; --muted: #95A39D; --line: #2A3531;
-    --brand: #5FB39F; --brand-ink: #0B1210; --brand-soft: #1C332D; --cream: #2A261E; --danger: #EE8270;
+    --bg: #0F1511; --surface: #161E18; --surface-2: #1B241D; --ink: #E3ECE4; --muted: #98A89B; --line: #2B372D;
+    --brand: #8CC99A; --brand-ink: #0E1A11; --brand-soft: #1E3323; --brand-line: #35553D;
+    --grid-head: #1D2B20; --grid-zebra: #18201A; --menubar: #1A2A1E; --menubar-ink: #CFE5D2; --cream: #2A261E; --danger: #EE8270;
     --s-todo: #A0ACA7; --s-todo-bg: #232C29; --s-doing: #79ACE6; --s-doing-bg: #182A3E;
     --s-block: #EE8270; --s-block-bg: #3A1F1A; --s-done: #66C391; --s-done-bg: #17321F;
     --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6; --near-bg: #2A2112; --late-bg: #2E1A16;
@@ -68,8 +74,9 @@
   }
 }
 :root[data-theme="dark"] {
-    --bg: #0F1513; --surface: #161E1B; --surface-2: #1B2420; --ink: #E4ECE8; --muted: #95A39D; --line: #2A3531;
-    --brand: #5FB39F; --brand-ink: #0B1210; --brand-soft: #1C332D; --cream: #2A261E; --danger: #EE8270;
+    --bg: #0F1511; --surface: #161E18; --surface-2: #1B241D; --ink: #E3ECE4; --muted: #98A89B; --line: #2B372D;
+    --brand: #8CC99A; --brand-ink: #0E1A11; --brand-soft: #1E3323; --brand-line: #35553D;
+    --grid-head: #1D2B20; --grid-zebra: #18201A; --menubar: #1A2A1E; --menubar-ink: #CFE5D2; --cream: #2A261E; --danger: #EE8270;
     --s-todo: #A0ACA7; --s-todo-bg: #232C29; --s-doing: #79ACE6; --s-doing-bg: #182A3E;
     --s-block: #EE8270; --s-block-bg: #3A1F1A; --s-done: #66C391; --s-done-bg: #17321F;
     --late: #EE8270; --today: #E5AE52; --today-bg: #352812; --soon: #79ACE6; --near-bg: #2A2112; --late-bg: #2E1A16;
@@ -205,7 +212,7 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 .fab {
   position: fixed; right: max(16px, env(safe-area-inset-right)); bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom, 0px)); z-index: 25;
   border: 0; border-radius: 16px; background: var(--brand); color: var(--brand-ink); padding: 0 18px; height: 52px;
-  font-weight: 700; display: flex; align-items: center; gap: 8px; box-shadow: 0 6px 20px rgba(31, 92, 79, .35); cursor: pointer;
+  font-weight: 700; display: flex; align-items: center; gap: 8px; box-shadow: 0 6px 20px rgba(45, 100, 60, .32); cursor: pointer;
 }
 @media (min-width: 800px) { .fab { right: calc(50% - 380px + 16px); } }
 

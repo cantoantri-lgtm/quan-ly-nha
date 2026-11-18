@@ -6,7 +6,7 @@
 
 /* ---------- Giao việc bằng giọng nói ---------- */
 .voice-panel { padding: 28px 16px; display: grid; gap: 16px; justify-items: center; text-align: center; }
-.mic { width: 96px; height: 96px; border-radius: 50%; border: 0; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; cursor: pointer; box-shadow: 0 8px 24px rgba(31, 92, 79, .3); }
+.mic { width: 96px; height: 96px; border-radius: 50%; border: 0; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; cursor: pointer; box-shadow: 0 8px 24px rgba(45, 100, 60, .3); }
 .mic.on { background: var(--danger); box-shadow: 0 0 0 10px var(--s-block-bg); }
 .stop-sq { width: 28px; height: 28px; border-radius: 6px; background: currentColor; }
 @media (prefers-reduced-motion: no-preference) { .mic.on { animation: pulse 1.6s ease-in-out infinite; } }

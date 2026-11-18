@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/session";
+import { ROLE_LABEL, type Role } from "../lib/labels";
 import "../nav.css";
 
 export const Icon = {
@@ -127,6 +128,12 @@ export const Icon = {
       <path d="m15 18-6-6 6-6" />
     </svg>
   ),
+  chev: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+  ),
+  refresh: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>
+  ),
   plus: (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
       <path d="M12 5v14M5 12h14" />
@@ -147,23 +154,11 @@ export function applyTheme(t: "light" | "dark" | null) {
 export function savedTheme(): "light" | "dark" | null {
   try { const v = localStorage.getItem("neo-theme"); return v === "light" || v === "dark" ? v : null; } catch { return null; }
 }
-const isDark = () => (document.documentElement.dataset.theme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
+export type AppItem = { to: string; label: string; icon: JSX.Element; n?: number };
 
-/** Thanh trên toàn app: logo (bấm về trang chủ), tên công ty, nút Apps, thông báo, chế độ tối, tài khoản */
-export function AppHeader() {
-  const { profile, unread, pendingApprovals, isManager, isApprover, isLeadUp, isCollaborator, isCustomer, isAccountant } = useSession();
-  const [open, setOpen] = useState(false);
-  const [dark, setDark] = useState(isDark());
-  const loc = useLocation();
-  useEffect(() => setOpen(false), [loc.pathname]);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  type AppItem = { to: string; label: string; icon: JSX.Element; n?: number };
+/** Nhóm chức năng theo vai trò: dùng cho bảng Apps (điện thoại) và thanh menu xổ xuống (PC). Quyền thật vẫn chặn ở CSDL. */
+export function useMenuGroups(): { title: string; menu: string; items: AppItem[] }[] {
+  const { unread, pendingApprovals, isManager, isApprover, isLeadUp, isCollaborator, isCustomer, isAccountant } = useSession();
   const apps: AppItem[] = isCustomer ? [
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
@@ -178,14 +173,14 @@ export function AppHeader() {
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
   ] : [];
   // Nhân viên: gom theo nhóm. Quyền hiện / ẩn giữ như cũ (CSDL vẫn là nơi chặn quyền thật).
-  const groups: { title: string; items: AppItem[] }[] = isCustomer || isCollaborator ? [{ title: "", items: apps }] : [
-    { title: "Quản trị", items: [
+  return isCustomer || isCollaborator ? [{ title: "", menu: "Chức năng", items: apps }] : [
+    { title: "Quản trị", menu: "Quản trị", items: [
       ...(isManager ? [{ to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user }] : []),
       ...(isManager || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
       ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
       ...(isManager ? [{ to: "/quan-tri", label: "Tổng quan quản trị", icon: Icon.gear }] : []),
     ] },
-    { title: "Quản lý toà nhà", items: [
+    { title: "Quản lý toà nhà", menu: "Toà nhà & khách", items: [
       { to: "/ban-do", label: "Bản đồ", icon: Icon.map },
       { to: "/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
       { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
@@ -197,15 +192,42 @@ export function AppHeader() {
       { to: "/phan-anh", label: "Phản ánh", icon: Icon.help },
       { to: "/khach-hang", label: "Khách hàng", icon: Icon.user },
     ] },
-    { title: "Văn phòng số", items: [
+    { title: "Văn phòng số", menu: "Văn phòng số", items: [
       { to: "/van-phong", label: "Văn phòng số", icon: Icon.office, n: pendingApprovals },
       { to: "/viec", label: "Công việc", icon: Icon.tasks },
     ] },
-    { title: "Tài khoản và thông báo", items: [
+    { title: "Tài khoản và thông báo", menu: "Tài khoản", items: [
       { to: "/thong-bao", label: "Thông báo", icon: Icon.bell, n: unread },
       { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
     ] },
   ];
+}
+
+const isDark = () => (document.documentElement.dataset.theme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
+
+/** Thanh trên toàn app: logo (bấm về trang chủ), tên công ty, nút Apps, thông báo, chế độ tối, tài khoản */
+export function AppHeader() {
+  const { profile, unread, isCollaborator, isCustomer } = useSession();
+  const [open, setOpen] = useState(false);
+  const [dark, setDark] = useState(isDark());
+  const loc = useLocation();
+  useEffect(() => setOpen(false), [loc.pathname]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const groups = useMenuGroups();
+  const [menu, setMenu] = useState<string | null>(null);
+  useEffect(() => setMenu(null), [loc.pathname]);
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menu]);
 
   function toggleTheme() {
     const next = dark ? "light" : "dark";
@@ -217,6 +239,28 @@ export function AppHeader() {
     <header className="apphead">
       <Link to={isCustomer ? "/thong-tin" : isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Next Living"><img src="/logo-next-living-ngang.svg" alt="Next Living" /></Link>
       <div className="ah-co"><b>NEXT LIVING</b><small>Thuộc Next Vision</small></div>
+      <nav className="ah-menu" aria-label="Menu chức năng">
+        {groups.filter((g) => g.items.length).map((g) => {
+          const on = menu === g.menu;
+          const n = g.items.reduce((t, a) => t + (a.n ?? 0), 0);
+          return (
+            <div key={g.menu} className="mm">
+              <button type="button" className="mm-btn" aria-expanded={on} aria-haspopup="true" onClick={() => setMenu(on ? null : g.menu)}>
+                {g.menu}{n ? <span className="mm-n num">{n > 99 ? "99+" : n}</span> : null}{Icon.chev}
+              </button>
+              {on ? (
+                <div className="mm-pop">
+                  {g.items.map((a) => (
+                    <NavLink key={a.to} to={a.to} end={a.to === "/quan-tri"} className={({ isActive }) => (isActive ? "active" : "")}>
+                      {a.icon}<span>{a.label}</span>{a.n ? <span className="n num">{a.n > 99 ? "99+" : a.n}</span> : null}
+                    </NavLink>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </nav>
       <div className="ah-tools">
         <button type="button" className="ah-btn apps" aria-expanded={open} aria-haspopup="true" aria-label="Chức năng" onClick={() => setOpen((o) => !o)}>
           {Icon.grid}<span className="ah-tip">Apps</span>
@@ -228,8 +272,10 @@ export function AppHeader() {
         <button type="button" className="ah-btn" aria-label={dark ? "Chế độ sáng" : "Chế độ tối"} onClick={toggleTheme}>
           {dark ? Icon.sun : Icon.moon}<span className="ah-tip">{dark ? "Chế độ sáng" : "Chế độ tối"}</span>
         </button>
+        {profile ? <span className="ah-who"><b>{profile.full_name}</b><small>{ROLE_LABEL[profile.role as Role] ?? ""}</small></span> : null}
         {profile ? <Link to="/tai-khoan" className="ah-me" aria-label="Tài khoản" title={profile.full_name}>{initials(profile.full_name)}</Link> : null}
       </div>
+      {menu ? <div className="apps-back" onClick={() => setMenu(null)} /> : null}
       {open ? (
         <>
           <div className="apps-back" onClick={() => setOpen(false)} />

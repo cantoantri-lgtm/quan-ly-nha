@@ -58,4 +58,66 @@
 }
 @media (max-width: 899px) { .ah-tip { display: none; } }
 
-@media print { .apphead { display: none !important; } }
+/* ---------- PC kiểu cửa sổ ERP: thanh menu xổ xuống, tab màn hình đang mở, thanh trạng thái ---------- */
+.ah-menu, .ah-who, .otabs, .statusbar { display: none; }
+@media (min-width: 900px) {
+  :root { --head-h: 56px; --tabs-h: 40px; }
+  .apphead { background: var(--menubar); border-bottom-color: var(--brand-line); gap: 6px; }
+  .ah-logo { padding: 2px 4px; }
+  .ah-logo img { height: 36px; }
+  .ah-co, .ah-btn.apps { display: none; }
+  .ah-menu { display: flex; align-items: center; gap: 2px; margin-left: 10px; flex-wrap: wrap; }
+  .mm { position: relative; }
+  .mm-btn {
+    display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--menubar-ink);
+    font-size: 14px; font-weight: 600; padding: 8px 10px 8px 12px; border-radius: 8px; cursor: pointer;
+  }
+  .mm-btn svg { width: 15px; height: 15px; opacity: .7; }
+  .mm-btn:hover, .mm-btn[aria-expanded="true"] { background: var(--surface); }
+  .mm-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+  .mm-pop {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 46; min-width: 250px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; box-shadow: var(--shadow-lg); padding: 6px; display: grid;
+  }
+  .mm-pop a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; color: var(--ink); font-size: 14px; }
+  .mm-pop a svg { width: 18px; height: 18px; color: var(--brand); flex: none; }
+  .mm-pop a span:first-of-type { flex: 1; }
+  .mm-pop a:hover { background: var(--brand-soft); }
+  .mm-pop a.active { background: var(--brand-soft); color: var(--brand); font-weight: 700; }
+  .mm-pop .n { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--danger); color: #fff; font-size: 11.5px; font-weight: 700; display: grid; place-items: center; }
+  .ah-btn:hover { background: var(--surface); }
+  .ah-who { display: grid; text-align: right; line-height: 1.2; margin: 0 4px 0 8px; color: var(--menubar-ink); }
+  .ah-who b { font-size: 13.5px; font-weight: 600; }
+  .ah-who small { font-size: 12px; opacity: .8; }
+  .ah-me { width: 34px; height: 34px; font-size: 13px; }
+
+  .otabs {
+    display: flex; align-items: flex-end; gap: 2px; padding: 6px 16px 0; min-height: var(--tabs-h); background: var(--bg);
+    border-bottom: 1px solid var(--line); position: sticky; top: var(--head-h); z-index: 35; overflow-x: auto; scrollbar-width: thin;
+  }
+  .otab {
+    flex: none; display: flex; align-items: center; max-width: 240px; border: 1px solid transparent; border-bottom: 0;
+    border-radius: 8px 8px 0 0; margin-bottom: -1px; color: var(--muted);
+  }
+  .otab a { padding: 7px 4px 7px 12px; font-size: 13px; font-weight: 500; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .otab button {
+    width: 24px; height: 24px; margin-right: 4px; border: 0; border-radius: 6px; background: transparent; color: inherit;
+    display: grid; place-items: center; cursor: pointer; opacity: .65; padding: 0;
+  }
+  .otab button svg { width: 13px; height: 13px; }
+  .otab button:hover { background: var(--brand-soft); opacity: 1; }
+  .otab:hover { color: var(--ink); }
+  .otab.on { background: var(--surface); border-color: var(--line); color: var(--brand); }
+  .otab.on a { font-weight: 700; }
+  .otab-clear { margin-left: auto; align-self: center; flex: none; border: 0; background: transparent; color: var(--muted); font-size: 12.5px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  .otab-clear:hover { color: var(--brand); background: var(--brand-soft); }
+  .topbar { top: calc(var(--head-h) + var(--tabs-h)); }
+
+  .statusbar {
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; position: sticky; bottom: 0; z-index: 30;
+    padding: 5px 16px; background: var(--menubar); color: var(--menubar-ink); border-top: 1px solid var(--brand-line); font-size: 12.5px;
+  }
+  .toast { bottom: 44px; }
+}
+
+@media print { .apphead, .otabs, .statusbar { display: none !important; } }
