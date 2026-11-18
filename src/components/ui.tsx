@@ -173,6 +173,7 @@ export function AppHeader() {
   ] : isCollaborator ? [
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+    { to: "/phong", label: "Website phòng trống (lấy link giới thiệu)", icon: Icon.map },
     { to: "/phan-anh", label: "Phản ánh", icon: Icon.help, n: unread },
     { to: "/tai-khoan", label: "Tài khoản", icon: Icon.user },
   ] : [];
@@ -188,6 +189,8 @@ export function AppHeader() {
       { to: "/ban-do", label: "Bản đồ", icon: Icon.map },
       { to: "/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
       { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
+      { to: "/lich-xem-phong", label: "Lịch hẹn xem phòng", icon: Icon.tasks },
+      { to: "/phong", label: "Website phòng trống", icon: Icon.map },
       { to: "/thu-tien-khach", label: "Thu tiền", icon: Icon.money },
       ...(isManager ? [{ to: "/quan-tri/thu-tien", label: "Tài khoản nhận tiền", icon: Icon.money }] : []),
       ...(isManager || isAccountant ? [{ to: "/hoa-don-gtgt", label: "Hoá đơn GTGT", icon: Icon.money }] : []),

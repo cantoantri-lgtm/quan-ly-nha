@@ -37,6 +37,7 @@ export default function Notifications() {
     else if (n.entity_type === "bill") nav(isCustomer ? "/thanh-toan-cua-toi" : "/thu-tien-khach");
     else if (n.entity_type === "building_meter" && n.entity_id) nav(`/toa/${n.entity_id}/dien-nuoc`);
     else if (n.entity_type === "vat_day") nav("/hoa-don-gtgt");
+    else if (n.entity_type === "viewing") nav("/lich-xem-phong");
     else load();
   }
 

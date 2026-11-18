@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { useSession } from "./lib/session";
 import { supabase } from "./lib/supabase";
 import { AppHeader, BottomNav, Toast } from "./components/ui";
@@ -37,9 +37,12 @@ import CustomerInfo from "./pages/CustomerInfo";
 import { MyPayments, StaffPayments } from "./pages/CustomerPayments";
 import Feedback, { FeedbackInbox, FeedbackThread } from "./pages/Feedback";
 import Customers from "./pages/Customers";
+import Viewings from "./pages/Viewings";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
 const MapPage = lazy(() => import("./pages/MapPage"));
+// Website phòng trống công khai (/phong): tải riêng, không cần đăng nhập
+const WebApp = lazy(() => import("./web/WebApp"));
 
 function Shell() {
   return (
@@ -75,6 +78,10 @@ function ManagerOnly() {
 
 export default function App() {
   const { session, profile, loading, isCollaborator, isCustomer } = useSession();
+  const loc = useLocation();
+
+  // Website phòng trống: ai cũng xem được, kể cả chưa đăng nhập
+  if (loc.pathname === "/phong" || loc.pathname.startsWith("/phong/")) return <Suspense fallback={<div className="loading">Đang tải…</div>}><WebApp /></Suspense>;
 
   // Trang thanh toán cho khách thuê: công khai, không cần đăng nhập
   if (window.location.pathname.startsWith("/thanh-toan/")) return <Routes><Route path="/thanh-toan/:code" element={<PayPage />} /></Routes>;
@@ -166,6 +173,7 @@ export default function App() {
         </Route>
         <Route path="toa-nha" element={<Buildings />} />
         <Route path="khach-hang" element={<Customers />} />
+        <Route path="lich-xem-phong" element={<Viewings />} />
         <Route path="khach-hang/:id" element={<CustomerInfo />} />
         <Route path="thu-tien-khach" element={<StaffPayments />} />
         <Route path="phan-anh" element={<FeedbackInbox />} />

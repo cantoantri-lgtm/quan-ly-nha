@@ -33,6 +33,12 @@
   --head-h: 56px;
   --logo-bg: transparent;
   --shadow-lg: 0 8px 28px rgba(22, 33, 29, .18);
+  /* Website phòng trống công khai (/phong): màu thương hiệu Next Living */
+  --web-bg: #FFFFFF; --web-alt: #F4F7F3; --web-ink: #14251A; --web-muted: #4E5A50; --web-line: #E1E8E2;
+  --web-green: #2F6B3A; --web-on-green: #FFFFFF; --web-title: #1E4D2B; --web-tint: #DCE7D8; --web-soft: #EAF3E7; --web-tag: #E6F1E4;
+  --web-hero: #2C3D31; --web-hero-2: #35493B; --web-hero-3: #3E5444; --web-on-hero: #DCE8D8; --web-sky: #7FC4EA;
+  --web-footer: #1E4D2B; --web-footer-ink: #DCE8D8; --web-footer-line: #3C6A49;
+  --web-card-1: #3E5F47; --web-card-2: #2F5A6E; --web-card-3: #4A5B3E;
   color-scheme: light;
 }
 :root[data-theme="light"] { color-scheme: light; }
@@ -51,6 +57,10 @@
     --gc-tim: #B88BE0; --gc-tim-bg: #2B1E3A;
     --gc-hong: #EE86AF; --gc-hong-bg: #3B1F2C;
     --gc-vang: #E3CB3A; --gc-vang-bg: #353010;
+    --web-bg: #0F1513; --web-alt: #141C18; --web-ink: #E4ECE8; --web-muted: #9DB0A5; --web-line: #26332D;
+    --web-green: #5FA86B; --web-on-green: #0B1A10; --web-title: #A8D99F; --web-tint: #1F2E25; --web-soft: #17261D; --web-tag: #1B3219;
+    --web-hero: #1A2620; --web-hero-2: #22312A; --web-hero-3: #2A3B32; --web-on-hero: #DCE8D8;
+    --web-footer: #10261A; --web-footer-ink: #C9D9C5; --web-footer-line: #2A4634;
     --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 8px 28px rgba(0,0,0,.5); --logo-bg: #EEF1EA;
     color-scheme: dark;
   }
@@ -69,6 +79,10 @@
     --gc-tim: #B88BE0; --gc-tim-bg: #2B1E3A;
     --gc-hong: #EE86AF; --gc-hong-bg: #3B1F2C;
     --gc-vang: #E3CB3A; --gc-vang-bg: #353010;
+    --web-bg: #0F1513; --web-alt: #141C18; --web-ink: #E4ECE8; --web-muted: #9DB0A5; --web-line: #26332D;
+    --web-green: #5FA86B; --web-on-green: #0B1A10; --web-title: #A8D99F; --web-tint: #1F2E25; --web-soft: #17261D; --web-tag: #1B3219;
+    --web-hero: #1A2620; --web-hero-2: #22312A; --web-hero-3: #2A3B32; --web-on-hero: #DCE8D8;
+    --web-footer: #10261A; --web-footer-ink: #C9D9C5; --web-footer-line: #2A4634;
     --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 8px 28px rgba(0,0,0,.5); --logo-bg: #EEF1EA;
     color-scheme: dark;
 }
