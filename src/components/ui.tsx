@@ -206,6 +206,7 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
     { title: "Văn phòng số", menu: "Văn phòng số", items: [
       { to: "/van-phong", label: "Văn phòng số", icon: Icon.office, n: pendingApprovals },
       { to: "/viec", label: "Công việc", icon: Icon.tasks },
+      { to: "/du-an", label: "Dự án", icon: Icon.chart },
     ] },
     { title: "Tài khoản và thông báo", menu: "Tài khoản", items: [
       { to: "/thong-bao", label: "Thông báo", icon: Icon.bell, n: unread },

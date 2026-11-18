@@ -5,6 +5,7 @@ import { useSession } from "../lib/session";
 import { PRIORITY_LABEL, STATUS_LABEL, type Task } from "../lib/labels";
 import { daysBetween, dueInfo, dueLevel, todayVN } from "../lib/dates";
 import { Empty, Icon, TopBar } from "../components/ui";
+import "../projects.css";
 
 type Row = Task & { assignee: { full_name: string } | null; creator: { full_name: string } | null; building: { code: string } | null; members: { user_id: string }[] | null };
 type Tab = "mine" | "given" | "all";
@@ -91,6 +92,10 @@ export default function Tasks() {
     <>
       <TopBar title="Công việc" />
       <main className="main stack">
+        <nav className="pj-switch" aria-label="Giao việc" style={{ alignSelf: "flex-start" }}>
+          <Link to="/viec" aria-current="page">Công việc</Link>
+          <Link to="/du-an">Dự án</Link>
+        </nav>
         {canAssign ? (
           <div className="tabs" role="tablist">
             {([["mine", "Việc của tôi"], ["given", "Tôi đã giao"], ["all", "Tất cả"]] as [Tab, string][]).map(([k, l]) => (

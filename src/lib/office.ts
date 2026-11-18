@@ -63,6 +63,9 @@ export type Req = {
   hr_note?: string | null;
   /** Đề nghị tạm ứng / thanh toán lập từ chuyến công tác */
   trip_id?: string | null;
+  /** Dự án / hạng mục chính (migration 069) */
+  project_id?: string | null;
+  project_item_id?: string | null;
 };
 
 export type ReqLine = {

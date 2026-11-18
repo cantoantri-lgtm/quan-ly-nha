@@ -90,6 +90,11 @@ export default function RequestForm() {
   const copyParam = !id ? qs.get("tu") : null;
   const [tripId, setTripId] = useState<string | null>(null);
   const [tripLabel, setTripLabel] = useState<string | null>(null);
+  // Dự án (migration 069): gắn chi phí vào dự án / hạng mục chính
+  const [projectId, setProjectId] = useState(!id ? qs.get("project") ?? "" : "");
+  const [projectItemId, setProjectItemId] = useState(!id ? qs.get("item") ?? "" : "");
+  const [projects, setProjects] = useState<{ id: string; code: string | null; name: string; status: string; building_id: string | null }[]>([]);
+  const [projItems, setProjItems] = useState<{ id: string; project_id: string; name: string; sort: number; start_date: string }[]>([]);
   const [settleDue, setSettleDue] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [advs, setAdvs] = useState<AdvDraft[]>([]);
@@ -148,6 +153,23 @@ export default function RequestForm() {
     })();
   }, [tripParam, editing, kind]);   // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!(kind === "thanh_toan" || kind === "tam_ung")) return;
+    (async () => {
+      const [pj, it] = await Promise.all([
+        supabase.from("projects").select("id,code,name,status,building_id").order("start_date", { ascending: false }),
+        supabase.from("project_items").select("id,project_id,name,sort,start_date").eq("level", 1),
+      ]);
+      const list = (pj.data ?? []) as typeof projects;
+      setProjects(list); setProjItems((it.data ?? []) as typeof projItems);
+      const pre = !editing ? list.find((x) => x.id === projectId) : null;
+      if (pre) {
+        if (pre.building_id) setBuildingId((b) => b || pre.building_id!);
+        setReason((r) => r || (kind === "tam_ung" ? `Tạm ứng dự án ${pre.code}: ${pre.name}` : `Thanh toán dự án ${pre.code}: ${pre.name}`));
+      }
+    })();
+  }, [kind]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   // Đề nghị thanh toán mới: mở sẵn một dòng chi tiết để gõ ngay
   useEffect(() => { if (!editing && kind === "thanh_toan" && lines.length === 0) setLines([emptyLine()]); }, [editing, kind]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -172,6 +194,7 @@ export default function RequestForm() {
       setDocNo(r.doc_no);
       setHandover(r.handover_to ?? ""); setPhone(r.contact_phone ?? ""); setTransport(r.transport ?? ""); setSettleDue(r.settle_due ?? "");
       setTripId(r.trip_id ?? null);
+      setProjectId(r.project_id ?? ""); setProjectItemId(r.project_item_id ?? "");
       if (r.kind === "cong_tac") {
         setTripType(r.trip_type ?? "trong_nuoc"); setTripArea(r.trip_area ?? ""); setVisaType(r.visa_type ?? "khong_yeu_cau"); setTraveler(r.traveler_id ?? "");
         loadTrip(r.id).then((t) => {
@@ -273,6 +296,8 @@ export default function RequestForm() {
       visa_type: kind === "cong_tac" && tripType === "nuoc_ngoai" ? visaType : null,
       traveler_id: kind === "cong_tac" ? traveler || null : null,
       trip_id: isMoney ? tripId : null,
+      project_id: isMoney ? projectId || null : null,
+      project_item_id: isMoney ? projectItemId || null : null,
       settle_due: kind === "tam_ung" ? settleDue || null : null,
     };
     setBusy(true);
@@ -357,6 +382,24 @@ export default function RequestForm() {
       </div>
       {oldLoaNo && !loaId ? <small className="muted">Số LOA ghi tay trước đây: {oldLoaNo}. Bấm kính lúp để chọn LOA tương ứng.</small> : null}
     </div>
+  ) : null;
+  const pjOpen = projects.filter((x) => (x.status !== "hoan_thanh" && x.status !== "huy") || x.id === projectId);
+  const pjItems = projItems.filter((x) => x.project_id === projectId).sort((a, b) => a.sort - b.sort || a.start_date.localeCompare(b.start_date));
+  const ProjectField = isMoney && (pjOpen.length || projectId) ? (
+    <>
+      <label className="field dn-span3"><span>Dự án <small className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</small></span>
+        <select id="rq-project" className="input" value={projectId} onChange={(e) => { setProjectId(e.target.value); setProjectItemId(""); }}>
+          <option value="">Không thuộc dự án</option>
+          {pjOpen.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
+        </select></label>
+      {projectId ? (
+        <label className="field dn-span3"><span>Hạng mục chính</span>
+          <select id="rq-project-item" className="input" value={projectItemId} onChange={(e) => setProjectItemId(e.target.value)}>
+            <option value="">Chưa gắn hạng mục</option>
+            {pjItems.map((x, i) => <option key={x.id} value={x.id}>{i + 1}. {x.name}</option>)}
+          </select></label>
+      ) : null}
+    </>
   ) : null;
   const LoaBudget = pick ? (
     <div className="loa-budget num dn-full" role="status" aria-label="Dự toán LOA">
@@ -535,6 +578,7 @@ export default function RequestForm() {
                 <ReadOnly label="Loại tiền" value="VND" />
                 {LoaField}
                 {LoaBudget}
+                {ProjectField}
                 <MoneyInput id="rq-amount" label="Số tiền tạm ứng" value={amount} onChange={setAmount} required />
                 <label className="field"><span>Ngày cần tiền *</span>
                   <input id="rq-start" type="date" className="input" value={start} required onChange={(e) => setStart(e.target.value)} /></label>
@@ -563,6 +607,7 @@ export default function RequestForm() {
                   <ReadOnly label="Loại tiền" value="VND" />
                   {LoaField}
                   {LoaBudget}
+                  {ProjectField}
                   <label className="field"><span>Hình thức thanh toán <span className="req">*</span></span>
                     <select id="rq-paymethod" className="input" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
                       {Object.entries(PAY_METHOD).map(([k, l]) => <option key={k} value={k}>{l}</option>)}

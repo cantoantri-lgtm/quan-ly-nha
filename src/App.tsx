@@ -27,6 +27,9 @@ import RequestDetail from "./pages/RequestDetail";
 import RequestPrint from "./pages/RequestPrint";
 import TripPrint from "./pages/TripPrint";
 import FlowSettings from "./pages/FlowSettings";
+import Projects from "./pages/Projects";
+import ProjectForm from "./pages/ProjectForm";
+import ProjectDetail from "./pages/ProjectDetail";
 import RequestList from "./pages/RequestList";
 import Org from "./pages/Org";
 import Tenants, { TenantDetail } from "./pages/Tenants";
@@ -154,6 +157,10 @@ export default function App() {
           <Route path="viec/:id/sua" element={<TaskForm />} />
         </Route>
         <Route path="viec/:id" element={<TaskDetail />} />
+        <Route path="du-an" element={<Projects />} />
+        <Route path="du-an/moi" element={<ProjectForm />} />
+        <Route path="du-an/:id" element={<ProjectDetail />} />
+        <Route path="du-an/:id/sua" element={<ProjectForm />} />
         <Route path="toa/:id" element={<BuildingDetail />} />
         <Route path="toa/:id/khach" element={<Tenants />} />
         <Route path="toa/:id/hop-dong" element={<Contracts />} />

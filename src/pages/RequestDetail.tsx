@@ -37,6 +37,7 @@ export default function RequestDetail() {
   const [tripOf, setTripOf] = useState<Req | null>(null);   // chuyến công tác gốc của đề nghị tạm ứng / thanh toán
   const [hrOpen, setHrOpen] = useState(false);
   const [hrNote, setHrNote] = useState("");
+  const [proj, setProj] = useState<{ id: string; code: string | null; name: string; item: string | null } | null>(null);
   const [aNote, setANote] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [uncCount, setUncCount] = useState(0);
@@ -61,6 +62,13 @@ export default function RequestDetail() {
       const [t, lk] = await Promise.all([loadTrip(rq.id), supabase.rpc("trip_linked", { p_trip: rq.id })]);
       setTrip(t); setLinked((lk.data ?? []) as typeof linked);
     } else { setTrip(null); setLinked([]); }
+    if (rq.project_id) {
+      const [pj, it] = await Promise.all([
+        supabase.from("projects").select("id,code,name").eq("id", rq.project_id).maybeSingle(),
+        rq.project_item_id ? supabase.from("project_items").select("name").eq("id", rq.project_item_id).maybeSingle() : Promise.resolve({ data: null }),
+      ]);
+      setProj(pj.data ? { ...(pj.data as { id: string; code: string | null; name: string }), item: (it.data as { name: string } | null)?.name ?? null } : null);
+    } else setProj(null);
     if (rq.trip_id) {
       const { data: t } = await supabase.from("requests").select("*").eq("id", rq.trip_id).maybeSingle();
       setTripOf((t as Req | null) ?? null);
@@ -217,6 +225,7 @@ export default function RequestDetail() {
             <dt>Kế hoạch</dt><dd className="num">{fullDate(r.start_date)} – {fullDate(r.end_date)} ({fmtDays(r.days)})</dd>
             {r.amount ? (<><dt>Dự trù</dt><dd className="num">{vnd(r.amount)}</dd></>) : null}
           </>) : null}
+          {isMoney && proj ? (<><dt>Dự án</dt><dd><Link to={`/du-an/${proj.id}`}>{proj.code} · {proj.name}</Link>{proj.item ? ` · ${proj.item}` : ""}</dd></>) : null}
           {isMoney && tripOf ? (<><dt>Chuyến công tác</dt><dd><Link to={`/van-phong/${tripOf.id}`}>{tripOf.doc_no ? `${tripOf.doc_no} · ` : ""}{tripOf.location} ({fullDate(tripOf.actual_start ?? tripOf.start_date)})</Link></dd></>) : null}
           {isMoney ? (<>
             {r.doc_no ? (<><dt>Số chứng từ</dt><dd className="num">{r.doc_no}{r.doc_date ? ` · ${fullDate(r.doc_date)}` : ""}</dd></>) : null}

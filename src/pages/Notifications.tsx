@@ -31,6 +31,7 @@ export default function Notifications() {
       refreshUnread();
     }
     if (n.entity_type === "task" && n.entity_id) nav(`/viec/${n.entity_id}`);
+    else if (n.entity_type === "project" && n.entity_id) nav(`/du-an/${n.entity_id}`);
     else if (n.entity_type === "request" && n.entity_id) nav(`/van-phong/${n.entity_id}`);
     else if (n.entity_type === "feedback" && n.entity_id) nav(`/phan-anh/${n.entity_id}`);
     else if (n.entity_type === "customer") nav(isCustomer ? "/thong-tin" : `/khach-hang/${n.entity_id}`);
