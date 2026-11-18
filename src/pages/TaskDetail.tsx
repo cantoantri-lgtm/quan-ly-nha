@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { RelatedPanel } from "../components/RelatedPanel";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { PRIORITY_LABEL, STATUS_LABEL, STATUS_ORDER, type Task, type TaskStatus } from "../lib/labels";
@@ -196,6 +197,7 @@ export default function TaskDetail() {
         {isOwner ? (
           <button className="btn danger" style={{ marginTop: 12 }} onClick={() => setConfirmDel(true)}>Xoá việc này</button>
         ) : null}
+        <RelatedPanel type="task" id={t.id} />
       </main>
 
       <Sheet open={confirmDel} onClose={() => setConfirmDel(false)} title="Xoá việc này?">

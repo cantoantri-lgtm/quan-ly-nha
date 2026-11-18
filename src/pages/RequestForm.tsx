@@ -8,6 +8,8 @@ import { KINDS, PAUSED_TIP, usePausedKinds, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PA
 import { uploadFile } from "../lib/files";
 import DnttEditor, { advFromRow, calcLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
 import { TopBar } from "../components/ui";
+import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
+import { addLink } from "../lib/links";
 import { ChainPreview } from "../components/ApprovalChain";
 import { useLeaveBalance } from "./Office";
 import "../office.css";
@@ -52,6 +54,8 @@ export default function RequestForm() {
   const [payee, setPayee] = useState("");
   const [bank, setBank] = useState("");
   const [buildingId, setBuildingId] = useState("");
+  const link = useLinkFrom(!editing);   // lập đề nghị từ công việc / phòng / phản ánh…: gắn liên kết sau khi gửi
+  useEffect(() => { if (link.info?.parent && !buildingId && buildings.some((b) => b.id === link.info!.parent)) setBuildingId(link.info.parent); }, [link.info]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(!editing);
@@ -206,6 +210,10 @@ export default function RequestForm() {
         }
       }
     }
+    if (!editing && link.from) {
+      const le = await addLink("request", rid, link.from.type, link.from.id);
+      if (le) problems.push("chưa gắn được liên kết: " + friendlyError({ message: le }));
+    }
     setBusy(false);
     if (problems.length) {
       toast(`Đã lưu đề nghị nhưng có lỗi: ${problems.join("; ")}. Mở đề nghị để bổ sung.`);
@@ -286,6 +294,7 @@ export default function RequestForm() {
       <main className="main main-wide">
         <form className="stack dn-form" onSubmit={submit}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault(); }}>
+          <LinkFromNote from={link.from} info={link.info} />
 
           {/* ---------- Người đăng ký ---------- */}
           <section className="card dn-sec">

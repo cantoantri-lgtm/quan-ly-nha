@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { RelatedPanel } from "../components/RelatedPanel";
 import { supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { timeAgo } from "../lib/dates";
@@ -260,6 +261,7 @@ export function FeedbackThread() {
         ) : (
           <p className="fb-note">{t.closed_reason === "tu_dong" ? "Phản ánh đã tự kết thúc sau 3 ngày không có phản hồi." : "Người gửi đã kết thúc phản ánh."}</p>
         )}
+        {!isRequester ? <RelatedPanel type="feedback" id={t.id} /> : null}
       </main>
     </>
   );

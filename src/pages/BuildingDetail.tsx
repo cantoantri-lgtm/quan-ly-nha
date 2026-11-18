@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { RelatedPanel } from "../components/RelatedPanel";
 import { callAccountFn, friendlyError, normPhone, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { useCanEditBuilding } from "../lib/useCanEdit";
@@ -94,6 +95,15 @@ export default function BuildingDetail() {
     return m;
   }, [rooms]);
   useEffect(() => { load(); }, [load]);
+  // Mở thẳng một phòng khi đi từ liên kết (?phong=<id>)
+  const [params, setParams] = useSearchParams();
+  const openRoom = params.get("phong");
+  useEffect(() => {
+    if (!openRoom || !rooms.length) return;
+    const r = rooms.find((x) => x.id === openRoom);
+    if (r) setEditing(r);
+    setParams((p) => { p.delete("phong"); return p; }, { replace: true });
+  }, [openRoom, rooms, setParams]);
 
   const stats = useMemo(() => {
     const c = { trong: 0, dang_o: 0, dang_sua: 0, giu_cho: 0 } as Record<RoomStatus, number>;
@@ -638,6 +648,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
         ) : null}
       </form>
       )}
+      {!isNew && !cred && room.id ? <RelatedPanel type="room" id={room.id} title={`Liên quan tới phòng ${room.code}`} bare /> : null}
     </Sheet>
   );
 }

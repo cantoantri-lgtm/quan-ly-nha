@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { RelatedPanel } from "../components/RelatedPanel";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { clock, daysBetween, todayVN } from "../lib/dates";
@@ -293,6 +294,7 @@ export default function RequestDetail() {
           {isLoa && r.status === "da_duyet" ? <p className="muted small" style={{ margin: 0 }}>Tờ trình đã duyệt xong nên khoá, không sửa / xoá. Cần thay đổi thì lập LOA mới và chọn LOA này làm tham chiếu.</p> : null}
           {canCancel ? <button className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setConfirm("huy")}>Rút lại {noun}</button> : null}
         </div>
+        <RelatedPanel type="request" id={r.id} />
       </main>
 
       <DecideSheet req={decide ? r : null} mode={decide} onClose={() => setDecide(null)} onDone={() => { setDecide(null); load(); }} />

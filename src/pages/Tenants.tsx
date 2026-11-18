@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { RelatedPanel } from "../components/RelatedPanel";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { useCanEditBuilding } from "../lib/useCanEdit";
@@ -289,6 +290,7 @@ export function TenantDetail() {
             ))}
           </section>
         )}
+        {id ? <RelatedPanel type="tenant" id={id} /> : null}
       </main>
       {editing ? <TenantSheet buildingId={t.building_id} tenant={t} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} /> : null}
     </>

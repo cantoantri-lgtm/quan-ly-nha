@@ -8,6 +8,7 @@ import { DUTY_LABEL, EDIT_LOCK_TIP, FLOW_TEXT, KINDS, PAUSED_TIP, usePausedKinds
   type LoaLine, type Req, type ReqKind, type ReqLine, type ReqStep } from "../lib/office";
 import { Icon, Sheet } from "../components/ui";
 import { Pager, usePaging } from "../components/Pager";
+import { RelatedPanel } from "../components/RelatedPanel";
 import "../office.css";
 import "../table.css";
 
@@ -52,7 +53,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   const [loaLines, setLoaLines] = useState<LoaLine[]>([]);
   const [coEdit, setCoEdit] = useState<Set<string>>(new Set());   // tờ trình mình là người cùng soạn
   const hasPanel = kind === "thanh_toan" || loa;
-  const [panel, setPanel] = useState<"ct" | "duyet">(hasPanel ? "ct" : "duyet");
+  const [panel, setPanel] = useState<"ct" | "duyet" | "lk">(hasPanel ? "ct" : "duyet");
   const [delReq, setDelReq] = useState<Req | null>(null);
   const [busy, setBusy] = useState(false);
   const [help, setHelp] = useState(false);
@@ -293,10 +294,12 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
         <section className="pg-card" aria-label="Chi tiết dòng đang chọn">
           <div className="sub-tabs" role="tablist">
             {hasPanel ? <button role="tab" aria-selected={panel === "ct"} onClick={() => setPanel("ct")}>{loa ? "Dự toán ngân sách" : "Chi tiết hoá đơn"}</button> : null}
-            <button role="tab" aria-selected={panel === "duyet" || !hasPanel} onClick={() => setPanel("duyet")}>Luồng duyệt</button>
+            <button role="tab" aria-selected={panel === "duyet" || (!hasPanel && panel !== "lk")} onClick={() => setPanel("duyet")}>Luồng duyệt</button>
+            <button role="tab" aria-selected={panel === "lk"} onClick={() => setPanel("lk")}>Liên quan</button>
             <span className="grow" />
             <Link to={`/van-phong/${sel.id}`} className="dt-link" style={{ alignSelf: "center" }}>Mở {noun} →</Link>
           </div>
+          {panel === "lk" ? <RelatedPanel key={sel.id} type="request" id={sel.id} title="Mục liên quan" bare /> : (
           <div className="dt-wrap">
             {loa && panel === "ct" ? (
               <table className="dt">
@@ -342,6 +345,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
               </table>
             )}
           </div>
+          )}
         </section>
       ) : null}
 

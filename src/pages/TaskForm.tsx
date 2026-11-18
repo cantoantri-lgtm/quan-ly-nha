@@ -4,6 +4,8 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { PRIORITY_LABEL, ROLE_LABEL, ROLE_RANK, type Priority, type Task } from "../lib/labels";
 import { TopBar } from "../components/ui";
+import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
+import { addLink } from "../lib/links";
 
 export default function TaskForm() {
   const { id } = useParams();
@@ -23,6 +25,8 @@ export default function TaskForm() {
   const [members, setMembers] = useState<{ building_id: string; user_id: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const link = useLinkFrom(!id);   // tạo việc từ phản ánh / phòng / đề nghị…: gắn liên kết sau khi lưu
+  useEffect(() => { if (link.info?.parent && !buildingId && buildings.some((b) => b.id === link.info!.parent)) setBuildingId(link.info.parent); }, [link.info]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!canAssign) return;
@@ -92,6 +96,10 @@ export default function TaskForm() {
       const r = await supabase.from("tasks").insert(stepRows);
       if (r.error) { setBusy(false); setErr("Đã tạo việc nhưng chưa thêm được các bước: " + friendlyError(r.error)); return; }
     }
+    if (link.from) {
+      const le = await addLink("task", data.id, link.from.type, link.from.id);
+      if (le) { setBusy(false); toast("Đã tạo việc nhưng chưa gắn được liên kết: " + friendlyError({ message: le })); nav(`/viec/${data.id}`, { replace: true }); return; }
+    }
     setBusy(false);
     toast(main === profile?.id && !others.length ? "Đã thêm việc." : others.length ? `Đã giao việc cho ${others.length + 1} người. Mọi người sẽ nhận thông báo.` : "Đã giao việc. Người làm sẽ nhận thông báo.");
     nav(`/viec/${data.id}`, { replace: true });
@@ -102,6 +110,7 @@ export default function TaskForm() {
       <TopBar title={editing ? "Sửa việc" : canAssign ? "Giao việc" : "Thêm việc"} back />
       <main className="main">
         <form className="stack" onSubmit={submit}>
+          <LinkFromNote from={link.from} info={link.info} />
           <label className="field">
             <span>Tên việc *</span>
             <input id="t-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)}
