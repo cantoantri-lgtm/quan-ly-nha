@@ -199,3 +199,81 @@
 .loa-nums .dot.pend { background: var(--today); }
 
 .kind-tile.paused { opacity: .6; }
+
+/* ---------- Form nhập Văn phòng số kiểu ERP (phương án A) ---------- */
+.dn-req { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr)); }
+.dn-search { display: flex; min-width: 0; }
+.dn-search .dn-search-val { flex: 1; min-width: 0; text-align: left; cursor: pointer; border-radius: 11px 0 0 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; }
+.dn-search-btn { width: 44px; border: 1px solid var(--line); border-left: 0; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.dn-search-btn:last-child { border-radius: 0 11px 11px 0; }
+.dn-search-btn.clear { background: var(--surface); color: var(--muted); }
+.dn-search-btn svg { width: 18px; height: 18px; }
+.loa-budget { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); padding: 8px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+.loa-budget b { color: var(--ink); }
+.loa-budget .hl b { color: var(--brand); }
+.loa-budget .over, .loa-budget .over b { color: var(--danger); font-weight: 700; }
+.dn-totals { display: flex; flex-wrap: wrap; gap: 4px 20px; align-items: baseline; font-size: 13px; color: var(--muted); }
+.dn-totals b { color: var(--ink); font-size: 15px; }
+.dn-totals .grand b { color: var(--brand); font-size: 20px; }
+.dn-totals .words { font-style: italic; flex-basis: 100%; }
+.dn-totals .over b { color: var(--danger); }
+.dn-linkrow { display: grid; gap: 10px; }
+.loa-pick table.dt tbody tr { cursor: pointer; }
+.req { color: var(--danger); }
+
+/* Bảng nhập kiểu Excel */
+.dn-grid-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.dn-grid-head .row { gap: 8px; }
+.dn-grid-sum { font-size: 13.5px; color: var(--muted); margin-left: 8px; }
+.dn-grid-sum b { color: var(--brand); font-size: 15px; }
+.dn-xls { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.dn-xls table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+.dn-xls th { background: var(--grid-head); color: var(--ink); font-weight: 600; font-size: 12.5px; text-align: left; padding: 8px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); white-space: nowrap; }
+.dn-xls td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 0; height: 36px; }
+.dn-xls th:last-child, .dn-xls td:last-child { border-right: 0; }
+.dn-xls .r { text-align: right; }
+.dn-xls td input, .dn-xls td select { width: 100%; height: 36px; border: 0; background: transparent; padding: 0 8px; font: inherit; font-size: 13.5px; color: var(--ink); outline: none; }
+.dn-xls td input.r { text-align: right; }
+.dn-xls td:focus-within { box-shadow: inset 0 0 0 2px var(--brand); }
+.dn-xls td.bad { background: var(--late-bg); }
+.dn-xls td.calc { background: var(--grid-zebra); padding: 0 8px; color: var(--ink); white-space: nowrap; }
+.dn-xls td.idx { text-align: center; color: var(--muted); background: var(--grid-zebra); padding: 0 6px; }
+.dn-xls td.acts { white-space: nowrap; padding: 0 4px; }
+.dn-xls tr.newrow td { height: auto; padding: 4px 8px; background: var(--surface); }
+.dn-xls tfoot td { background: var(--grid-head); padding: 9px 8px; font-weight: 600; height: auto; }
+.xls-btn { width: 28px; height: 28px; border: 0; background: transparent; color: var(--muted); border-radius: 6px; display: inline-grid; place-items: center; cursor: pointer; padding: 0; }
+.xls-btn svg { width: 15px; height: 15px; }
+.xls-btn:hover { background: var(--brand-soft); color: var(--brand); }
+.xls-btn.no:hover { background: var(--s-block-bg); color: var(--danger); }
+
+@media (min-width: 900px) {
+  /* Mục phẳng, tiêu đề xanh có đường kẻ như mẫu đính kèm */
+  .dn-erp { gap: 18px; }
+  .dn-erp > .dn-sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px 20px; display: grid; gap: 20px; }
+  .dn-erp .dn-sec { padding: 0; border: 0; background: transparent; box-shadow: none; gap: 12px; }
+  .dn-erp .dn-h { display: flex; align-items: center; gap: 12px; color: var(--brand); font-size: 13.5px; }
+  .dn-erp .dn-h::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .dn-erp .dn-grid-head .dn-h { flex: 1; }
+  .dn-erp .dn-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 14px; }
+  .dn-erp.money .dn-fields { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .dn-erp .dn-req { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .dn-erp .dn-span2 { grid-column: span 2; }
+  .dn-erp .dn-span3 { grid-column: span 3; }
+  .dn-erp .dn-span4 { grid-column: span 4; }
+  .dn-erp .dn-full { grid-column: 1 / -1; }
+  .dn-erp .field > span { font-size: 12.5px; font-weight: 500; }
+  .dn-erp .input, .dn-erp select.input { min-height: 38px; padding: 7px 10px; border-radius: 6px; font-size: 14px; }
+  .dn-erp textarea.input { min-height: 60px; }
+  .dn-erp .input.ro { min-height: 38px; }
+  .dn-erp .dn-search .dn-search-val { border-radius: 6px 0 0 6px; }
+  .dn-erp .dn-search-btn { width: 40px; }
+  .dn-erp .dn-search-btn:last-child { border-radius: 0 6px 6px 0; }
+  .dn-erp .dn-attach { display: grid; grid-template-columns: 260px minmax(0, 1fr); align-items: start; }
+  .dn-erp .dn-attach > * { grid-column: 2; }
+  .dn-erp .dn-attach > .btn { grid-column: 1; grid-row: 1 / span 4; min-height: 96px; border: 1.5px dashed var(--brand-line); }
+  .dn-erp .dn-linkrow { grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) auto; align-items: end; }
+  .dn-erp .dn-submit { padding: 12px 20px; }
+}
+.main.main-form { max-width: 1500px; }
+@media (min-width: 900px) { .dn-erp .dn-submit { bottom: var(--status-h, 0px); } }
+.dn-sheet { display: grid; gap: 14px; min-width: 0; }

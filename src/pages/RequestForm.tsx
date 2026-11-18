@@ -6,8 +6,10 @@ import { daysBetween, ddmmyyyy, todayVN, workDays } from "../lib/dates";
 import { parseMoney, vnd, vndWords } from "../lib/money";
 import { KINDS, PAUSED_TIP, usePausedKinds, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, isEditableStatus, loaLeft, type LoaPick, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
 import { uploadFile } from "../lib/files";
-import DnttEditor, { advFromRow, calcLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
-import { TopBar } from "../components/ui";
+import DnttEditor, { advFromRow, calcLine, emptyLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
+import { LoaPicker } from "../components/LoaPicker";
+import { LEVEL_SHORT } from "../lib/org";
+import { Icon, TopBar } from "../components/ui";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
 import { addLink } from "../lib/links";
 import { ChainPreview } from "../components/ApprovalChain";
@@ -38,7 +40,7 @@ function MoneyInput({ id, value, onChange, label, required }: { id: string; valu
 export default function RequestForm() {
   const { kind: kindParam, id } = useParams();
   const editing = !!id;
-  const { profile, buildings, people, toast, refreshUnread, isManager } = useSession();
+  const { profile, buildings, people, toast, refreshUnread, isManager, myStaff } = useSession();
   const nav = useNavigate();
   const [kind, setKind] = useState<ReqKind>((kindParam as ReqKind) || "nghi_phep");
   const today = todayVN();
@@ -78,6 +80,15 @@ export default function RequestForm() {
   const [advs, setAdvs] = useState<AdvDraft[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [links, setLinks] = useState<LinkDraft[]>([]);
+  const [loaOpen, setLoaOpen] = useState(false);
+  const [deptName, setDeptName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!myStaff?.department_id) return;
+    supabase.from("departments").select("name").eq("id", myStaff.department_id).maybeSingle()
+      .then(({ data }) => setDeptName((data as { name: string } | null)?.name ?? null));
+  }, [myStaff?.department_id]);
+  // Đề nghị thanh toán mới: mở sẵn một dòng chi tiết để gõ ngay
+  useEffect(() => { if (!editing && kind === "thanh_toan" && lines.length === 0) setLines([emptyLine()]); }, [editing, kind]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const balance = useLeaveBalance(profile?.id);
   const { paused, loaded: pauseLoaded } = usePausedKinds();
@@ -123,8 +134,10 @@ export default function RequestForm() {
   }, [isMoney]);
   const isPay = kind === "thanh_toan";
   const absence = kind === "nghi_phep" || kind === "ra_ngoai" || kind === "cong_tac";   // vắng mặt: có bàn giao
-  const hasLines = isPay && lines.length > 0;
-  const tot = totals(lines, advs);
+  // Dòng trống hoàn toàn (vd vừa bấm thêm dòng) thì bỏ qua khi tính và khi lưu
+  const filled = lines.filter((l) => l.amount.trim() || l.seller_name.trim() || l.invoice_no.trim() || l.description.trim() || l.invoice_serial.trim());
+  const hasLines = isPay && filled.length > 0;
+  const tot = totals(filled, advs);
   const multiDay = kind === "cong_tac" || (kind === "nghi_phep" && span === "ca_ngay") || kind === "ra_ngoai";
   const isSunday = (iso: string) => new Date(iso + "T00:00:00Z").getUTCDay() === 0;
   const days = kind === "nghi_phep"
@@ -137,14 +150,15 @@ export default function RequestForm() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
-    const amt = hasLines ? tot.net : parseMoney(amount);
-    if (isMoney && !amt) { setErr(hasLines ? "Tiền tạm ứng phải nhỏ hơn tổng thanh toán." : "Nhập số tiền đề nghị."); return; }
+    if (isPay && !hasLines) { setErr("Nhập ít nhất một dòng chi tiết thanh toán. Tổng tiền tự cộng từ các dòng."); return; }
+    const amt = isPay ? tot.net : parseMoney(amount);
+    if (isMoney && !amt) { setErr(isPay ? "Tiền tạm ứng phải nhỏ hơn tổng thanh toán." : "Nhập số tiền đề nghị."); return; }
     if (!hasLines && amount && !amt) { setErr("Số tiền chưa đúng định dạng."); return; }
     if (isPay) {
       if (payMethod === "chuyen_khoan" && !bank.trim()) { setErr("Nhập số tài khoản và ngân hàng nhận tiền."); return; }
-      for (let i = 0; i < lines.length; i++) {
-        if (!calcLine(lines[i]).pre) { setErr(`Khoản ${i + 1}: nhập tiền trước VAT.`); return; }
-        if (!lines[i].cost_center.trim()) { setErr(`Khoản ${i + 1}: nhập Cost Center.`); return; }
+      for (let i = 0; i < filled.length; i++) {
+        if (!calcLine(filled[i]).pre) { setErr(`Dòng ${lines.indexOf(filled[i]) + 1}: nhập tiền trước VAT.`); return; }
+        if (!filled[i].cost_center.trim()) { setErr(`Dòng ${lines.indexOf(filled[i]) + 1}: nhập Cost Center.`); return; }
       }
       for (let i = 0; i < advs.length; i++) if (!parseMoney(advs[i].amount)) { setErr(`Tạm ứng ${i + 1}: nhập số tiền.`); return; }
     }
@@ -191,8 +205,8 @@ export default function RequestForm() {
         const d2 = await supabase.from("request_lines").delete().eq("request_id", rid);
         if (d1.error || d2.error) problems.push(friendlyError((d1.error || d2.error)!));
       }
-      if (lines.length) {
-        const r1 = await supabase.from("request_lines").insert(lines.map((l, i) => ({ ...lineToRow(l, i), request_id: rid })));
+      if (filled.length) {
+        const r1 = await supabase.from("request_lines").insert(filled.map((l, i) => ({ ...lineToRow(l, i), request_id: rid })));
         if (r1.error) problems.push(friendlyError(r1.error));
         else if (advs.length) {
           const r2 = await supabase.from("request_advances").insert(advs.map((a) => ({ request_id: rid, amount: parseMoney(a.amount), description: a.description.trim() || null })));
@@ -238,30 +252,32 @@ export default function RequestForm() {
   );
 
   const bankReq = isPay && payMethod === "chuyen_khoan";
-  const total = isPay ? (hasLines ? tot.net : parseMoney(amount)) : parseMoney(amount);
+  const total = isPay ? tot.net : parseMoney(amount);
   const others = people.filter((p) => p.is_active && p.id !== profile?.id);
   const pick = picks?.find((x) => x.id === loaId) ?? null;
-  const leftAfter2 = pick ? loaLeft(pick) - (total ?? 0) : null;   // dự toán còn lại sau đề nghị này
 
-  const LoaSel = isMoney ? (
-    <section className="card dn-sec k-loa">
-      <h2 className="dn-h">Tờ trình (LOA) tham chiếu <small className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</small></h2>
-      <label className="field"><span>LOA đã duyệt liên quan</span>
-        <select id="rq-loa" className="input" value={loaId} onChange={(e) => setLoaId(e.target.value)}>
-          <option value="">{picks == null ? "Đang tải…" : "Không gắn LOA"}</option>
-          {loaId && picks && !pick ? <option value={loaId}>LOA đang gắn</option> : null}
-          {(picks ?? []).map((x) => <option key={x.id} value={x.id}>{x.doc_no} · {x.subject} · còn {vnd(loaLeft(x))}</option>)}
-        </select></label>
-      {oldLoaNo ? <p className="muted small" style={{ margin: 0 }}>Số LOA ghi tay trước đây: {oldLoaNo}. Có thể chọn LOA tương ứng trong danh sách để theo dõi dự toán.</p> : null}
-      {pick ? (
-        <p className="calc-line num" style={{ margin: 0 }}>
-          Dự toán <b>{vnd(pick.amount)}</b> · đã duyệt chi {vnd(pick.used)} · đang chờ duyệt {vnd(pick.pending)} · người lập {pick.requester_name ?? "—"}
-          {leftAfter2 != null && total ? <><br />{leftAfter2 < 0 ? <span className="over">Vượt dự toán LOA {vnd(-leftAfter2)}. Vẫn gửi được, các cấp duyệt sẽ thấy cảnh báo này.</span> : <>Còn lại sau đề nghị này: <b>{vnd(leftAfter2)}</b></>}</> : null}
-        </p>
-      ) : (
-        <p className="muted small" style={{ margin: 0 }}>Nếu khoản chi này thuộc một LOA đã duyệt, chọn LOA để theo dõi dự toán còn lại. Không có thì để trống.</p>
-      )}
-    </section>
+  const loaAfter = pick && total ? loaLeft(pick) - total : null;
+  const LoaField = isMoney ? (
+    <div className="field dn-span3">
+      <span>Tờ trình (LOA) <small className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</small></span>
+      <div className="dn-search">
+        <button type="button" id="rq-loa" className="input dn-search-val" onClick={() => setLoaOpen(true)} aria-haspopup="dialog">
+          {pick ? `${pick.doc_no ?? "LOA"} · ${pick.subject}` : loaId ? "LOA đang gắn" : <span className="muted">Bấm kính lúp để tìm LOA</span>}
+        </button>
+        {loaId ? <button type="button" className="dn-search-btn clear" aria-label="Bỏ gắn LOA" title="Bỏ gắn LOA" onClick={() => setLoaId("")}>{Icon.x}</button> : null}
+        <button type="button" className="dn-search-btn" aria-label="Tìm và chọn LOA" title="Tìm LOA" onClick={() => setLoaOpen(true)}>{Icon.search}</button>
+      </div>
+      {oldLoaNo && !loaId ? <small className="muted">Số LOA ghi tay trước đây: {oldLoaNo}. Bấm kính lúp để chọn LOA tương ứng.</small> : null}
+    </div>
+  ) : null;
+  const LoaBudget = pick ? (
+    <div className="loa-budget num dn-full" role="status" aria-label="Dự toán LOA">
+      <span>Dự toán <b>{vnd(pick.amount)}</b></span>
+      <span>Đã duyệt chi <b>{vnd(pick.used)}</b></span>
+      <span>Đang chờ duyệt <b>{vnd(pick.pending)}</b></span>
+      <span className="hl">Còn lại <b>{vnd(loaLeft(pick))}</b></span>
+      {loaAfter != null ? <span className={loaAfter < 0 ? "over" : ""}>Còn lại sau đề nghị này <b>{vnd(loaAfter)}</b>{loaAfter < 0 ? " · vượt dự toán, vẫn gửi được, cấp duyệt sẽ thấy cảnh báo" : ""}</span> : null}
+    </div>
   ) : null;
 
   const Handover = absence ? (
@@ -290,24 +306,25 @@ export default function RequestForm() {
 
   return (
     <>
-      <TopBar title={editing ? `Sửa · ${meta.label}` : meta.label} back />
-      <main className="main main-wide">
-        <form className="stack dn-form" onSubmit={submit}
+      <TopBar title={editing ? `Sửa · ${meta.label}` : `Lập ${meta.label.charAt(0).toLowerCase()}${meta.label.slice(1)}`} back
+        action={<button type="submit" form="dn-form" className="tb-action" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu và gửi lại" : "Gửi"}</button>} />
+      <main className={`main ${isMoney ? "main-form" : "main-wide"}`}>
+        <form id="dn-form" className={`stack dn-form dn-erp${isMoney ? " money" : ""}`} onSubmit={submit}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault(); }}>
           <LinkFromNote from={link.from} info={link.info} />
+          <div className="dn-sheet">
 
           {/* ---------- Người đăng ký ---------- */}
           <section className="card dn-sec">
-            <h2 className="dn-h">Người đề nghị</h2>
-            <div className="dn-fields">
-              <ReadOnly label="Họ và tên" value={profile?.full_name ?? ""} />
-              {!isMoney ? null : <ReadOnly label="Số chứng từ" value={docNo ?? "Tự cấp khi gửi"} num />}
-              {!isMoney ? null : <ReadOnly label="Ngày chứng từ" value={ddmmyyyy(today)} num />}
-              {!isMoney ? null : <ReadOnly label="Loại tiền" value="VND" />}
+            <h2 className="dn-h">Người đăng ký</h2>
+            <div className="dn-req">
+              <ReadOnly label="Người đăng ký" value={profile?.full_name ?? ""} />
+              <ReadOnly label="Phòng ban" value={deptName ?? "—"} />
+              <ReadOnly label="Chức vụ" value={myStaff?.position ?? "—"} />
+              <ReadOnly label="Cấp" value={myStaff?.level ? LEVEL_SHORT[myStaff.level] ?? `L${myStaff.level}` : "—"} />
+              <ReadOnly label="Điện thoại" value={profile?.phone ?? "—"} num />
             </div>
           </section>
-
-          {LoaSel}
 
           {/* ---------- Nghỉ phép / Ra ngoài / Công tác ---------- */}
           {absence ? (
@@ -379,8 +396,13 @@ export default function RequestForm() {
           {/* ---------- Tạm ứng ---------- */}
           {kind === "tam_ung" ? (
             <section className="card dn-sec">
-              <h2 className="dn-h">Nội dung tạm ứng</h2>
+              <h2 className="dn-h">Thông tin</h2>
               <div className="dn-fields">
+                <ReadOnly label="Số chứng từ" value={docNo ?? "Tự cấp khi gửi"} num />
+                <ReadOnly label="Ngày chứng từ" value={ddmmyyyy(today)} num />
+                <ReadOnly label="Loại tiền" value="VND" />
+                {LoaField}
+                {LoaBudget}
                 <MoneyInput id="rq-amount" label="Số tiền tạm ứng" value={amount} onChange={setAmount} required />
                 <label className="field"><span>Ngày cần tiền *</span>
                   <input id="rq-start" type="date" className="input" value={start} required onChange={(e) => setStart(e.target.value)} /></label>
@@ -392,7 +414,7 @@ export default function RequestForm() {
                   <input id="rq-bank" className="input" value={bank} onChange={(e) => setBank(e.target.value)} placeholder="Để trống nếu nhận tiền mặt" /></label>
                 {BuildingSel}
               </div>
-              <label className="field"><span>Lý do tạm ứng *</span>
+              <label className="field dn-full"><span>Lý do tạm ứng *</span>
                 <textarea id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
                   placeholder="VD: Ứng tiền mua vật tư sửa chữa toà 89CMT8" /></label>
             </section>
@@ -402,44 +424,40 @@ export default function RequestForm() {
           {isPay ? (
             <>
               <section className="card dn-sec">
-                <h2 className="dn-h">Thông tin thanh toán</h2>
+                <h2 className="dn-h">Thông tin</h2>
                 <div className="dn-fields">
-                  <label className="field"><span>Loại thanh toán *</span>
+                  <ReadOnly label="Số chứng từ" value={docNo ?? "Tự cấp khi gửi"} num />
+                  <ReadOnly label="Ngày chứng từ" value={ddmmyyyy(today)} num />
+                  <ReadOnly label="Loại tiền" value="VND" />
+                  {LoaField}
+                  {LoaBudget}
+                  <label className="field"><span>Hình thức thanh toán <span className="req">*</span></span>
+                    <select id="rq-paymethod" className="input" value={payMethod} onChange={(e) => setPayMethod(e.target.value)}>
+                      {Object.entries(PAY_METHOD).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                    </select></label>
+                  <label className="field"><span>Loại thanh toán <span className="req">*</span></span>
                     <select id="rq-paytype" className="input" value={payType} onChange={(e) => setPayType(e.target.value)}>
                       {Object.entries(PAY_TYPE).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                     </select></label>
-                  <label className="field"><span>Ngày cần thanh toán *</span>
+                  <label className="field"><span>Ngày cần thanh toán <span className="req">*</span></span>
                     <input id="rq-start" type="date" className="input" value={start} required onChange={(e) => setStart(e.target.value)} /></label>
                   {BuildingSel}
-                </div>
-                <div className="field"><span>Phương thức thanh toán *</span><Options name="Phương thức thanh toán" value={payMethod} options={PAY_METHOD} onChange={setPayMethod} /></div>
-              </section>
-
-              <section className="card dn-sec">
-                <h2 className="dn-h">Đơn vị nhận tiền</h2>
-                <div className="dn-fields">
-                  <label className="field"><span>Tên đơn vị</span>
-                    <input id="rq-payee" className="input" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="VD: Cửa hàng nội thất An Phát" /></label>
                   <label className="field"><span>Mã đơn vị</span>
                     <input id="rq-vendor" className="input" value={vendorCode} onChange={(e) => setVendorCode(e.target.value)} /></label>
-                  <label className="field"><span>Người liên hệ</span>
-                    <input id="rq-contact" className="input" value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
+                  <label className="field"><span>Tên đơn vị nhận</span>
+                    <input id="rq-payee" className="input" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="VD: Cửa hàng nội thất An Phát" /></label>
                   <label className="field"><span>Mã liên hệ</span>
                     <input id="rq-contact-code" className="input" value={contactCode} onChange={(e) => setContactCode(e.target.value)} /></label>
-                  <label className="field dn-span2"><span>{bankReq ? "Thông tin chuyển khoản (STK, ngân hàng) *" : "Số tài khoản, ngân hàng"}</span>
+                  <label className="field"><span>Người liên hệ</span>
+                    <input id="rq-contact" className="input" value={contactName} onChange={(e) => setContactName(e.target.value)} /></label>
+                  <label className="field dn-span4"><span>{bankReq ? <>Thông tin CK (STK + ngân hàng) <span className="req">*</span></> : "Số tài khoản, ngân hàng"}</span>
                     <input id="rq-bank" className="input" value={bank} onChange={(e) => setBank(e.target.value)} required={bankReq}
                       placeholder={bankReq ? "VD: 20338000 · VietinBank" : "Không cần nếu không chuyển khoản"} /></label>
+                  <label className="field dn-full"><span>Nội dung <span className="req">*</span></span>
+                    <input id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
+                      placeholder="VD: Thanh toán sơn và vật tư sửa chữa toà 89CMT8 tháng 11" /></label>
                 </div>
-                <label className="field"><span>Nội dung *</span>
-                  <textarea id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
-                    placeholder="VD: Mua 2 bộ bàn ghế ngoài trời cho 89CMT8" /></label>
               </section>
-
-              {!hasLines ? (
-                <section className="card dn-sec">
-                  <MoneyInput id="rq-amount" label="Số tiền" value={amount} onChange={setAmount} required />
-                </section>
-              ) : null}
 
               <DnttEditor lines={lines} setLines={setLines} advs={advs} setAdvs={setAdvs}
                 files={editing ? undefined : files} setFiles={editing ? undefined : setFiles}
@@ -449,16 +467,31 @@ export default function RequestForm() {
             </>
           ) : null}
 
+          </div>
+
           <ChainPreview kind={kind} />
 
           {err ? <div className="error-box" role="alert">{err}</div> : null}
           <div className="dn-submit">
-            <div className="dn-total-words">
-              {isMoney && total ? <><b className="num">{vnd(total)}</b><small>{vndWords(total)}</small></> : <small>{editing ? "Lưu và gửi lại để duyệt lại từ cấp đầu." : "Gửi để bắt đầu luồng duyệt."}</small>}
-            </div>
+            {isPay ? (
+              <div className="dn-totals num" aria-live="polite">
+                <span>Tổng thanh toán <b>{vnd(tot.gross)}</b></span>
+                {tot.adv ? <span>Trừ tạm ứng <b>− {vnd(tot.adv)}</b></span> : null}
+                <span className={`grand${tot.net <= 0 && hasLines ? " over" : ""}`}>Tổng tiền VNĐ <b>{vnd(tot.net)}</b></span>
+                {loaAfter != null ? <span className={loaAfter < 0 ? "over" : ""}>LOA còn lại sau đề nghị <b>{vnd(loaAfter)}</b></span> : null}
+                {tot.net > 0 ? <span className="words">{vndWords(tot.net)}</span> : <span className="words">Tổng tiền tự cộng từ các dòng chi tiết.</span>}
+              </div>
+            ) : (
+              <div className="dn-total-words">
+                {isMoney && total ? <><b className="num">{vnd(total)}</b><small>{vndWords(total)}</small></>
+                  : <small>{editing ? "Lưu và gửi lại để duyệt lại từ cấp đầu." : "Gửi để bắt đầu luồng duyệt."}</small>}
+                {loaAfter != null ? <small className={loaAfter < 0 ? "err-text" : ""}>LOA còn lại sau đề nghị: {vnd(loaAfter)}</small> : null}
+              </div>
+            )}
             <button className="btn" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu và gửi lại" : "Gửi đề nghị"}</button>
           </div>
         </form>
+        <LoaPicker open={loaOpen} onClose={() => setLoaOpen(false)} picks={picks} value={loaId} onPick={setLoaId} />
       </main>
     </>
   );

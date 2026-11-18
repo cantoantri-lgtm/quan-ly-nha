@@ -61,7 +61,7 @@
 /* ---------- PC kiểu cửa sổ ERP: thanh menu xổ xuống, tab màn hình đang mở, thanh trạng thái ---------- */
 .ah-menu, .ah-who, .otabs, .statusbar { display: none; }
 @media (min-width: 900px) {
-  :root { --head-h: 56px; --tabs-h: 40px; }
+  :root { --head-h: 56px; --tabs-h: 40px; --status-h: 30px; }
   .apphead { background: var(--menubar); border-bottom-color: var(--brand-line); gap: 6px; }
   .ah-logo { padding: 2px 4px; }
   .ah-logo img { height: 36px; }

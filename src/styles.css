@@ -311,3 +311,5 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 @media (prefers-reduced-motion: no-preference) {
   .btn, .chip, .task-card { transition: background-color .15s, border-color .15s, opacity .15s; }
 }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.sheet.wide { max-width: 980px; }
