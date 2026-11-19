@@ -5,6 +5,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { PRIORITY_LABEL, STATUS_LABEL, STATUS_ORDER, type Task, type TaskStatus } from "../lib/labels";
 import { clock, ddmmyyyy, dueInfo } from "../lib/dates";
+import { dirLine, useDirectory } from "../lib/directory";
 import { Empty, Sheet, TopBar } from "../components/ui";
 
 type Detail = Task & {
@@ -21,6 +22,7 @@ export default function TaskDetail() {
   const [t, setT] = useState<Detail | null>(null);
   const [steps, setSteps] = useState<Task[]>([]);
   const [newStepDue, setNewStepDue] = useState("");
+  const dir = useDirectory();
   const [updates, setUpdates] = useState<Update[]>([]);
   const [members, setMembers] = useState<string[]>([]);
   const [notFound, setNotFound] = useState(false);
@@ -145,8 +147,12 @@ export default function TaskDetail() {
 
         <dl className="card kv">
           <dt>{members.length ? "Phụ trách chính" : "Người làm"}</dt>
-          <dd>{t.assignee?.full_name ?? "—"}{t.assignee?.phone && t.assignee_id !== profile.id ? <> · <a href={`tel:${t.assignee.phone}`}>{t.assignee.phone}</a></> : null}</dd>
-          {members.length ? (<><dt>Cùng làm</dt><dd>{members.map((uid) => people.find((p) => p.id === uid)?.full_name ?? "—").join(", ")}</dd></>) : null}
+          <dd>{t.assignee?.full_name ?? "—"}{t.assignee?.phone && t.assignee_id !== profile.id ? <> · <a href={`tel:${t.assignee.phone}`}>{t.assignee.phone}</a></> : null}
+            {t.assignee_id && dir.get(t.assignee_id) ? <small className="muted kv-sub">{dirLine(dir.get(t.assignee_id))}</small> : null}</dd>
+          {members.length ? (<><dt>Cùng làm</dt><dd>{members.map((uid) => {
+            const d = dir.get(uid);
+            return <span key={uid} className="kv-person">{people.find((p) => p.id === uid)?.full_name ?? "—"}{d ? <small className="muted"> · {d.job_title}</small> : null}</span>;
+          })}</dd></>) : null}
           <dt>Người giao</dt><dd>{t.creator?.full_name ?? "—"}</dd>
           {t.building ? (<><dt>Toà nhà</dt><dd>{t.building.code} · {t.building.name}</dd></>) : null}
           <dt>Hạn</dt><dd>{t.due_date ? ddmmyyyy(t.due_date) : "Không đặt hạn"}</dd>

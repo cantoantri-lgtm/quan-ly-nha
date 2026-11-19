@@ -7,6 +7,7 @@ import { TopBar } from "../components/ui";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
 import { addLink } from "../lib/links";
 import { ddmmyyyy } from "../lib/dates";
+import { dirLine, useDirectory } from "../lib/directory";
 
 export default function TaskForm() {
   const { id } = useParams();
@@ -25,6 +26,7 @@ export default function TaskForm() {
   const [steps, setSteps] = useState<{ title: string; due: string }[]>([{ title: "", due: "" }]);
   const [members, setMembers] = useState<{ building_id: string; user_id: string }[]>([]);
   const [busy, setBusy] = useState(false);
+  const dir = useDirectory();
   const [err, setErr] = useState<string | null>(null);
   const link = useLinkFrom(!id);   // tạo việc từ phản ánh / phòng / đề nghị…: gắn liên kết sau khi lưu
   useEffect(() => { if (link.info?.parent && !buildingId && buildings.some((b) => b.id === link.info!.parent)) setBuildingId(link.info.parent); }, [link.info]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -58,8 +60,18 @@ export default function TaskForm() {
       if (buildingId && members.length) return members.some((m) => m.building_id === buildingId && m.user_id === p.id);
       if (!isManager) return members.some((m) => m.user_id === p.id);
       return true;
-    }).sort((a, b) => (a.id === profile.id ? -1 : b.id === profile.id ? 1 : a.full_name.localeCompare(b.full_name, "vi")));
-  }, [people, profile, buildingId, members, isManager]);
+    }).sort((a, b) => {
+      if (a.id === profile.id) return -1;
+      if (b.id === profile.id) return 1;
+      // Xếp theo phòng ban rồi tên; người chưa có vị trí xuống cuối
+      const da = dir.get(a.id), db = dir.get(b.id);
+      const sa = da ? da.dept_sort : 9999, sb = db ? db.dept_sort : 9999;
+      if (sa !== sb) return sa - sb;
+      const ka = `${da?.department ?? ""}|${da?.team ?? ""}`, kb = `${db?.department ?? ""}|${db?.team ?? ""}`;
+      if (ka !== kb) return ka.localeCompare(kb, "vi");
+      return a.full_name.localeCompare(b.full_name, "vi");
+    });
+  }, [people, profile, buildingId, members, isManager, dir]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -140,7 +152,10 @@ export default function TaskForm() {
                   <label key={p.id}>
                     <input type="checkbox" checked={picked.includes(p.id)}
                       onChange={(e) => setPicked(e.target.checked ? [...picked, p.id] : picked.filter((x) => x !== p.id))} />
-                    <span style={{ flex: 1 }}>{p.id === profile?.id ? `Tôi (${p.full_name})` : `${p.full_name} · ${ROLE_LABEL[p.role]}`}</span>
+                    <span className="pick-who">
+                      <b>{p.id === profile?.id ? `Tôi (${p.full_name})` : p.full_name}</b>
+                      <small>{dirLine(dir.get(p.id)) || `${ROLE_LABEL[p.role]} · chưa xếp vị trí trên sơ đồ`}</small>
+                    </span>
                     {picked.length > 1 && (assigneeId === p.id || (!picked.includes(assigneeId) && picked[0] === p.id)) ? <span className="tag">Phụ trách chính</span> : null}
                   </label>
                 ))}
@@ -153,7 +168,7 @@ export default function TaskForm() {
               <label className="field">
                 <span>Người phụ trách chính</span>
                 <select id="t-main" className="input" value={picked.includes(assigneeId) ? assigneeId : picked[0]} onChange={(e) => setAssigneeId(e.target.value)}>
-                  {picked.map((pid) => <option key={pid} value={pid}>{people.find((p) => p.id === pid)?.full_name ?? "?"}</option>)}
+                  {picked.map((pid) => { const d = dir.get(pid); return <option key={pid} value={pid}>{people.find((p) => p.id === pid)?.full_name ?? "?"}{d ? ` · ${d.job_title}` : ""}</option>; })}
                 </select>
                 <small className="muted">Người chính chịu trách nhiệm cuối. Mọi người đều cập nhật được tiến độ và tick các bước.</small>
               </label>
