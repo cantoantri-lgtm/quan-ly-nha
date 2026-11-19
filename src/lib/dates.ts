@@ -32,6 +32,20 @@ export function addDaysISO(iso: string, n: number): string {
   return new Date(Date.parse(iso + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10);
 }
 
+/** Ngày kết thúc hợp đồng n tháng tính từ ngày bắt đầu: 01/12 + 12 tháng → 30/11 năm sau; 31/01 + 1 tháng → 27/02 */
+export function termEndISO(start: string, months: number): string {
+  const [y, m, d] = start.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();   // ngày cuối của tháng đích
+  const same = new Date(Date.UTC(y, m - 1 + months, Math.min(d, last)));
+  return addDaysISO(same.toISOString().slice(0, 10), -1);
+}
+
+/** Số tháng tròn giữa 2 ngày theo cách tính thời hạn hợp đồng; null nếu không tròn tháng */
+export function termMonths(start: string, end: string): number | null {
+  for (let n = 1; n <= 120; n++) if (termEndISO(start, n) === end) return n;
+  return null;
+}
+
 /** Sắp đến hạn = hạn hôm nay hoặc trong SOON_DAYS ngày tới (việc chưa xong) */
 export const SOON_DAYS = 2;
 /** Mức nhắc hạn để tô màu: trễ, hạn hôm nay, sắp đến hạn; null nếu còn xa hoặc không có hạn */

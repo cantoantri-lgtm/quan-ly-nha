@@ -20,6 +20,7 @@ import { PolicyPanel } from "../components/PolicyView";
 import RoomTypesSheet from "../components/RoomTypesSheet";
 import { groupColorKey, type RoomType } from "../lib/roomTypes";
 import "../rooms.css";
+import { ContractTerm } from "../components/ContractTerm";
 
 export type RoomStatus = "trong" | "dang_o" | "dang_sua" | "giu_cho";
 export type Room = {
@@ -363,6 +364,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
     if (repKey === key && rest.length) setRepKey(rest[0].key);
   }
   const [cStart, setCStart] = useState(todayVN());
+  const [cEnd, setCEnd] = useState("");
   const [cRent, setCRent] = useState(room.list_price != null ? new Intl.NumberFormat("vi-VN").format(room.list_price) : "");
   const [cDep, setCDep] = useState("");
   const [fContract, setFContract] = useState<File[]>([]);
@@ -397,6 +399,8 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
         if (accPw.length < 6) { setErr("Mật khẩu tạm cần ít nhất 6 ký tự."); return; }
       }
       if (!tConsent) { setErr("Cần tích xác nhận tất cả khách đồng ý cho lưu CCCD / hộ chiếu."); return; }
+      if (!cStart || !cEnd) { setErr("Nhập ngày hiệu lực hợp đồng: từ ngày và đến ngày."); return; }
+      if (cEnd < cStart) { setErr("Ngày kết thúc hợp đồng phải sau ngày bắt đầu."); return; }
       if (r == null) { setErr("Nhập giá thuê tháng của hợp đồng."); return; }
       if (d == null) { setErr("Tiền cọc chưa đúng."); return; }
       if (!fContract.length) { setErr("Cần tải lên ít nhất một ảnh hoặc file PDF hợp đồng."); return; }
@@ -438,7 +442,7 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
       // 2. Hợp đồng đứng tên khách đại diện (CSDL tự thêm người đại diện vào danh sách người ở)
       if (!D.contract) {
         const c = await supabase.from("contracts").insert({
-          room_id: room.id!, tenant_id: repId, start_date: cStart, rent_amount: rentN, deposit_amount: depN, billing_day: 5,
+          room_id: room.id!, tenant_id: repId, start_date: cStart, end_date: cEnd, rent_amount: rentN, deposit_amount: depN, billing_day: 5,
         }).select("id").single();
         if (c.error) return stop(`Chưa lập được hợp đồng: ${/contracts_one_active/.test(c.error.message) ? "phòng đang có hợp đồng hiệu lực." : friendlyError(c.error)}`);
         D.contract = c.data.id;
@@ -621,11 +625,11 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
               <input id="r-tconsent" type="checkbox" checked={tConsent} onChange={(e) => setTConsent(e.target.checked)} style={{ marginTop: 4 }} />
               <span className="small">Tất cả khách trong phòng đã được thông báo và đồng ý để công ty lưu số và ảnh CCCD / hộ chiếu nhằm quản lý lưu trú, khai báo tạm trú, lập hợp đồng.</span>
             </label>
+            <ContractTerm idPrefix="r-c" start={cStart} end={cEnd} onStart={setCStart} onEnd={setCEnd} />
             <div className="row" style={{ alignItems: "flex-start" }}>
-              <label className="field" style={{ flex: "1 1 150px" }}><span>Hợp đồng bắt đầu *</span><input id="r-cstart" className="input" type="date" value={cStart} onChange={(e) => setCStart(e.target.value)} /></label>
               <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input id="r-crent" className="input num" inputMode="decimal" value={cRent} onChange={(e) => setCRent(e.target.value)} /></label>
+              <label className="field" style={{ flex: "1 1 150px" }}><span>Tiền cọc</span><input id="r-cdep" className="input num" inputMode="decimal" value={cDep} onChange={(e) => setCDep(e.target.value)} /></label>
             </div>
-            <label className="field"><span>Tiền cọc</span><input id="r-cdep" className="input num" inputMode="decimal" value={cDep} onChange={(e) => setCDep(e.target.value)} /></label>
             <label className="field"><span>File hợp đồng * (ảnh chụp hoặc PDF)</span>
               <input id="r-cfile" className="input" type="file" multiple accept="image/*,application/pdf" onChange={(e) => setFContract([...(e.target.files ?? [])])} />
               {fContract.length ? <small className="muted">{fContract.map((f) => f.name).join(", ")}</small> : null}</label>

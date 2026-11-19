@@ -8,6 +8,7 @@ import { naturalCompare, parseMoney, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import FileGallery from "../components/FileGallery";
 import ContractQR from "../components/ContractQR";
+import { ContractTerm } from "../components/ContractTerm";
 import { uploadFile } from "../lib/files";
 import type { Room } from "./BuildingDetail";
 import { ID_NAME, ID_PHOTOS, ID_TYPES, idError, normId, type IdType } from "../lib/idDoc";
@@ -45,7 +46,9 @@ export default function Contracts() {
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
-  const shown = useMemo(() => list.filter((c) => all || c.status === "hieu_luc"), [list, all]);
+  const [noEnd, setNoEnd] = useState(false);
+  const missing = useMemo(() => list.filter((c) => c.status === "hieu_luc" && !c.end_date), [list]);
+  const shown = useMemo(() => (noEnd ? missing : list.filter((c) => all || c.status === "hieu_luc")), [list, all, noEnd, missing]);
   const opened = list.find((c) => c.id === openId) ?? null;
 
   if (!building) return (<><TopBar title="Hợp đồng" back /><main className="main"><Empty title="Không tìm thấy toà này" /></main></>);
@@ -55,9 +58,16 @@ export default function Contracts() {
         action={canEdit ? <button className="tb-action" onClick={() => setAdding(true)}>+ Hợp đồng</button> : null} />
       <main className="main stack">
         <div className="chips" role="group" aria-label="Lọc hợp đồng">
-          <button className="chip" aria-pressed={!all} onClick={() => setAll(false)}>Đang hiệu lực<span className="n">{list.filter((c) => c.status === "hieu_luc").length}</span></button>
-          <button className="chip" aria-pressed={all} onClick={() => setAll(true)}>Tất cả<span className="n">{list.length}</span></button>
+          <button className="chip" aria-pressed={!all && !noEnd} onClick={() => { setAll(false); setNoEnd(false); }}>Đang hiệu lực<span className="n">{list.filter((c) => c.status === "hieu_luc").length}</span></button>
+          <button className="chip" aria-pressed={all && !noEnd} onClick={() => { setAll(true); setNoEnd(false); }}>Tất cả<span className="n">{list.length}</span></button>
+          {missing.length ? <button className="chip" aria-pressed={noEnd} onClick={() => setNoEnd(true)}>Thiếu ngày kết thúc<span className="n">{missing.length}</span></button> : null}
         </div>
+        {missing.length && !noEnd ? (
+          <div className="sheet-nudge" role="status" style={{ margin: 0 }}>
+            {missing.length} hợp đồng đang hiệu lực chưa có ngày kết thúc nên app không nhắc được hợp đồng sắp hết hạn.{" "}
+            <button type="button" className="btn ghost sm" style={{ minHeight: 28, padding: "2px 6px", color: "inherit", textDecoration: "underline" }} onClick={() => setNoEnd(true)}>Xem và bổ sung</button>
+          </div>
+        ) : null}
         {loading ? <div className="loading">Đang tải…</div> : shown.length === 0 ? (
           <Empty title="Chưa có hợp đồng">{canEdit ? "Bấm \"+ Hợp đồng\" để lập hợp đồng cho phòng. Cần có khách thuê trước (mục Khách thuê)." : undefined}</Empty>
         ) : (
@@ -66,7 +76,7 @@ export default function Contracts() {
               <div key={c.id} className="list-row" role="button" tabIndex={0} onClick={() => setSp({ mo: c.id })} onKeyDown={(e) => e.key === "Enter" && setSp({ mo: c.id })}>
                 <div className="grow">
                   <div className="name">Phòng {c.rooms?.code} · {c.tenants?.full_name}</div>
-                  <div className="sub">{ddmmyyyy(c.start_date)} → {c.end_date ? ddmmyyyy(c.end_date) : "không thời hạn"} · {vnd(c.rent_amount)}/tháng</div>
+                  <div className="sub">{ddmmyyyy(c.start_date)} → {c.end_date ? ddmmyyyy(c.end_date) : <b style={{ color: "var(--late)" }}>chưa có ngày kết thúc</b>} · {vnd(c.rent_amount)}/tháng</div>
                 </div>
                 <span className={`tag ${c.status === "hieu_luc" ? "st-ok" : ""}`}>{ST[c.status]}</span>
               </div>
@@ -119,7 +129,8 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
     if (!roomId || !tenantId) { setErr("Chọn phòng và khách thuê."); return; }
     if (rentN == null) { setErr("Nhập giá thuê tháng, VD 4.500.000 hoặc 4,5tr."); return; }
     if (depN == null) { setErr("Tiền cọc chưa đúng."); return; }
-    if (end && end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
+    if (!start || !end) { setErr("Nhập ngày hiệu lực hợp đồng: từ ngày và đến ngày."); return; }
+    if (end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
     setBusy(true);
     const { data, error } = await supabase.from("contracts").insert({
       room_id: roomId, tenant_id: tenantId, code: code.trim() || null, start_date: start, end_date: end || null,
@@ -147,10 +158,7 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
           </select>
           <small className="muted">Chưa có khách? Thêm ở mục <Link to={`/toa/${buildingId}/khach`}>Khách thuê</Link> trước.</small></label>
         <label className="field"><span>Số hợp đồng</span><input id="c-code" className="input" value={code} onChange={(e) => setCode(e.target.value)} placeholder="VD: HD-339-0012" /></label>
-        <div className="row" style={{ alignItems: "flex-start" }}>
-          <label className="field" style={{ flex: "1 1 150px" }}><span>Bắt đầu *</span><input id="c-start" className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} required /></label>
-          <label className="field" style={{ flex: "1 1 150px" }}><span>Kết thúc</span><input id="c-end" className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
-        </div>
+        <ContractTerm start={start} end={end} onStart={setStart} onEnd={setEnd} />
         <div className="row" style={{ alignItems: "flex-start" }}>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input id="c-rent" className="input num" inputMode="decimal" value={rent} onChange={(e) => setRent(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Tiền cọc</span><input id="c-dep" className="input num" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
@@ -195,7 +203,7 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
         <dl className="kv">
           {c.code ? <><dt>Số HĐ</dt><dd>{c.code}</dd></> : null}
           <dt>Trạng thái</dt><dd>{ST[c.status]}</dd>
-          <dt>Thời hạn</dt><dd>{ddmmyyyy(c.start_date)} → {c.end_date ? ddmmyyyy(c.end_date) : "không thời hạn"}</dd>
+          <dt>Hiệu lực</dt><dd>{ddmmyyyy(c.start_date)} → {c.end_date ? ddmmyyyy(c.end_date) : <b style={{ color: "var(--late)" }}>chưa có ngày kết thúc</b>}</dd>
           <dt>Giá thuê</dt><dd className="num">{vnd(c.rent_amount)}/tháng · hạn ngày {c.billing_day}</dd>
           <dt>Tiền cọc</dt><dd className="num">{vnd(c.deposit_amount)} · {DEP[c.deposit_status]}</dd>
           <dt>Số xe gửi</dt><dd className="num">{c.vehicles ?? 0} xe</dd>
@@ -256,7 +264,8 @@ function EditContract({ c, onClose, onSaved }: { c: Contract; onClose: () => voi
     if (r == null) { setErr("Giá thuê chưa đúng, VD 4.500.000 hoặc 4,5tr."); return; }
     if (d == null) { setErr("Tiền cọc chưa đúng."); return; }
     if (!Number.isInteger(b) || b < 1 || b > 28) { setErr("Hạn đóng tiền là ngày từ 1 đến 28."); return; }
-    if (end && end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
+    if (!start || !end) { setErr("Nhập ngày hiệu lực hợp đồng: từ ngày và đến ngày."); return; }
+    if (end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
     setBusy(true);
     const { error } = await supabase.from("contracts").update({
       code: code.trim() || null, start_date: start, end_date: end || null, rent_amount: r, deposit_amount: d, billing_day: b, vehicles: Number(vehicles) || 0, note: note.trim() || null,
@@ -269,10 +278,8 @@ function EditContract({ c, onClose, onSaved }: { c: Contract; onClose: () => voi
     <Sheet open onClose={onClose} title={`Sửa hợp đồng phòng ${c.rooms?.code ?? ""}`}>
       <form className="stack" onSubmit={submit}>
         <label className="field"><span>Số hợp đồng</span><input className="input" value={code} onChange={(e) => setCode(e.target.value)} /></label>
-        <div className="row" style={{ alignItems: "flex-start" }}>
-          <label className="field" style={{ flex: "1 1 150px" }}><span>Bắt đầu *</span><input className="input" type="date" value={start} onChange={(e) => setStart(e.target.value)} required /></label>
-          <label className="field" style={{ flex: "1 1 150px" }}><span>Kết thúc</span><input className="input" type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></label>
-        </div>
+        {!c.end_date ? <p className="sheet-nudge" style={{ margin: 0 }}>Hợp đồng này chưa có ngày kết thúc. Xem trên bản hợp đồng đã ký rồi nhập đúng ngày hiệu lực.</p> : null}
+        <ContractTerm idPrefix="e" start={start} end={end} onStart={setStart} onEnd={setEnd} />
         <div className="row" style={{ alignItems: "flex-start" }}>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input className="input num" inputMode="decimal" value={rent} onChange={(e) => setRent(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Tiền cọc</span><input className="input num" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
