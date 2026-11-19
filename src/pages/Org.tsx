@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { parseMoney, vnd } from "../lib/money";
-import { FLOW_TEXT } from "../lib/office";
-import { DUTY_NAME, LEVEL_LABEL, LEVEL_SHORT, STATUS_LABEL, type Dept, type Pay, type Scale, type Staff } from "../lib/org";
+import { DUTY_LABEL, FLOW_TEXT, KINDS } from "../lib/office";
+import { DUTY_NAME, LEVEL_LABEL, LEVEL_SHORT, STAFFED, STATUS_LABEL, TRIAL_HINT, type Dept, type Pay, type Scale, type Staff } from "../lib/org";
+import { ddmm, ddmmyyyy, todayVN } from "../lib/dates";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import "../office.css";
 import "../org.css";
@@ -11,19 +13,21 @@ import "../org.css";
 type Draft = {
   id: string | null; person_name: string; position: string; department_id: string; team: string; level: string; rank: string;
   status: string; hire_note: string; profile_id: string; duty: string; is_leader: boolean; salary: string; legacy: string;
+  trial_end: string; teamNew: boolean;
 };
 const blank = (dept: string): Draft => ({
   id: null, person_name: "", position: "", department_id: dept, team: "", level: "1", rank: "1", status: "co", hire_note: "",
-  profile_id: "", duty: "", is_leader: false, salary: "", legacy: "",
+  profile_id: "", duty: "", is_leader: false, salary: "", legacy: "", trial_end: "", teamNew: false,
 });
 const isTemp = (id: string) => id.startsWith("new-");
 const rowOf = (s: Staff) => ({
   person_name: s.person_name, position: s.position, department_id: s.department_id, team: s.team, level: s.level, rank: s.rank,
   status: s.status, hire_note: s.hire_note, profile_id: s.profile_id, duty: s.duty, is_leader: s.is_leader,
+  trial_end: s.status === "tap_su" || s.status === "thu_viec" ? s.trial_end ?? null : null,
 });
 
 export default function Org() {
-  const { myStaff, people, toast } = useSession();
+  const { myStaff, people, toast, isFlowAdmin } = useSession();
   const level = myStaff?.level ?? 0;
   const canSee = level >= 3;
   const canEdit = level >= 4;
@@ -35,6 +39,10 @@ export default function Org() {
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [flows, setFlows] = useState<{ kind: string; steps: { duty: string; approver_name: string | null }[] }[] | null>(null);
+  useEffect(() => {
+    supabase.rpc("approval_flow_list").then(({ data }) => { if (data) setFlows(data as typeof flows); });
+  }, []);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -64,7 +72,8 @@ export default function Org() {
 
   const payOf = (id: string) => pay.find((x) => x.staff_id === id)?.base_salary ?? null;
   const counts = useMemo(() => ({
-    co: staff.filter((s) => s.status === "co" && s.person_name !== "Chủ doanh nghiệp").length,
+    co: staff.filter((s) => STAFFED.has(s.status) && s.person_name !== "Chủ doanh nghiệp").length,
+    thu: staff.filter((s) => s.status === "tap_su" || s.status === "thu_viec").length,
     tuyen: staff.filter((s) => s.status === "tuyen").length,
     ngoai: staff.filter((s) => s.status === "thue_ngoai").length,
   }), [staff]);
@@ -84,7 +93,7 @@ export default function Org() {
       id: s.id, person_name: s.person_name ?? "", position: s.position, department_id: s.department_id ?? "", team: s.team ?? "",
       level: s.level ? String(s.level) : "", rank: s.rank ? String(s.rank) : "", status: s.status, hire_note: s.hire_note ?? "",
       profile_id: s.profile_id ?? "", duty: s.duty ?? "", is_leader: s.is_leader, salary: payOf(s.id) != null ? String(payOf(s.id)) : "",
-      legacy: s.profile_id ? "" : (s.person_name ?? ""),
+      legacy: s.profile_id ? "" : (s.person_name ?? ""), trial_end: s.trial_end ?? "", teamNew: false,
     });
   }
 
@@ -92,7 +101,7 @@ export default function Org() {
     if (!edit) return;
     const p = people.find((x) => x.id === pid);
     if (p) setEdit({ ...edit, profile_id: p.id, person_name: p.full_name, status: edit.status === "tuyen" ? "co" : edit.status });
-    else setEdit({ ...edit, profile_id: "", person_name: edit.legacy, status: edit.legacy ? edit.status : (edit.status === "co" ? "tuyen" : edit.status) });
+    else setEdit({ ...edit, profile_id: "", person_name: edit.legacy, status: edit.legacy ? edit.status : (STAFFED.has(edit.status) ? "tuyen" : edit.status) });
   }
 
   // Bấm "Áp dụng" trong biểu mẫu chỉ ghi vào bản nháp; chỉ khi bấm "Lưu" ở sơ đồ mới ghi vào hệ thống.
@@ -114,6 +123,7 @@ export default function Org() {
       team: edit.team.trim() || null, level: edit.level ? Number(edit.level) : null, rank: edit.rank ? Number(edit.rank) : null,
       status: edit.status as Staff["status"], hire_note: edit.hire_note.trim() || null, profile_id: edit.profile_id || null,
       duty: (edit.duty || null) as Staff["duty"], is_leader: edit.is_leader,
+      trial_end: (edit.status === "tap_su" || edit.status === "thu_viec") && edit.trial_end ? edit.trial_end : null,
       sort: old?.sort ?? (Math.max(0, ...staff.map((x) => x.sort)) + 1),
     };
     setStaff(old ? staff.map((s) => (s.id === id ? row : s)) : [...staff, row]);
@@ -167,6 +177,10 @@ export default function Org() {
     setBusy(false); toast("Đã lưu sơ đồ công ty."); load();
   }
 
+  // Bộ phận đã có trong phòng đang chọn (gồm cả bản nháp chưa lưu)
+  const deptTeams = edit ? Array.from(new Set(staff.filter((s) => (s.department_id ?? "") === edit.department_id && s.team?.trim()).map((s) => s.team!.trim())))
+    .sort((a, b) => a.localeCompare(b, "vi")) : [];
+
   if (loading) return (<><TopBar title="Sơ đồ công ty" back /><div className="loading">Đang tải…</div></>);
 
   // Nhân viên thường: chỉ thấy vị trí và lương của chính mình
@@ -195,10 +209,11 @@ export default function Org() {
         <span>{s.position}</span>
         <div className="op-badges">
           {s.level ? <span className="badge">L{s.level}{s.rank ? `-${s.rank}` : ""}</span> : null}
-          {s.status !== "co" ? <span className={`badge ${s.status}`}>{STATUS_LABEL[s.status]}</span> : null}
+          {s.status !== "co" ? <span className={`badge ${s.status}`}>{STATUS_LABEL[s.status]}{s.trial_end && (s.status === "tap_su" || s.status === "thu_viec") ? ` đến ${ddmm(s.trial_end)}` : ""}</span> : null}
+          {s.trial_end && (s.status === "tap_su" || s.status === "thu_viec") && s.trial_end < todayVN() ? <span className="badge overdue">Quá hạn đánh giá</span> : null}
           {s.is_leader ? <span className="badge lead">Leader</span> : null}
           {s.duty ? <span className="badge duty">{DUTY_NAME[s.duty]}</span> : null}
-          {s.profile_id ? <span className="badge acc" title={accountName(s.profile_id) ?? ""}>Có tài khoản</span> : s.status === "co" && s.person_name ? <span className="badge noacc">Chưa có tài khoản</span> : null}
+          {s.profile_id ? <span className="badge acc" title={accountName(s.profile_id) ?? ""}>Có tài khoản</span> : STAFFED.has(s.status) && s.person_name ? <span className="badge noacc">Chưa có tài khoản</span> : null}
         </div>
         {s.hire_note ? <small>{s.hire_note}</small> : null}
       </div>
@@ -210,7 +225,7 @@ export default function Org() {
     <li className={`ot-person st-${s.status}`}>
       <b>{s.person_name ?? "Tuyển mới"}</b>
       <span>{s.position}</span>
-      {s.is_leader || s.duty ? <em>{[s.is_leader ? "Leader" : "", s.duty ? DUTY_NAME[s.duty].split(" (")[0] : ""].filter(Boolean).join(" · ")}</em> : null}
+      {s.is_leader || s.duty || s.status === "tap_su" || s.status === "thu_viec" ? <em>{[s.status === "tap_su" || s.status === "thu_viec" ? `${STATUS_LABEL[s.status]}${s.trial_end ? ` đến ${ddmm(s.trial_end)}` : ""}` : "", s.is_leader ? "Leader" : "", s.duty ? DUTY_NAME[s.duty].split(" (")[0] : ""].filter(Boolean).join(" · ")}</em> : null}
       {s.hire_note ? <small>{s.hire_note}</small> : null}
       {canEdit ? <button className="ot-edit" aria-label={`Sửa ${s.person_name ?? s.position}`} onClick={() => open(s)}>Sửa</button> : null}
     </li>
@@ -229,16 +244,20 @@ export default function Org() {
       <TopBar title="Sơ đồ công ty" back action={canEdit ? <button className="tb-action" onClick={() => open(null)}>+ Vị trí</button> : null} />
       <main className="main main-full stack">
         <section className="card org-stats" aria-label="Tổng quan nhân sự">
-          <div><b className="num">{counts.co}</b><span>đang có</span></div>
+          <div><b className="num">{counts.co}</b><span>đang có{counts.thu ? ` (${counts.thu} tập sự / thử việc)` : ""}</span></div>
           <div><b className="num">{counts.tuyen}</b><span>đang tuyển</span></div>
           <div><b className="num">{counts.ngoai}</b><span>thuê ngoài</span></div>
         </section>
 
         <section className="card dn-sec">
           <h2 className="dn-h">Luồng duyệt đề nghị</h2>
-          <p style={{ margin: 0 }}><b>Nghỉ phép, làm việc bên ngoài, công tác:</b> {FLOW_TEXT.nghi_phep}</p>
-          <p style={{ margin: 0 }}><b>Tờ trình (LOA), thanh toán, tạm ứng:</b> {FLOW_TEXT.thanh_toan}</p>
-          <p className="muted small" style={{ margin: 0 }}>Bước chưa có người giữ tự bỏ qua; một người đứng nhiều bước chỉ duyệt một lần. Người giữ nhiệm vụ Nhân sự, Kế toán, Giám đốc đặt ở từng vị trí (nút Sửa).</p>
+          {flows ? flows.map((f) => (
+            <p key={f.kind} style={{ margin: 0 }}><b>{KINDS.find((k) => k.kind === f.kind)?.label ?? f.kind}:</b> {["Người đề nghị", ...f.steps.map((st) => `${DUTY_LABEL[st.duty] ?? st.duty}${st.approver_name ? ` (${st.approver_name})` : ""}`)].join(" → ")}</p>
+          )) : (<>
+            <p style={{ margin: 0 }}><b>Nghỉ phép, làm việc bên ngoài, công tác:</b> {FLOW_TEXT.nghi_phep}</p>
+            <p style={{ margin: 0 }}><b>Tờ trình (LOA), thanh toán, tạm ứng:</b> {FLOW_TEXT.thanh_toan}</p>
+          </>)}
+          <p className="muted small" style={{ margin: 0 }}>Bước chưa có người giữ tự bỏ qua; một người đứng nhiều bước chỉ duyệt một lần. Người giữ nhiệm vụ Nhân sự, Kế toán, Giám đốc đặt ở từng vị trí (nút Sửa). <Link to="/van-phong/luong-duyet">{isFlowAdmin ? "Chỉnh luồng phê duyệt" : "Xem luồng phê duyệt"}</Link>.</p>
         </section>
 
         {canEdit ? (
@@ -370,10 +389,27 @@ export default function Org() {
               <label className="field"><span>Vị trí *</span>
                 <input className="input" value={edit.position} onChange={(e) => setEdit({ ...edit, position: e.target.value })} required /></label>
               <label className="field"><span>Phòng</span>
-                <select className="input" value={edit.department_id} onChange={(e) => setEdit({ ...edit, department_id: e.target.value })}>
+                <select className="input" value={edit.department_id} onChange={(e) => {
+                  const dep = e.target.value;
+                  const has = staff.some((s) => (s.department_id ?? "") === dep && (s.team ?? "").trim() === edit.team.trim());
+                  setEdit({ ...edit, department_id: dep, team: has || edit.teamNew ? edit.team : "" });
+                }}>
                   <option value="">Chưa xếp</option>{depts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
-              <label className="field"><span>Bộ phận / nhóm</span>
-                <input className="input" value={edit.team} onChange={(e) => setEdit({ ...edit, team: e.target.value })} placeholder="VD: KD tòa nhà" /></label>
+              <div className="field"><span><label htmlFor="org-team">Bộ phận / nhóm</label></span>
+                {edit.teamNew ? (
+                  <div className="row" style={{ flexWrap: "nowrap", gap: 6 }}>
+                    <input id="org-team" className="input" value={edit.team} autoFocus onChange={(e) => setEdit({ ...edit, team: e.target.value })} placeholder="Tên bộ phận mới, VD: KD căn hộ dịch vụ" maxLength={80} />
+                    {deptTeams.length ? <button type="button" className="btn ghost sm" onClick={() => setEdit({ ...edit, team: "", teamNew: false })}>Chọn có sẵn</button> : null}
+                  </div>
+                ) : (
+                  <select id="org-team" className="input" value={edit.team} onChange={(e) => e.target.value === "__new" ? setEdit({ ...edit, team: "", teamNew: true }) : setEdit({ ...edit, team: e.target.value })}>
+                    <option value="">Không chia bộ phận</option>
+                    {deptTeams.map((t) => <option key={t} value={t}>{t}</option>)}
+                    <option value="__new">+ Tạo bộ phận mới…</option>
+                  </select>
+                )}
+                {edit.teamNew && edit.team.trim() && deptTeams.some((t) => t.toLowerCase() === edit.team.trim().toLowerCase()) ? <small className="muted">Đã có bộ phận này, sẽ xếp chung.</small> : null}
+              </div>
               <label className="field"><span>Cấp (Level)</span>
                 <select className="input" value={edit.level} onChange={(e) => setEdit({ ...edit, level: e.target.value })}>
                   <option value="">Ngoài thang</option>{[1, 2, 3, 4].map((l) => <option key={l} value={l}>{LEVEL_LABEL[l]}</option>)}</select></label>
@@ -383,6 +419,14 @@ export default function Org() {
               <label className="field"><span>Tình trạng</span>
                 <select className="input" value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })}>
                   {Object.entries(STATUS_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+              {edit.status === "tap_su" || edit.status === "thu_viec" ? (
+                <>
+                  <label className="field"><span>{edit.status === "tap_su" ? "Kết thúc tập sự" : "Kết thúc thử việc"}</span>
+                    <input id="org-trial-end" type="date" className="input" value={edit.trial_end} onChange={(e) => setEdit({ ...edit, trial_end: e.target.value })} />
+                    {edit.trial_end && edit.trial_end < todayVN() ? <small className="err-text">Đã quá ngày {ddmmyyyy(edit.trial_end)}: cần đánh giá và chuyển chính thức hoặc kết thúc.</small> : null}</label>
+                  <p className="muted small dn-span2 org-hint">{TRIAL_HINT[edit.status]}</p>
+                </>
+              ) : null}
               <label className="field"><span>Nhiệm vụ duyệt cấp công ty</span>
                 <select className="input" value={edit.duty} onChange={(e) => setEdit({ ...edit, duty: e.target.value })}>
                   <option value="">Không</option>{Object.entries(DUTY_NAME).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>

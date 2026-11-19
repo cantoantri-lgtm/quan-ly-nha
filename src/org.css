@@ -112,3 +112,10 @@
 .ot-members .ot-person { display: grid; }
 .ot .ot-members { flex-direction: column; align-items: stretch; justify-content: flex-start; padding-top: 12px; width: 140px; }
 @media (max-width: 760px) { .ot .ot-members { display: block; width: auto; padding-top: 8px; } .ot .ot-members li { margin-top: 6px; } }
+
+/* Tập sự / thử việc (migration 071) */
+.badge.tap_su, .badge.thu_viec { background: var(--s-doing-bg); color: var(--s-doing); }
+.badge.overdue { background: var(--s-block-bg); color: var(--danger); }
+.org-person.st-tap_su, .org-person.st-thu_viec { border-left-color: var(--s-doing); }
+.ot-person.st-tap_su, .ot-person.st-thu_viec { border-style: dashed; border-left-style: solid; border-left-color: var(--s-doing); }
+.org-hint { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--grid-zebra); grid-column: 1 / -1; }
