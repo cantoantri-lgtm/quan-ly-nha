@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/session";
 import { ROLE_LABEL, type Role } from "../lib/labels";
+import { usePageActive } from "./KeepAlive";
 import "../nav.css";
 
 export const Icon = {
@@ -384,20 +385,43 @@ export function Toast() {
 }
 
 export function Sheet({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+  const active = usePageActive();
+  const dirty = useRef(false);        // đã gõ / chọn gì trong popup
+  const backAt = useRef(0);           // lúc cửa sổ vừa được chọn lại
+  const [nudge, setNudge] = useState(false);
+  useEffect(() => { if (open) { dirty.current = false; setNudge(false); } }, [open]);
   useEffect(() => {
-    if (!open) return;
+    if (!open || !active) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onBack = () => { backAt.current = Date.now(); };
+    const onVis = () => { if (document.visibilityState === "visible") onBack(); };
     document.addEventListener("keydown", onKey);
+    window.addEventListener("focus", onBack);
+    document.addEventListener("visibilitychange", onVis);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
-  }, [open, onClose]);
+    return () => {
+      document.removeEventListener("keydown", onKey); window.removeEventListener("focus", onBack);
+      document.removeEventListener("visibilitychange", onVis); document.body.style.overflow = prev;
+    };
+  }, [open, onClose, active]);
   if (!open) return null;
+  // Bấm ra ngoài: chỉ đóng khi chưa nhập gì, và không phải cú bấm để quay lại cửa sổ từ ứng dụng khác
+  function outside() {
+    if (Date.now() - backAt.current < 1200) return;
+    if (dirty.current) { setNudge(true); return; }
+    onClose();
+  }
   return (
-    <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`sheet${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}>
+    <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && outside()}>
+      <div className={`sheet${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-label={title}
+        onInputCapture={() => { dirty.current = true; }} onChangeCapture={() => { dirty.current = true; }}>
         <div className="grip" />
-        <h3>{title}</h3>
+        <div className="sheet-head">
+          <h3>{title}</h3>
+          <button type="button" className="sheet-x" aria-label="Đóng" title="Đóng (Esc)" onClick={onClose}>{Icon.x}</button>
+        </div>
+        {nudge ? <p className="sheet-nudge" role="status">Đang nhập dở nên popup không tự đóng. Bấm ✕ hoặc Esc nếu muốn bỏ.</p> : null}
         {children}
       </div>
     </div>

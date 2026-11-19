@@ -9,6 +9,7 @@ import { DUTY_LABEL, EDIT_LOCK_TIP, FLOW_TEXT, KINDS, PAUSED_TIP, usePausedKinds
 import { Icon, Sheet } from "../components/ui";
 import { Pager, usePaging } from "../components/Pager";
 import { RelatedPanel } from "../components/RelatedPanel";
+import { usePageActive } from "../components/KeepAlive";
 import DecideSheet, { type DecideMode } from "../components/DecideSheet";
 import { CostTable, LegTable } from "../components/TripGrids";
 import { loadTrip, type TripCost, type TripLeg } from "../lib/trip";
@@ -106,11 +107,13 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
     return () => { window.removeEventListener("neo:notification", h); window.removeEventListener("focus", h); };
   }, [load]);
   // Phím tắt F2: thêm mới
+  const pageActive = usePageActive();
   useEffect(() => {
+    if (!pageActive) return;   // trang đang ẩn sau tab khác
     const onKey = (e: KeyboardEvent) => { if (e.key === "F2" && !closed) { e.preventDefault(); nav(newUrl); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [nav, newUrl, closed]);
+  }, [nav, newUrl, closed, pageActive]);
 
   const name = (id: string | null) => people.find((p) => p.id === id)?.full_name ?? "—";
 

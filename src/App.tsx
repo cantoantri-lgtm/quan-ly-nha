@@ -27,6 +27,7 @@ import RequestDetail from "./pages/RequestDetail";
 import RequestPrint from "./pages/RequestPrint";
 import TripPrint from "./pages/TripPrint";
 import FlowSettings from "./pages/FlowSettings";
+import { KeepAliveOutlet } from "./components/KeepAlive";
 import Projects from "./pages/Projects";
 import ProjectForm from "./pages/ProjectForm";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -56,7 +57,7 @@ function Shell() {
     <div className="app">
       <AppHeader />
       <OpenTabs />
-      <Outlet />
+      <KeepAliveOutlet />
       <StatusBar />
       <BottomNav />
       <Toast />

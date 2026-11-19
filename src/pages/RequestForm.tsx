@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
@@ -44,6 +44,7 @@ export default function RequestForm() {
   const editing = !!id;
   const { profile, buildings, people, toast, refreshUnread, isManager, myStaff } = useSession();
   const nav = useNavigate();
+  const formId = "dn-form-" + useId().replace(/:/g, "");   // mỗi trang đang mở một mã riêng (PC giữ nhiều tab)
   const [kind, setKind] = useState<ReqKind>((kindParam as ReqKind) || "nghi_phep");
   const today = todayVN();
   const [subType, setSubType] = useState(kind === "ra_ngoai" ? "co_quay_lai" : "phep_nam");
@@ -438,9 +439,9 @@ export default function RequestForm() {
   return (
     <>
       <TopBar title={editing ? `Sửa · ${meta.label}` : `Lập ${meta.label.charAt(0).toLowerCase()}${meta.label.slice(1)}`} back
-        action={<button type="submit" form="dn-form" className="tb-action" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu và gửi lại" : "Gửi"}</button>} />
+        action={<button type="submit" form={formId} className="tb-action" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu và gửi lại" : "Gửi"}</button>} />
       <main className={`main ${isMoney ? "main-form" : "main-wide"}`}>
-        <form id="dn-form" className={`stack dn-form dn-erp${isMoney || kind === "cong_tac" ? " money" : ""}`} onSubmit={submit}
+        <form id={formId} className={`stack dn-form dn-erp${isMoney || kind === "cong_tac" ? " money" : ""}`} onSubmit={submit}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault(); }}>
           <LinkFromNote from={link.from} info={link.info} />
           {tripId && isMoney ? <p className="ok-box" style={{ margin: 0 }}>Lập từ chuyến công tác: <b>{tripLabel ?? "đã gắn"}</b>. {kind === "thanh_toan" ? "Các dòng chi phí đã điền sẵn từ bảng kê; nhập Cost center và tự thêm phần trừ tạm ứng nếu có." : "Số tiền lấy từ dự trù chi phí, sửa được."}</p> : null}

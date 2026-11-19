@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
@@ -35,6 +35,7 @@ export default function ProjectForm() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ready, setReady] = useState(!editing);
+  const formId = "pj-form-" + useId().replace(/:/g, "");
 
   useEffect(() => {
     supabase.rpc("loa_pickable").then(({ data }) => setPicks((data ?? []) as LoaPick[]));
@@ -84,10 +85,10 @@ export default function ProjectForm() {
   return (
     <>
       <TopBar title={editing ? "Sửa dự án" : "Dự án mới"} back={editing ? `/du-an/${id}` : "/du-an"}
-        action={<button className="tb-action" type="submit" form="pj-form" disabled={busy}>Lưu</button>} />
+        action={<button className="tb-action" type="submit" form={formId} disabled={busy}>Lưu</button>} />
       <main className="main stack">
         {!ready ? <div className="loading">Đang tải…</div> : (
-        <form id="pj-form" className="stack" onSubmit={submit}>
+        <form id={formId} className="stack" onSubmit={submit}>
           <section className="card stack pj-sec">
             <label className="field"><span>Tên dự án <span className="req">*</span></span>
               <input id="pj-name" className="input" value={name} onChange={(e) => setName(e.target.value)} required maxLength={200} placeholder="VD: Cải tạo toà 89CMT8 thành căn hộ dịch vụ" /></label>

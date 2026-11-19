@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useNavigationType } from "react-router-dom";
+import { TABS_EVENT } from "./KeepAlive";
 import { useSession } from "../lib/session";
 import { ddmmyyyy, todayVN } from "../lib/dates";
 import { KINDS } from "../lib/office";
@@ -66,12 +67,24 @@ export function OpenTabs() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const named = useMemo(() => new Map(pairs), [sig]);
   const [tabs, setTabs] = useState<OpenTab[]>(loadTabs);
+  const navType = useNavigationType();
+  const prevKey = useRef(loc.pathname);
 
   useEffect(() => {
     const key = loc.pathname;
     const to = loc.pathname + loc.search;
     const g = guess(key, named);
-    setTabs((prev) => {
+    const from = prevKey.current;
+    prevKey.current = key;
+    setTabs((before) => {
+      let prev = before;
+      // Chuyển trang kiểu thay thế (lưu form xong mở chi tiết, trang tự chuyển hướng): tab cũ nhường chỗ cho tab mới,
+      // không giữ lại form đã gửi
+      if (navType === "REPLACE" && from !== key) {
+        const pi = prev.findIndex((t) => t.key === from);
+        if (pi >= 0 && !prev.some((t) => t.key === key)) { const next = [...prev]; next[pi] = { key, to, title: g.title }; return next; }
+        if (pi >= 0) prev = prev.filter((t) => t.key !== from);
+      }
       const i = prev.findIndex((t) => t.key === key);
       if (i >= 0) {
         if (prev[i].to === to) return prev;
@@ -84,15 +97,19 @@ export function OpenTabs() {
     if (!g.dom) return;
     // Trang chi tiết: đọc tên thật trên trang (vd tên toà) khi dữ liệu đã tải
     const read = () => {
-      const el = document.querySelector<HTMLElement>(".topbar h1, .pg-head h2, main h1, main h2");
+      const root = document.querySelector<HTMLElement>('.ka-page[data-active="true"]') ?? document;
+      const el = root.querySelector<HTMLElement>(".topbar h1, .pg-head h2, main h1, main h2");
       const t = el?.textContent?.replace(/\s+/g, " ").trim();
       if (t) setTabs((prev) => prev.map((x) => (x.key === key && x.title !== t ? { ...x, title: t.length > 40 ? t.slice(0, 39) + "…" : t } : x)));
     };
     const t1 = setTimeout(read, 400), t2 = setTimeout(read, 1600);
     return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [loc.pathname, loc.search, named]);
+  }, [loc.pathname, loc.search, named]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { try { sessionStorage.setItem(TAB_STORE, JSON.stringify(tabs)); } catch { /* bỏ qua */ } }, [tabs]);
+  useEffect(() => {
+    try { sessionStorage.setItem(TAB_STORE, JSON.stringify(tabs)); } catch { /* bỏ qua */ }
+    window.dispatchEvent(new Event(TABS_EVENT));
+  }, [tabs]);
 
   function close(key: string) {
     const i = tabs.findIndex((t) => t.key === key);

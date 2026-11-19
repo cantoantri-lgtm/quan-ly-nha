@@ -62,6 +62,8 @@
 .ah-menu, .ah-who, .otabs, .statusbar { display: none; }
 @media (min-width: 900px) {
   :root { --head-h: 56px; --tabs-h: 40px; --status-h: 30px; }
+  /* Popup chừa thanh menu, thanh tab và thanh trạng thái: chuyển tab được khi popup đang mở, quay lại vẫn còn */
+  .sheet-backdrop { top: calc(var(--head-h) + var(--tabs-h)); bottom: var(--status-h); }
   .apphead { background: var(--menubar); border-bottom-color: var(--brand-line); gap: 6px; }
   .ah-logo { padding: 2px 4px; }
   .ah-logo img { height: 36px; }
