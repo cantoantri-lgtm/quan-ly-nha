@@ -106,19 +106,33 @@ const RULES = `Quy tắc:
 9. Công ty nghỉ Chủ nhật. Toà khách sạn cho thuê theo đêm nên không có hợp đồng tháng.
 10. Câu hỏi ngoài phạm vi số liệu kinh doanh (VD chuyện riêng, lương, thông tin cá nhân khách) thì từ chối lịch sự trong summary, các mảng để rỗng.`;
 
+// Model bận (503, 500, 502, 504), hết lượt riêng của model (429) hoặc chờ quá lâu: chuyển sang model kế tiếp
+const BUSY = [429, 500, 502, 503, 504];
+const PER_MODEL_MS = 40_000;
+
 async function callGemini(key: string, contents: unknown[], system: string) {
   let lastErr = "";
+  let busy = false;
   for (const { model, level } of MODELS) {
     const t0 = performance.now();
     const generationConfig: Record<string, unknown> = {
       responseMimeType: "application/json", responseSchema: SCHEMA, temperature: 0.3, maxOutputTokens: 8192,
     };
     if (level) generationConfig.thinkingConfig = { thinkingLevel: level };
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig }),
+        signal: AbortSignal.timeout(PER_MODEL_MS),
+      });
+    } catch (e) {
+      lastErr = `${model}: ${(e as Error).name === "TimeoutError" ? "quá " + PER_MODEL_MS / 1000 + " giây" : (e as Error).message}`;
+      console.error("gemini lỗi", lastErr);
+      busy = true;
+      continue;
+    }
     const body = await res.json().catch(() => ({}));
     const ms = Math.round(performance.now() - t0);
     if (res.ok) {
@@ -132,8 +146,10 @@ async function callGemini(key: string, contents: unknown[], system: string) {
     }
     lastErr = `${model}: ${res.status} ${body?.error?.message ?? ""}`;
     console.error(`gemini lỗi ${ms}ms`, lastErr);
+    if (BUSY.includes(res.status)) { busy = true; continue; }
     if (![400, 403, 404].includes(res.status) || !/model|not found|not supported|permission|thinking|no longer available/i.test(lastErr)) break;
   }
+  if (busy) throw new Error("busy:" + lastErr);
   throw new Error(lastErr || "Gemini không trả kết quả");
 }
 
@@ -293,6 +309,7 @@ ${RULES}`;
     const msg = (e as Error).message;
     console.error("tro-ly-bao-cao", msg);
     if (msg.startsWith("db:")) return json({ error: "Không lấy được số liệu: " + msg.slice(3, 200) }, 403);
+    if (msg.startsWith("busy:")) return json({ error: "Máy chủ AI của Google đang quá tải, cả 3 model đều bận. Anh thử lại sau 1–2 phút.", code: "busy" }, 503);
     if (/API key|API_KEY_INVALID|PERMISSION_DENIED/i.test(msg)) return json({ error: "Khoá Gemini không hợp lệ hoặc hết hạn.", code: "bad_key" }, 502);
     if (/quota|RESOURCE_EXHAUSTED|429/i.test(msg)) return json({ error: "Đã dùng hết hạn mức AI tạm thời. Thử lại sau ít phút." }, 429);
     return json({ error: "AI chưa trả lời được: " + msg.slice(0, 300) }, 502);
