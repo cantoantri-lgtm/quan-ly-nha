@@ -15,6 +15,7 @@
   --menubar: #DCEDD7;      /* thanh menu trên cùng (PC) */
   --menubar-ink: #22432C;
   --cream: #F4EBD9;
+  --ai: #5B4FC9; --ai-bg: #EEECFB; --ai-2: #D9822B;   /* trợ lý báo cáo AI */
   --danger: #B3402F;
 
   --s-todo: #6B7773;   --s-todo-bg: #ECEFED;
@@ -69,6 +70,7 @@
     --web-title: #C9E2C2; --web-tint: #22302A; --web-soft: #1B2721; --web-tag: #22352A;
     --web-hero: #26352C; --web-hero-2: #2D3E34; --web-hero-3: #34473B; --web-on-hero: #E1EBDD;
     --web-footer: #17241D; --web-footer-ink: #D2DECD; --web-footer-line: #2F4337;
+    --ai: #A79CF5; --ai-bg: #231F3D; --ai-2: #EE9D4F;
     --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 8px 28px rgba(0,0,0,.5); --logo-bg: #EEF1EA;
     color-scheme: dark;
   }
@@ -93,6 +95,7 @@
     --web-title: #C9E2C2; --web-tint: #22302A; --web-soft: #1B2721; --web-tag: #22352A;
     --web-hero: #26352C; --web-hero-2: #2D3E34; --web-hero-3: #34473B; --web-on-hero: #E1EBDD;
     --web-footer: #17241D; --web-footer-ink: #D2DECD; --web-footer-line: #2F4337;
+    --ai: #A79CF5; --ai-bg: #231F3D; --ai-2: #EE9D4F;
     --shadow: 0 1px 2px rgba(0,0,0,.4); --shadow-lg: 0 8px 28px rgba(0,0,0,.5); --logo-bg: #EEF1EA;
     color-scheme: dark;
 }

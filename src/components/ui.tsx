@@ -3,9 +3,15 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useSession } from "../lib/session";
 import { ROLE_LABEL, type Role } from "../lib/labels";
 import { usePageActive } from "./KeepAlive";
+import { openAiPanel } from "../lib/ai";
 import "../nav.css";
 
 export const Icon = {
+  spark: (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9L12 2.5z" /><path d="M19 15l.9 2.1 2.1.9-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" opacity=".7" />
+    </svg>
+  ),
   tasks: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M9 6h11M9 12h11M9 18h11" /><path d="m3.5 6 1.5 1.5L7.5 5M3.5 12l1.5 1.5L7.5 11M3.5 18l1.5 1.5L7.5 17" />
@@ -188,6 +194,7 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
       ...(isManager ? [{ to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user }] : []),
       ...(isManager || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
       ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
+      ...(isManager ? [{ to: "/bao-cao-ai", label: "Báo cáo AI", icon: Icon.spark }] : []),
       ...(isManager ? [{ to: "/quan-tri", label: "Tổng quan quản trị", icon: Icon.gear }] : []),
       ...(isManager ? [{ to: "/quan-tri/website", label: "Cài đặt website", icon: Icon.map }] : []),
       ...(isFlowAdmin ? [{ to: "/van-phong/luong-duyet", label: "Luồng phê duyệt", icon: Icon.org }] : []),
@@ -220,7 +227,7 @@ const isDark = () => (document.documentElement.dataset.theme ?? (matchMedia("(pr
 
 /** Thanh trên toàn app: logo (bấm về trang chủ), tên công ty, nút Apps, thông báo, chế độ tối, tài khoản */
 export function AppHeader() {
-  const { profile, unread, isCollaborator, isCustomer } = useSession();
+  const { profile, unread, isCollaborator, isCustomer, isManager } = useSession();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(isDark());
   const loc = useLocation();
@@ -278,7 +285,12 @@ export function AppHeader() {
         <button type="button" className="ah-btn apps" aria-expanded={open} aria-haspopup="true" aria-label="Chức năng" onClick={() => setOpen((o) => !o)}>
           {Icon.grid}<span className="ah-tip">Apps</span>
         </button>
-        {isCollaborator ? null : <Link to={isCustomer ? "/thong-tin" : "/"} className="ah-btn" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>}
+        {isCollaborator ? null : <Link to={isCustomer ? "/thong-tin" : "/"} className="ah-btn ah-home" aria-label="Trang chủ">{Icon.home}<span className="ah-tip">Trang chủ</span></Link>}
+        {isManager ? (
+          <button type="button" className="ah-btn ah-ai" aria-label="Hỏi trợ lý báo cáo AI" onClick={() => openAiPanel()}>
+            {Icon.spark}<span className="ah-tip">Hỏi AI</span>
+          </button>
+        ) : null}
         <Link to="/thong-bao" className="ah-btn" aria-label="Thông báo">
           {Icon.bell}{unread > 0 ? <span className="ah-badge num">{unread > 99 ? "99+" : unread}</span> : null}<span className="ah-tip">Thông báo</span>
         </Link>

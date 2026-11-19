@@ -46,6 +46,8 @@ import Feedback, { FeedbackInbox, FeedbackThread } from "./pages/Feedback";
 import Customers from "./pages/Customers";
 import Viewings from "./pages/Viewings";
 import WebSettings from "./pages/WebSettings";
+import AiReport from "./pages/AiReport";
+import { AiPanel } from "./components/AiPanel";
 
 // Bản đồ tải riêng khi mở (thư viện bản đồ khá nặng)
 const MapPage = lazy(() => import("./pages/MapPage"));
@@ -60,6 +62,7 @@ function Shell() {
       <KeepAliveOutlet />
       <StatusBar />
       <BottomNav />
+      <AiPanel />
       <Toast />
     </div>
   );
@@ -183,6 +186,9 @@ export default function App() {
         <Route path="to-chuc" element={<Org />} />
         <Route element={<LeadOnly />}>
           <Route path="bao-cao" element={<Reports />} />
+        </Route>
+        <Route element={<ManagerOnly />}>
+          <Route path="bao-cao-ai" element={<AiReport />} />
         </Route>
         <Route element={<MoneyOnly />}>
           <Route path="hoa-don-gtgt" element={<VatDaily />} />

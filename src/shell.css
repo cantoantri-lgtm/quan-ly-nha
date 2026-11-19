@@ -123,3 +123,6 @@
 }
 
 @media print { .apphead, .otabs, .statusbar { display: none !important; } }
+
+/* Điện thoại hẹp (≤399px): thu nhỏ nút trên thanh trên cùng cho vừa */
+@media (max-width: 399px) { .ah-btn { width: 38px; height: 38px; } .ah-me { width: 34px; height: 34px; font-size: 13px; } .ah-logo img { height: 34px; } }

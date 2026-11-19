@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { PRIORITY_LABEL, ROLE_LABEL, ROLE_RANK, type Priority, type Task } from "../lib/labels";
@@ -15,14 +15,33 @@ export default function TaskForm() {
   const { profile, people, buildings, isManager, isSupervisor, toast } = useSession();
   const canAssign = isManager || isSupervisor;
   const nav = useNavigate();
+  // Điền sẵn khi mở từ đề xuất của Báo cáo AI: /viec/moi?tieu-de=&mo-ta=&han=&uu-tien=&toa=
+  const [sp] = useSearchParams();
+  const pre = (k: string) => (id ? "" : sp.get(k) ?? "");
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [buildingId, setBuildingId] = useState(buildings.length === 1 ? buildings[0].id : "");
+  const [title, setTitle] = useState(() => pre("tieu-de").slice(0, 200));
+  const [description, setDescription] = useState(() => pre("mo-ta").slice(0, 2000));
+  const [buildingId, setBuildingId] = useState(() => {
+    const b = pre("toa");
+    if (b && buildings.some((x) => x.id === b)) return b;
+    return buildings.length === 1 ? buildings[0].id : "";
+  });
   const [assigneeId, setAssigneeId] = useState(canAssign ? "" : profile?.id ?? "");   // người phụ trách chính
   const [picked, setPicked] = useState<string[]>([]);                                   // tất cả người làm (gồm người chính)
-  const [due, setDue] = useState("");
-  const [priority, setPriority] = useState<Priority>("binh_thuong");
+  const [due, setDue] = useState(() => (/^\d{4}-\d{2}-\d{2}$/.test(pre("han")) ? pre("han") : ""));
+  const [priority, setPriority] = useState<Priority>(() => {
+    const p = pre("uu-tien");
+    return p in PRIORITY_LABEL ? (p as Priority) : "binh_thuong";
+  });
+  // Trang Giao việc đang mở sẵn (tab PC) mà bấm "Tạo việc" từ AI lần nữa: điền lại theo đề xuất mới
+  const preKey = id ? "" : sp.toString();
+  useEffect(() => {
+    if (!preKey || !sp.get("tieu-de")) return;
+    setTitle(pre("tieu-de").slice(0, 200)); setDescription(pre("mo-ta").slice(0, 2000));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(pre("han"))) setDue(pre("han"));
+    if (pre("uu-tien") in PRIORITY_LABEL) setPriority(pre("uu-tien") as Priority);
+    if (buildings.some((x) => x.id === pre("toa"))) setBuildingId(pre("toa"));
+  }, [preKey]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [steps, setSteps] = useState<{ title: string; due: string }[]>([{ title: "", due: "" }]);
   const [members, setMembers] = useState<{ building_id: string; user_id: string }[]>([]);
   const [busy, setBusy] = useState(false);
