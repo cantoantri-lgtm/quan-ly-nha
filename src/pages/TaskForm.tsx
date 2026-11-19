@@ -6,6 +6,7 @@ import { PRIORITY_LABEL, ROLE_LABEL, ROLE_RANK, type Priority, type Task } from 
 import { TopBar } from "../components/ui";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
 import { addLink } from "../lib/links";
+import { ddmmyyyy } from "../lib/dates";
 
 export default function TaskForm() {
   const { id } = useParams();
@@ -21,7 +22,7 @@ export default function TaskForm() {
   const [picked, setPicked] = useState<string[]>([]);                                   // tất cả người làm (gồm người chính)
   const [due, setDue] = useState("");
   const [priority, setPriority] = useState<Priority>("binh_thuong");
-  const [steps, setSteps] = useState<string[]>([""]);
+  const [steps, setSteps] = useState<{ title: string; due: string }[]>([{ title: "", due: "" }]);
   const [members, setMembers] = useState<{ building_id: string; user_id: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -90,8 +91,8 @@ export default function TaskForm() {
       const m = await supabase.rpc("task_set_members", { p_task: data.id, p_users: others });
       if (m.error) { setBusy(false); setErr("Đã giao việc cho người chính nhưng chưa thêm được người cùng làm: " + friendlyError(m.error)); nav(`/viec/${data.id}/sua`, { replace: true }); return; }
     }
-    const stepRows = steps.map((s) => s.trim()).filter(Boolean)
-      .map((s, i) => ({ parent_id: data.id, title: s, sort_order: i + 1 }));
+    const stepRows = steps.map((s) => ({ title: s.title.trim(), due: s.due })).filter((s) => s.title)
+      .map((s, i) => ({ parent_id: data.id, title: s.title, due_date: s.due || null, sort_order: i + 1 }));
     if (stepRows.length) {
       const r = await supabase.from("tasks").insert(stepRows);
       if (r.error) { setBusy(false); setErr("Đã tạo việc nhưng chưa thêm được các bước: " + friendlyError(r.error)); return; }
@@ -177,19 +178,24 @@ export default function TaskForm() {
               <span>Các bước thực hiện (không bắt buộc)</span>
               <div className="stack" style={{ gap: 8 }}>
                 {steps.map((s, i) => (
-                  <div key={i} className="row" style={{ flexWrap: "nowrap" }}>
-                    <span className="muted num" style={{ width: 20, textAlign: "right" }}>{i + 1}.</span>
-                    <input id={`t-step-${i}`} className="input" value={s} placeholder="Tên bước"
-                      onChange={(e) => setSteps(steps.map((x, j) => (j === i ? e.target.value : x)))} />
+                  <div key={i} className="step-row">
+                    <span className="muted num step-no">{i + 1}.</span>
+                    <input id={`t-step-${i}`} className="input step-title" value={s.title} placeholder="Tên bước" aria-label={`Tên bước ${i + 1}`}
+                      onChange={(e) => setSteps(steps.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} />
+                    <input id={`t-step-due-${i}`} className="input step-due" type="date" value={s.due} aria-label={`Hạn bước ${i + 1}`} title="Hạn hoàn thành bước"
+                      max={due || undefined} onChange={(e) => setSteps(steps.map((x, j) => (j === i ? { ...x, due: e.target.value } : x)))} />
                     {steps.length > 1 ? (
                       <button type="button" className="btn ghost sm" aria-label={`Xoá bước ${i + 1}`}
                         onClick={() => setSteps(steps.filter((_, j) => j !== i))}>Xoá</button>
                     ) : null}
                   </div>
                 ))}
-                <button type="button" className="btn secondary sm" style={{ justifySelf: "start" }} onClick={() => setSteps([...steps, ""])}>
+                {due && steps.some((s) => s.due && s.due > due) ? <small className="err-text">Có bước hạn sau hạn của việc ({ddmmyyyy(due)}). Kiểm tra lại ngày.</small> : null}
+                <button type="button" className="btn secondary sm" style={{ justifySelf: "start" }}
+                  onClick={() => setSteps([...steps, { title: "", due: steps[steps.length - 1]?.due ?? "" }])}>
                   + Thêm bước
                 </button>
+                <small className="muted">Mỗi bước có thể đặt hạn riêng (không bắt buộc). Bước đến hạn mà chưa xong sẽ hiện màu cảnh báo.</small>
               </div>
             </div>
           ) : null}

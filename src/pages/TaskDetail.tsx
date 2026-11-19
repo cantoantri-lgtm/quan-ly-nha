@@ -20,6 +20,7 @@ export default function TaskDetail() {
   const nav = useNavigate();
   const [t, setT] = useState<Detail | null>(null);
   const [steps, setSteps] = useState<Task[]>([]);
+  const [newStepDue, setNewStepDue] = useState("");
   const [updates, setUpdates] = useState<Update[]>([]);
   const [members, setMembers] = useState<string[]>([]);
   const [notFound, setNotFound] = useState(false);
@@ -88,10 +89,18 @@ export default function TaskDetail() {
   async function addStep(e: FormEvent) {
     e.preventDefault();
     if (!newStep.trim()) return;
-    const { error } = await supabase.from("tasks").insert({ parent_id: t!.id, title: newStep.trim(), sort_order: steps.length + 1 });
+    const { error } = await supabase.from("tasks").insert({ parent_id: t!.id, title: newStep.trim(), due_date: newStepDue || null, sort_order: steps.length + 1 });
     if (error) { toast(friendlyError(error)); return; }
-    setNewStep("");
+    setNewStep(""); setNewStepDue("");
     load();
+  }
+
+  async function setStepDue(s: Task, due: string) {
+    const prev = s.due_date;
+    setSteps(steps.map((x) => (x.id === s.id ? { ...x, due_date: due || null } : x)));
+    const { error } = await supabase.from("tasks").update({ due_date: due || null }).eq("id", s.id);
+    if (error) { setSteps(steps.map((x) => (x.id === s.id ? { ...x, due_date: prev } : x))); toast(friendlyError(error)); return; }
+    toast(due ? `Đã đặt hạn bước ${ddmmyyyy(due)}.` : "Đã bỏ hạn của bước.");
   }
 
   async function sendUpdate(e: FormEvent) {
@@ -149,18 +158,32 @@ export default function TaskDetail() {
         <section className="card">
           {steps.length ? (
             <ul className="steps">
-              {steps.map((s) => (
-                <li key={s.id} className={s.status === "xong" ? "done" : ""}>
-                  <input id={`step-${s.id}`} type="checkbox" checked={s.status === "xong"} disabled={!canUpdate}
-                    onChange={() => toggleStep(s)} aria-label={s.title} />
-                  <label className="st" htmlFor={`step-${s.id}`}>{s.title}</label>
-                </li>
-              ))}
+              {steps.map((s, i) => {
+                const sd = dueInfo(s.due_date, s.status === "xong");
+                const canDate = isOwner || s.created_by === profile.id;   // CSDL: người tạo bước, Quản lý, Giám sát toà
+                return (
+                  <li key={s.id} className={s.status === "xong" ? "done" : ""}>
+                    <input id={`step-${s.id}`} type="checkbox" checked={s.status === "xong"} disabled={!canUpdate}
+                      onChange={() => toggleStep(s)} aria-label={s.title} />
+                    <div className="st-body">
+                      <label className="st" htmlFor={`step-${s.id}`}>{s.title}</label>
+                      <div className="st-due">
+                        {sd ? <span className={`due ${sd.tone}`}>{sd.text}</span> : <span className="muted small">Chưa đặt hạn</span>}
+                        {canDate ? (
+                          <input type="date" className="input st-date" value={s.due_date ?? ""} aria-label={`Hạn bước ${i + 1}: ${s.title}`}
+                            title="Đổi hạn bước" onChange={(e) => setStepDue(s, e.target.value)} />
+                        ) : null}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           ) : <p className="muted small" style={{ padding: "12px 16px", margin: 0 }}>Chưa chia bước.</p>}
           {canUpdate ? (
             <form className="add-step" onSubmit={addStep}>
               <input id="new-step" className="input" placeholder="Thêm bước…" value={newStep} onChange={(e) => setNewStep(e.target.value)} />
+              <input id="new-step-due" className="input step-due" type="date" value={newStepDue} onChange={(e) => setNewStepDue(e.target.value)} aria-label="Hạn của bước mới" title="Hạn của bước mới (không bắt buộc)" />
               <button className="btn secondary" disabled={!newStep.trim()}>Thêm</button>
             </form>
           ) : null}

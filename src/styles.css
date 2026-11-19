@@ -241,7 +241,23 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 .steps input[type="checkbox"] { width: 22px; height: 22px; margin: 0; accent-color: var(--brand); flex: none; }
 .steps .st { flex: 1; min-width: 0; }
 .steps li.done .st { color: var(--muted); text-decoration: line-through; }
-.add-step { display: flex; gap: 8px; padding: 10px 16px 14px; border-top: 1px solid var(--line); }
+.add-step { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px 14px; border-top: 1px solid var(--line); }
+.add-step #new-step { flex: 1 1 200px; }
+/* Hạn từng bước */
+.step-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 6px 8px; align-items: center; }
+.step-row .step-due { grid-column: 2; width: 100%; }
+.step-row > .btn { grid-column: 3; grid-row: 1; }
+@media (min-width: 600px) {
+  .step-row { grid-template-columns: 22px minmax(0, 1fr) 160px auto; }
+  .step-row .step-due { grid-column: 3; grid-row: 1; }
+  .step-row > .btn { grid-column: 4; }
+}
+.step-no { text-align: right; }
+.step-due { width: 160px; flex: 0 0 auto; }
+.steps .st-body { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.st-due { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.st-due .due { font-size: 12.5px; }
+.st-date { width: auto; min-height: 32px; padding: 3px 8px; font-size: 13px; }
 
 .timeline { list-style: none; margin: 0; padding: 0; }
 .timeline li { padding: 12px 16px; border-top: 1px solid var(--line); display: grid; gap: 3px; }
