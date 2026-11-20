@@ -114,7 +114,11 @@ export const KINDS: { kind: ReqKind; label: string; hint: string }[] = [
 ];
 
 export const LEAVE_TYPE: Record<string, string> = { phep_nam: "Phép năm", khong_luong: "Không lương" };
-export const LEAVE_SPAN: Record<string, string> = { ca_ngay: "Cả ngày", sang: "Nửa ngày sáng", chieu: "Nửa ngày chiều" };
+export const LEAVE_SPAN: Record<string, string> = {
+  ca_ngay: "Cả ngày", sang: "Nửa ngày sáng", chieu: "Nửa ngày chiều", dau_gio: "2 giờ đầu buổi sáng", cuoi_gio: "2 giờ cuối buổi chiều",
+};
+/** Số ngày phép trừ theo thời gian nghỉ trong 1 ngày (khớp tg_requests_guard) */
+export const LEAVE_SPAN_DAYS: Record<string, number> = { sang: 0.5, chieu: 0.5, dau_gio: 0.25, cuoi_gio: 0.25 };
 export const OUT_TYPE: Record<string, string> = {
   khong_den_cty: "Không tới công ty",
   co_quay_lai: "Có quay lại công ty",
@@ -146,7 +150,8 @@ export function statusLabel(r: Pick<Req, "kind" | "status">): string {
 }
 
 export const fmtDays = (d: number | null | undefined) =>
-  d == null ? "" : d === 0.5 ? "nửa ngày" : `${String(d).replace(/\.0$/, "").replace(".", ",")} ngày`;
+  d == null ? "" : Number(d) === 0.5 ? "nửa ngày" : Number(d) === 0.25 ? "2 giờ (0,25 ngày)"
+    : `${Number(d).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ngày`;
 
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 
@@ -159,7 +164,8 @@ export function summary(r: Req): string {
   const range = (a: string, b: string | null) => (b && b !== a ? `${ddmm(a)} – ${ddmm(b)}` : ddmm(a));
   switch (r.kind) {
     case "nghi_phep":
-      return r.span === "ca_ngay" ? `${range(r.start_date, r.end_date)} · ${fmtDays(r.days)}` : `${LEAVE_SPAN[r.span ?? ""]} ${ddmm(r.start_date)}`;
+      return r.span === "ca_ngay" ? `${range(r.start_date, r.end_date)} · ${fmtDays(r.days)}`
+        : `${LEAVE_SPAN[r.span ?? ""]} ${ddmm(r.start_date)}${r.span === "dau_gio" || r.span === "cuoi_gio" ? " · 0,25 ngày" : ""}`;
     case "ra_ngoai": {
       const t = r.start_time || r.end_time ? ` · ${hhmm(r.start_time)}${r.end_time ? "–" + hhmm(r.end_time) : ""}` : "";
       return `${range(r.start_date, r.end_date)}${t}${r.location ? " · " + r.location : ""}`;

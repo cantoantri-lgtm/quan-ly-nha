@@ -4,7 +4,7 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { daysBetween, ddmmyyyy, todayVN, workDays } from "../lib/dates";
 import { parseMoney, vnd, vndWords } from "../lib/money";
-import { KINDS, PAUSED_TIP, usePausedKinds, LEAVE_SPAN, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, isEditableStatus, loaLeft, type LoaPick, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
+import { KINDS, PAUSED_TIP, usePausedKinds, LEAVE_SPAN, LEAVE_SPAN_DAYS, LEAVE_TYPE, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, isEditableStatus, loaLeft, type LoaPick, type Req, type ReqAdvance, type ReqKind, type ReqLine } from "../lib/office";
 import { uploadFile } from "../lib/files";
 import DnttEditor, { advFromRow, calcLine, emptyLine, lineFromRow, lineToRow, totals, type AdvDraft, type LineDraft, type LinkDraft } from "../components/DnttEditor";
 import { LoaPicker } from "../components/LoaPicker";
@@ -236,7 +236,7 @@ export default function RequestForm() {
   const multiDay = kind === "cong_tac" || (kind === "nghi_phep" && span === "ca_ngay") || kind === "ra_ngoai";
   const isSunday = (iso: string) => new Date(iso + "T00:00:00Z").getUTCDay() === 0;
   const days = kind === "nghi_phep"
-    ? (span !== "ca_ngay" ? (isSunday(start) ? 0 : 0.5) : end >= start ? workDays(start, end) : 0)   // nghỉ phép: bỏ Chủ nhật
+    ? (span !== "ca_ngay" ? (isSunday(start) ? 0 : LEAVE_SPAN_DAYS[span] ?? 0.5) : end >= start ? workDays(start, end) : 0)   // nghỉ phép: bỏ Chủ nhật
     : end >= start ? daysBetween(start, end) + 1 : 0;
   const sundays = kind === "nghi_phep" && span === "ca_ngay" && end >= start ? daysBetween(start, end) + 1 - days : 0;
   const quota = profile?.annual_leave_days == null ? null : Number(profile.annual_leave_days);
@@ -466,7 +466,10 @@ export default function RequestForm() {
               {kind === "nghi_phep" ? (
                 <div className="dn-fields">
                   <div className="field"><span>Loại nghỉ</span><Options name="Loại nghỉ" value={subType} options={LEAVE_TYPE} onChange={setSubType} /></div>
-                  <div className="field"><span>Thời gian nghỉ</span><Options name="Thời gian nghỉ" value={span} options={LEAVE_SPAN} onChange={setSpan} /></div>
+                  <div className="field"><span>Thời gian nghỉ</span><Options name="Thời gian nghỉ" value={span} options={LEAVE_SPAN} onChange={setSpan} />
+                    {span === "dau_gio" || span === "cuoi_gio" ? (
+                      <small className="muted">Trừ 0,25 ngày phép. Khối văn phòng: {span === "dau_gio" ? "08:00–10:00" : "15:00–17:00"}; khối kinh doanh tính 2 giờ {span === "dau_gio" ? "đầu" : "cuối"} ca đã phân.</small>
+                    ) : null}</div>
                 </div>
               ) : null}
               {kind === "ra_ngoai" ? (
