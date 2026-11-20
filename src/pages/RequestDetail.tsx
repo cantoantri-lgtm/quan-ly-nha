@@ -248,6 +248,7 @@ export default function RequestDetail() {
             <dt>Tổng dự kiến</dt><dd className="num"><b>{vnd(r.amount)}</b></dd>
             <dt>Ngày cần hàng</dt><dd className="num">{fullDate(r.start_date)}</dd>
             {r.payee ? (<><dt>Nhà cung cấp đề xuất</dt><dd>{r.payee}</dd></>) : null}
+            {r.loa_no ? (<><dt>LOA tham khảo</dt><dd className="num">{r.loa_id ? <Link to={`/van-phong/${r.loa_id}`}>{r.loa_no}</Link> : r.loa_no}</dd></>) : null}
           </>) : null}
           {r.kind === "thanh_toan" && prOf ? (<><dt>Đề nghị mua hàng</dt><dd><Link to={`/van-phong/${prOf.id}`}>{prOf.doc_no ?? "MH"} · {prOf.reason}</Link> <span className="muted num">({vnd(prOf.amount)})</span></dd></>) : null}
           {(isMoney || isBuy) && proj ? (<><dt>Dự án</dt><dd><Link to={`/du-an/${proj.id}`}>{proj.code} · {proj.name}</Link>{proj.item ? ` · ${proj.item}` : ""}</dd></>) : null}
@@ -312,7 +313,7 @@ export default function RequestDetail() {
           </>
         ) : null}
 
-        {isMoney && r.loa_id ? <LoaBudget loaId={r.loa_id} loaNo={r.loa_no} refreshKey={r.updated_at} /> : null}
+        {(isMoney || isBuy) && r.loa_id ? <LoaBudget loaId={r.loa_id} loaNo={r.loa_no} refreshKey={r.updated_at} /> : null}
 
         {isLoa ? (
           <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} title="Tài liệu đính kèm" docTypes={LOA_DOC_TYPE}

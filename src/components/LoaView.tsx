@@ -163,12 +163,12 @@ export default function LoaView({ r, d }: { r: Req; d: LoaDetails }) {
                 {linked.map((x) => (
                   <li key={x.id}>
                     <span>{x.can_open ? <Link to={`/van-phong/${x.id}`} className="dt-link">{kindLabel({ kind: x.kind, sub_type: null })} {x.doc_no ?? ""}</Link> : <>{kindLabel({ kind: x.kind, sub_type: null })} {x.doc_no ?? ""}</>}
-                      <br /><small className="muted">{x.requester_name ?? "—"} · {statusLabel(x)}</small></span>
+                      <br /><small className="muted">{x.requester_name ?? "—"} · {statusLabel(x)}{x.kind === "mua_hang" ? " · tham khảo, không trừ dự toán" : ""}</small></span>
                     <b className="num">{vnd(x.amount)}</b>
                   </li>
                 ))}
               </ul>
-            ) : <p className="muted small" style={{ margin: 0 }}>Chưa có đề nghị tạm ứng / thanh toán nào dùng LOA này.</p>}
+            ) : <p className="muted small" style={{ margin: 0 }}>Chưa có đề nghị mua hàng, tạm ứng hay thanh toán nào dùng LOA này.</p>}
           </section>
         </>
       ) : null}

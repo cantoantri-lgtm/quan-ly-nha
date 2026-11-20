@@ -184,6 +184,7 @@ export default function RequestForm() {
   function applyPurchase(x: PurchasePick) {
     setReason((v) => v || `Thanh toán theo đề nghị mua hàng ${x.doc_no ?? ""}: ${x.reason}`.trim());
     if (x.payee) setPayee((v) => v || x.payee!);
+    if (x.loa_id) setLoaId((v) => v || x.loa_id!);
     if (x.building_id) setBuildingId((v) => v || x.building_id!);
     if (x.project_id) { setProjectId((v) => v || x.project_id!); if (x.project_item_id) setProjectItemId((v) => v || x.project_item_id!); }
   }
@@ -242,9 +243,9 @@ export default function RequestForm() {
   const isMoney = kind === "thanh_toan" || kind === "tam_ung";
   // LOA chi tiền đã duyệt mà mình được dùng (người lập, cùng soạn, được xem)
   useEffect(() => {
-    if (!isMoney) return;
+    if (!isMoney && kind !== "mua_hang") return;
     supabase.rpc("loa_pickable").then(({ data }) => setPicks((data ?? []) as LoaPick[]));
-  }, [isMoney]);
+  }, [isMoney, kind]);
   const isPay = kind === "thanh_toan";
   const isBuy = kind === "mua_hang";
   const absence = kind === "nghi_phep" || kind === "ra_ngoai" || kind === "cong_tac";   // vắng mặt: có bàn giao
@@ -309,7 +310,7 @@ export default function RequestForm() {
       building_id: buildingId || null,
       pay_method: isPay ? payMethod : null,
       pay_type: isPay ? payType : null,
-      loa_id: isMoney ? loaId || null : null,
+      loa_id: isMoney || isBuy ? loaId || null : null,
       vendor_code: isPay ? vendorCode.trim() || null : null,
       contact_name: isPay ? contactName.trim() || null : null,
       contact_code: isPay ? contactCode.trim() || null : null,
@@ -422,7 +423,7 @@ export default function RequestForm() {
   const pick = picks?.find((x) => x.id === loaId) ?? null;
 
   const loaAfter = pick && total ? loaLeft(pick) - total : null;
-  const LoaField = isMoney ? (
+  const LoaField = isMoney || isBuy ? (
     <div className="field dn-span3">
       <span>Tờ trình (LOA) <small className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</small></span>
       <div className="dn-search">
@@ -459,7 +460,7 @@ export default function RequestForm() {
       <span>Đã duyệt chi <b>{vnd(pick.used)}</b></span>
       <span>Đang chờ duyệt <b>{vnd(pick.pending)}</b></span>
       <span className="hl">Còn lại <b>{vnd(loaLeft(pick))}</b></span>
-      {loaAfter != null ? <span className={loaAfter < 0 ? "over" : ""}>Còn lại sau đề nghị này <b>{vnd(loaAfter)}</b>{loaAfter < 0 ? " · vượt dự toán, vẫn gửi được, cấp duyệt sẽ thấy cảnh báo" : ""}</span> : null}
+      {loaAfter != null ? <span className={loaAfter < 0 ? "over" : ""}>{isBuy ? "Còn lại nếu mua theo đề nghị này" : "Còn lại sau đề nghị này"} <b>{vnd(loaAfter)}</b>{loaAfter < 0 ? " · vượt dự toán, vẫn gửi được, cấp duyệt sẽ thấy cảnh báo" : ""}</span> : null}
     </div>
   ) : null;
 
@@ -662,6 +663,8 @@ export default function RequestForm() {
                   <label className="field"><span>Ngày cần hàng <span className="req">*</span></span>
                     <input id="rq-start" type="date" className="input" value={start} required onChange={(e) => setStart(e.target.value)} /></label>
                   {BuildingSel}
+                  {LoaField}
+                  {LoaBudget}
                   {ProjectField}
                   <label className="field dn-span2"><span>Nhà cung cấp đề xuất</span>
                     <input id="rq-payee" className="input" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="VD: Cửa hàng vật tư An Phát" /></label>

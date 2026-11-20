@@ -119,6 +119,7 @@ export default function RequestPrint() {
               <tr><th>Kính gửi</th><td>Giám đốc và phòng Kế toán</td></tr>
               <tr><th>Ngày cần hàng</th><td>{fullDate(r.start_date)}</td></tr>
               {r.payee ? <tr><th>Nhà cung cấp đề xuất</th><td>{r.payee}</td></tr> : null}
+              {r.loa_no ? <tr><th>LOA tham khảo</th><td>{r.loa_no}</td></tr> : null}
             </>) : isMoney ? (<>
               <tr><th>Kính gửi</th><td>Giám đốc và phòng Kế toán</td></tr>
               <tr><th>{r.kind === "thanh_toan" ? "Hạn thanh toán" : "Ngày cần tiền"}</th><td>{fullDate(r.start_date)}</td></tr>

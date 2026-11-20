@@ -10,7 +10,7 @@ export type PLine = {
 export type PLineDraft = { item_name: string; spec: string; unit: string; quantity: string; unit_price: string; note: string };
 export type PurchasePick = {
   id: string; doc_no: string | null; reason: string; amount: number; requester_name: string | null; doc_date: string | null;
-  building_id: string | null; project_id: string | null; project_item_id: string | null; payee: string | null; paid: number; pending: number;
+  building_id: string | null; project_id: string | null; project_item_id: string | null; payee: string | null; paid: number; pending: number; loa_id: string | null;
 };
 
 export const emptyPLine = (): PLineDraft => ({ item_name: "", spec: "", unit: "", quantity: "1", unit_price: "", note: "" });
