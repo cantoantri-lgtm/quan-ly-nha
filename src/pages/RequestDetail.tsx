@@ -15,6 +15,8 @@ import { ApprovalSteps } from "../components/ApprovalChain";
 import { KIND_ICON, LeaveBalance } from "./Office";
 import { CostGrid, CostTable, LegGrid, LegTable } from "../components/TripGrids";
 import { TRIP_TYPE, VISA_TYPE, costFilled, costFromRow, costTotal, emptyCost, emptyLeg, legFilled, legFromRow, loadTrip, saveTrip, type CostDraft, type LegDraft, type TripCost, type TripLeg } from "../lib/trip";
+import { PurchaseTable } from "../components/PurchaseGrid";
+import { loadPLines, type PLine } from "../lib/purchase";
 import "../office.css";
 
 export default function RequestDetail() {
@@ -43,6 +45,10 @@ export default function RequestDetail() {
   const [uncCount, setUncCount] = useState(0);
   const [loa, setLoa] = useState<LoaDetails | null>(null);   // chỉ có khi đây là tờ trình (LOA)
   const [loaCanEdit, setLoaCanEdit] = useState(false);       // người lập hoặc người cùng soạn, khi còn sửa được
+  // Đề nghị mua hàng: danh sách hàng + các đề nghị thanh toán tham chiếu; thanh toán: đề nghị mua hàng gốc
+  const [pLines, setPLines] = useState<PLine[]>([]);
+  const [prPays, setPrPays] = useState<{ id: string; doc_no: string | null; reason: string | null; amount: number; status: string; requester_name: string | null; created_at: string; can_open: boolean }[]>([]);
+  const [prOf, setPrOf] = useState<{ id: string; doc_no: string | null; reason: string; amount: number } | null>(null);
 
   const load = useCallback(async () => {
     const [{ data }, st] = await Promise.all([
@@ -69,6 +75,14 @@ export default function RequestDetail() {
       ]);
       setProj(pj.data ? { ...(pj.data as { id: string; code: string | null; name: string }), item: (it.data as { name: string } | null)?.name ?? null } : null);
     } else setProj(null);
+    if (rq.kind === "mua_hang") {
+      const [pl, lk] = await Promise.all([loadPLines(rq.id), supabase.rpc("purchase_linked", { p_pr: rq.id })]);
+      setPLines(pl); setPrPays((lk.data ?? []) as typeof prPays);
+    } else { setPLines([]); setPrPays([]); }
+    if (rq.purchase_id) {
+      const { data: pr } = await supabase.from("requests").select("id,doc_no,reason,amount").eq("id", rq.purchase_id).maybeSingle();
+      setPrOf((pr as typeof prOf) ?? null);
+    } else setPrOf(null);
     if (rq.trip_id) {
       const { data: t } = await supabase.from("requests").select("*").eq("id", rq.trip_id).maybeSingle();
       setTripOf((t as Req | null) ?? null);
@@ -96,6 +110,9 @@ export default function RequestDetail() {
   const mine = r.requester_id === profile.id;
   const isMoney = r.kind === "thanh_toan" || r.kind === "tam_ung";
   const isLoa = r.kind === "loa";
+  const isBuy = r.kind === "mua_hang";
+  const prPaid = prPays.filter((x) => x.status === "da_duyet" || x.status === "hoan_tat").reduce((a, x) => a + Number(x.amount), 0);
+  const prPending = prPays.filter((x) => x.status === "cho_duyet").reduce((a, x) => a + Number(x.amount), 0);
   const noun = isLoa ? "tờ trình" : "đề nghị";
   const Noun = isLoa ? "Tờ trình" : "Đề nghị";
   const today = todayVN();
@@ -184,8 +201,9 @@ export default function RequestDetail() {
             <span className="rq-ico" aria-hidden="true">{KIND_ICON[r.kind]}</span>
             <span className={`rq-pill ${r.status}`}>{statusLabel(r)}</span>
           </div>
-          <h2 className="num">{isMoney ? vnd(r.amount) : summary(r)}</h2>
-          {isMoney && r.amount ? <p className="muted" style={{ margin: 0, fontSize: 13 }}>{vndWords(r.amount)}</p> : null}
+          <h2 className="num">{isMoney || isBuy ? vnd(r.amount) : summary(r)}</h2>
+          {isBuy ? <p style={{ margin: 0, fontWeight: 600 }}>{r.doc_no ? `${r.doc_no} · ` : ""}{r.reason}</p> : null}
+          {(isMoney || isBuy) && r.amount ? <p className="muted" style={{ margin: 0, fontSize: 13 }}>{vndWords(r.amount)}</p> : null}
           {isLoa ? <p style={{ margin: 0, fontWeight: 600 }}>{r.doc_no ? `${r.doc_no} · ` : ""}{r.reason}</p> : null}
           <p className="muted" style={{ margin: 0 }}>{requester?.full_name ?? "—"} · {isLoa ? (loa?.submitted_at ? `trình ${clock(loa.submitted_at)}` : `lập ${clock(r.created_at)}`) : `gửi ${clock(r.created_at)}`}</p>
         </section>
@@ -225,7 +243,14 @@ export default function RequestDetail() {
             <dt>Kế hoạch</dt><dd className="num">{fullDate(r.start_date)} – {fullDate(r.end_date)} ({fmtDays(r.days)})</dd>
             {r.amount ? (<><dt>Dự trù</dt><dd className="num">{vnd(r.amount)}</dd></>) : null}
           </>) : null}
-          {isMoney && proj ? (<><dt>Dự án</dt><dd><Link to={`/du-an/${proj.id}`}>{proj.code} · {proj.name}</Link>{proj.item ? ` · ${proj.item}` : ""}</dd></>) : null}
+          {isBuy ? (<>
+            {r.doc_no ? (<><dt>Số chứng từ</dt><dd className="num">{r.doc_no}{r.doc_date ? ` · ${fullDate(r.doc_date)}` : ""}</dd></>) : null}
+            <dt>Tổng dự kiến</dt><dd className="num"><b>{vnd(r.amount)}</b></dd>
+            <dt>Ngày cần hàng</dt><dd className="num">{fullDate(r.start_date)}</dd>
+            {r.payee ? (<><dt>Nhà cung cấp đề xuất</dt><dd>{r.payee}</dd></>) : null}
+          </>) : null}
+          {r.kind === "thanh_toan" && prOf ? (<><dt>Đề nghị mua hàng</dt><dd><Link to={`/van-phong/${prOf.id}`}>{prOf.doc_no ?? "MH"} · {prOf.reason}</Link> <span className="muted num">({vnd(prOf.amount)})</span></dd></>) : null}
+          {(isMoney || isBuy) && proj ? (<><dt>Dự án</dt><dd><Link to={`/du-an/${proj.id}`}>{proj.code} · {proj.name}</Link>{proj.item ? ` · ${proj.item}` : ""}</dd></>) : null}
           {isMoney && tripOf ? (<><dt>Chuyến công tác</dt><dd><Link to={`/van-phong/${tripOf.id}`}>{tripOf.doc_no ? `${tripOf.doc_no} · ` : ""}{tripOf.location} ({fullDate(tripOf.actual_start ?? tripOf.start_date)})</Link></dd></>) : null}
           {isMoney ? (<>
             {r.doc_no ? (<><dt>Số chứng từ</dt><dd className="num">{r.doc_no}{r.doc_date ? ` · ${fullDate(r.doc_date)}` : ""}</dd></>) : null}
@@ -238,7 +263,7 @@ export default function RequestDetail() {
             {r.contact_name || r.contact_code ? (<><dt>Liên hệ</dt><dd>{[r.contact_name, r.contact_code].filter(Boolean).join(" · ")}</dd></>) : null}
             <dt>Hình thức</dt><dd>{r.pay_method ? PAY_METHOD[r.pay_method] : r.bank_info ? "Chuyển khoản" : "Tiền mặt"}{r.bank_info ? ` — ${r.bank_info}` : ""}</dd>
           </>) : null}
-          <dt>{isMoney ? "Nội dung" : r.kind === "cong_tac" ? "Mục đích" : r.kind === "ra_ngoai" ? "Công việc" : "Lý do"}</dt><dd className="desc">{r.reason}</dd>
+          <dt>{isMoney ? "Nội dung" : isBuy || r.kind === "cong_tac" ? "Mục đích" : r.kind === "ra_ngoai" ? "Công việc" : "Lý do"}</dt><dd className="desc">{r.reason}</dd>
           {building ? (<><dt>Toà nhà</dt><dd>{building.code} · {building.name}</dd></>) : null}
           {r.handover_to ? (<><dt>Bàn giao cho</dt><dd>{name(r.handover_to)}</dd></>) : null}
           {r.contact_phone ? (<><dt>SĐT liên hệ</dt><dd className="num">{r.contact_phone}</dd></>) : null}
@@ -251,6 +276,39 @@ export default function RequestDetail() {
             <LegTable legs={trip.planLegs} people={people} />
             <div className="section-title">Chi phí dự trù</div>
             <CostTable costs={trip.planCosts} />
+          </>
+        ) : null}
+
+        {isBuy ? (
+          <>
+            <div className="section-title">Danh sách hàng cần mua</div>
+            <PurchaseTable lines={pLines} />
+            <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} title="Báo giá đính kèm"
+              hint="Báo giá, hình ảnh mẫu hàng (ảnh hoặc PDF, tối đa 10 MB mỗi tệp)."
+              canUpload={isManager || (mine && (r.status === "cho_duyet" || editable))}
+              canDelete={isManager || (mine && editable)} />
+            {r.status === "da_duyet" || r.status === "hoan_tat" || prPays.length ? (
+              <>
+                <div className="section-title">Thanh toán theo đề nghị mua hàng này</div>
+                <div className="card stack" style={{ gap: 8 }}>
+                  <p className="num" style={{ margin: 0 }}>Duyệt mua <b>{vnd(r.amount)}</b> · đã duyệt chi <b>{vnd(prPaid)}</b>{prPending ? <> · đang chờ duyệt <b>{vnd(prPending)}</b></> : null} · còn <b className={Number(r.amount) - prPaid - prPending < 0 ? "err-text" : ""}>{vnd(Number(r.amount) - prPaid - prPending)}</b></p>
+                  {prPays.length ? (
+                    <ul className="plain-list">
+                      {prPays.map((x) => (
+                        <li key={x.id}>
+                          {x.can_open ? <Link to={`/van-phong/${x.id}`}>Thanh toán {x.doc_no ?? ""}</Link> : <span>Thanh toán {x.doc_no ?? ""}</span>}
+                          <span className="muted"> · {x.requester_name ?? "?"} · </span><b className="num">{vnd(x.amount)}</b>
+                          <span className="muted"> · {statusLabel({ kind: "thanh_toan", status: x.status as Req["status"] })}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="muted" style={{ margin: 0 }}>Chưa có đề nghị thanh toán nào tham chiếu.</p>}
+                  {r.status === "da_duyet" || r.status === "hoan_tat" ? (
+                    <Link className="btn secondary sm" style={{ justifySelf: "start" }} to={`/van-phong/moi/thanh_toan?mh=${r.id}`}>Lập đề nghị thanh toán theo đề nghị này</Link>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
           </>
         ) : null}
 

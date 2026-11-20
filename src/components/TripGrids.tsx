@@ -6,7 +6,7 @@ import { Icon } from "./ui";
 import "../office.css";
 
 type Person = { id: string; full_name: string };
-type Col<T> = { k: keyof T & string; label: string; w: number; req?: boolean; num?: boolean; type?: "date" | "staff" | "money" | "cat" };
+export type Col<T> = { k: keyof T & string; label: string; w: number; req?: boolean; num?: boolean; type?: "date" | "staff" | "money" | "cat" };
 const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
 
 function toIso(v: string) {
@@ -15,7 +15,7 @@ function toIso(v: string) {
 }
 
 /** Bảng nhập kiểu Excel dùng chung: Tab sang ô, Enter xuống dòng / thêm dòng, dán nhiều ô từ Excel */
-function XlsGrid<T extends Record<string, string>>({ title, rows, setRows, cols, blank, people, extra, extraAfter, foot, caption }: {
+export function XlsGrid<T extends Record<string, string>>({ title, rows, setRows, cols, blank, people, extra, extraAfter, foot, caption }: {
   title: string; rows: T[]; setRows: (v: T[]) => void; cols: Col<T>[]; blank: () => T; people?: Person[];
   extra?: { label: string; w: number; render: (r: T) => string }; extraAfter?: string; foot?: React.ReactNode; caption: string;
 }) {

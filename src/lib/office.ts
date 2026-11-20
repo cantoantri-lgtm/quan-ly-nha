@@ -5,7 +5,7 @@ import { supabase } from "./supabase";
 import { listFiles, removeFile } from "./files";
 import { useCallback, useEffect, useState } from "react";
 
-export type ReqKind = "nghi_phep" | "ra_ngoai" | "cong_tac" | "loa" | "thanh_toan" | "tam_ung";
+export type ReqKind = "nghi_phep" | "ra_ngoai" | "cong_tac" | "loa" | "mua_hang" | "thanh_toan" | "tam_ung";
 export type ReqStatus = "nhap" | "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy" | "hoan_tat" | "tra_lai";
 
 export type Req = {
@@ -66,6 +66,7 @@ export type Req = {
   /** Dự án / hạng mục chính (migration 069) */
   project_id?: string | null;
   project_item_id?: string | null;
+  purchase_id?: string | null;   // đề nghị thanh toán tham chiếu đề nghị mua hàng
 };
 
 export type ReqLine = {
@@ -97,6 +98,7 @@ export const FLOW_TEXT: Record<ReqKind, string> = {
   loa: "Người lập → Leader → Trưởng phòng → Kế toán → Giám đốc",
   thanh_toan: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
   tam_ung: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
+  mua_hang: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
 };
 export const PAY_TYPE: Record<string, string> = {
   nha_cung_cap: "Thanh toán nhà cung cấp", hoan_ung: "Hoàn ứng", chi_phi_van_hanh: "Chi phí vận hành",
@@ -109,6 +111,7 @@ export const KINDS: { kind: ReqKind; label: string; hint: string }[] = [
   { kind: "ra_ngoai", label: "Làm việc bên ngoài", hint: "Ra ngoài trong giờ làm" },
   { kind: "cong_tac", label: "Đi công tác", hint: "Duyệt trước, báo cáo sau" },
   { kind: "loa", label: "Tờ trình (LOA)", hint: "Xin duyệt chính sách, ngân sách" },
+  { kind: "mua_hang", label: "Đề nghị mua hàng", hint: "Xin duyệt trước khi mua" },
   { kind: "thanh_toan", label: "Đề nghị thanh toán", hint: "Chi tiền đã mua / cần trả" },
   { kind: "tam_ung", label: "Đề nghị tạm ứng", hint: "Ứng tiền trước để làm việc" },
 ];
@@ -133,6 +136,7 @@ export function kindLabel(r: Pick<Req, "kind" | "sub_type">): string {
     case "loa": return "Tờ trình (LOA)";
     case "thanh_toan": return "Đề nghị thanh toán";
     case "tam_ung": return "Đề nghị tạm ứng";
+    case "mua_hang": return "Đề nghị mua hàng";
   }
 }
 
@@ -187,7 +191,7 @@ export const EDITABLE_STATUS: ReqStatus[] = ["nhap", "tra_lai", "tu_choi", "da_h
 export const isEditableStatus = (s: ReqStatus) => EDITABLE_STATUS.includes(s);
 /** Đã xong hẳn: nghỉ phép / ra ngoài / tờ trình chỉ cần duyệt; còn lại đợi chi tiền hoặc báo cáo thực tế */
 export const isFinished = (r: Pick<Req, "kind" | "status">) =>
-  r.status === "hoan_tat" || (r.status === "da_duyet" && (r.kind === "nghi_phep" || r.kind === "ra_ngoai" || r.kind === "loa"));
+  r.status === "hoan_tat" || (r.status === "da_duyet" && (r.kind === "nghi_phep" || r.kind === "ra_ngoai" || r.kind === "loa" || r.kind === "mua_hang"));
 export const EDIT_LOCK_TIP = "Đang trong quá trình phê duyệt hoặc đã duyệt xong nên không sửa / xoá được. Chỉ sửa được khi bị trả lại, bị từ chối hoặc đã rút.";
 
 /** Ngày theo giờ Việt Nam (yyyy-mm-dd) của một thời điểm ISO */

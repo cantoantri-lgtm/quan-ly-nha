@@ -33,7 +33,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
   const tab = (params.get("tab") as Tab) || "tat_ca";
-  const money = kind === "thanh_toan" || kind === "tam_ung";
+  const money = kind === "thanh_toan" || kind === "tam_ung" || kind === "mua_hang";
   const loa = kind === "loa";
   const trip = kind === "cong_tac";
   const noun = loa ? "tờ trình" : "đề nghị";
@@ -274,7 +274,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
                   {loa ? <><th>Số LOA</th><th>Ngày</th></> : money ? <><th>Số chứng từ</th><th>Ngày</th></> : trip ? <><th>Số đăng ký</th><th>Ngày gửi</th></> : <th>Ngày gửi</th>}
                   <th>{loa ? "Người trình" : "Người đề nghị"}</th>
                   {loa ? <><th>Tiêu đề</th><th className="r">Số tiền</th></>
-                    : money ? <><th>Nội dung</th><th>Đơn vị nhận</th><th className="r">Tiền đề nghị</th></>
+                    : money ? <><th>Nội dung</th><th>{kind === "mua_hang" ? "Nhà cung cấp" : "Đơn vị nhận"}</th><th className="r">Tiền đề nghị</th></>
                     : trip ? <><th>Người đi</th><th>Nơi công tác</th><th>Kế hoạch</th><th>Nội dung</th><th className="r">Dự trù</th><th>Thực tế</th><th className="r">Chi phí TT</th><th>Nhân sự XN</th></>
                     : <><th>Thời gian</th><th>Lý do</th></>}
                   <th>Trạng thái</th><th>Đang chờ</th>
@@ -426,7 +426,7 @@ function List({ kind, label }: { kind: ReqKind; label: string }) {
           {loa ? <p style={{ margin: 0 }}><b>Bản nháp:</b> tờ trình lưu nháp nhiều lần được, chỉ người lập và người cùng soạn nhìn thấy. Bấm “Trình duyệt” thì hệ thống cấp số LOA và bắt đầu luồng duyệt. LOA đã duyệt xong thì khoá.</p> : null}
           {loa ? <p style={{ margin: 0 }}><b>Dùng LOA:</b> đề nghị tạm ứng và đề nghị thanh toán có thể chọn một LOA chi tiền đã duyệt để tham chiếu và theo dõi dự toán (không bắt buộc). Người lập, người cùng soạn, người và phòng ban được xem của LOA đó mới chọn được.</p> : null}
           {trip ? <p style={{ margin: 0 }}><b>Đi công tác:</b> lập phiếu với kế hoạch và chi phí dự trù, gửi duyệt. Duyệt xong thì in phiếu yêu cầu, kế hoạch, giấy đi đường; cần tiền trước thì lập đề nghị tạm ứng ngay trong phiếu. Về thì bấm “Nhập thực tế công tác”, nhập lộ trình và bảng kê chứng từ. Nhân sự xác nhận ngày đi, ngày về để tính công. Từ bảng kê bấm “Lập đề nghị thanh toán”.</p> : null}
-          {money ? <p style={{ margin: 0 }}><b>Tờ trình (LOA):</b> không bắt buộc. Khoản chi thuộc một LOA đã duyệt thì chọn LOA đó để theo dõi dự toán.</p> : null}
+          {money && kind !== "mua_hang" ? <p style={{ margin: 0 }}><b>Tờ trình (LOA):</b> không bắt buộc. Khoản chi thuộc một LOA đã duyệt thì chọn LOA đó để theo dõi dự toán.</p> : null}
         </div>
       </Sheet>
     </main>

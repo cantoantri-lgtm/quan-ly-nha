@@ -15,6 +15,8 @@ import { Icon, TopBar, Combo } from "../components/ui";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
 import { addLink } from "../lib/links";
 import { ChainPreview } from "../components/ApprovalChain";
+import { PurchaseGrid } from "../components/PurchaseGrid";
+import { checkPLines, emptyPLine, loadPLines, pFromRow, pTotal, savePLines, type PLineDraft, type PurchasePick } from "../lib/purchase";
 import { useLeaveBalance } from "./Office";
 import "../office.css";
 
@@ -87,6 +89,11 @@ export default function RequestForm() {
   const [projects, setProjects] = useState<{ id: string; code: string | null; name: string; status: string; building_id: string | null }[]>([]);
   const [projItems, setProjItems] = useState<{ id: string; project_id: string; name: string; sort: number; start_date: string }[]>([]);
   const [settleDue, setSettleDue] = useState("");
+  // Đề nghị mua hàng (SQL 080): danh sách hàng; thanh toán tham chiếu đề nghị mua hàng đã duyệt (?mh=<id>)
+  const [pLines, setPLines] = useState<PLineDraft[]>([]);
+  const [purchaseId, setPurchaseId] = useState(!id ? qs.get("mh") ?? "" : "");
+  const [purchases, setPurchases] = useState<PurchasePick[] | null>(null);
+  const [pFiles, setPFiles] = useState<File[]>([]);
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [advs, setAdvs] = useState<AdvDraft[]>([]);
   const [files, setFiles] = useState<File[]>([]);
@@ -145,7 +152,7 @@ export default function RequestForm() {
   }, [tripParam, editing, kind]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!(kind === "thanh_toan" || kind === "tam_ung")) return;
+    if (!(kind === "thanh_toan" || kind === "tam_ung" || kind === "mua_hang")) return;
     (async () => {
       const [pj, it] = await Promise.all([
         supabase.from("projects").select("id,code,name,status,building_id").order("start_date", { ascending: false }),
@@ -156,13 +163,30 @@ export default function RequestForm() {
       const pre = !editing ? list.find((x) => x.id === projectId) : null;
       if (pre) {
         if (pre.building_id) setBuildingId((b) => b || pre.building_id!);
-        setReason((r) => r || (kind === "tam_ung" ? `Tạm ứng dự án ${pre.code}: ${pre.name}` : `Thanh toán dự án ${pre.code}: ${pre.name}`));
+        setReason((r) => r || (kind === "tam_ung" ? `Tạm ứng dự án ${pre.code}: ${pre.name}` : kind === "mua_hang" ? `Mua hàng cho dự án ${pre.code}: ${pre.name}` : `Thanh toán dự án ${pre.code}: ${pre.name}`));
       }
     })();
   }, [kind]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Đề nghị thanh toán mới: mở sẵn một dòng chi tiết để gõ ngay
   useEffect(() => { if (!editing && kind === "thanh_toan" && lines.length === 0) setLines([emptyLine()]); }, [editing, kind]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!editing && kind === "mua_hang" && pLines.length === 0) setPLines([emptyPLine()]); }, [editing, kind]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // Đề nghị thanh toán: danh sách đề nghị mua hàng đã duyệt để tham chiếu; mở từ đề nghị mua hàng thì điền sẵn
+  useEffect(() => {
+    if (kind !== "thanh_toan") return;
+    supabase.rpc("purchase_pickable").then(({ data }) => {
+      const list = (data ?? []) as PurchasePick[];
+      setPurchases(list);
+      const pre = !editing && purchaseId ? list.find((x) => x.id === purchaseId) : null;
+      if (pre) applyPurchase(pre);
+    });
+  }, [kind]);   // eslint-disable-line react-hooks/exhaustive-deps
+  function applyPurchase(x: PurchasePick) {
+    setReason((v) => v || `Thanh toán theo đề nghị mua hàng ${x.doc_no ?? ""}: ${x.reason}`.trim());
+    if (x.payee) setPayee((v) => v || x.payee!);
+    if (x.building_id) setBuildingId((v) => v || x.building_id!);
+    if (x.project_id) { setProjectId((v) => v || x.project_id!); if (x.project_item_id) setProjectItemId((v) => v || x.project_item_id!); }
+  }
 
   const balance = useLeaveBalance(profile?.id);
   const { paused, loaded: pauseLoaded } = usePausedKinds();
@@ -185,7 +209,11 @@ export default function RequestForm() {
       setDocNo(r.doc_no);
       setHandover(r.handover_to ?? ""); setPhone(r.contact_phone ?? ""); setTransport(r.transport ?? ""); setSettleDue(r.settle_due ?? "");
       setTripId(r.trip_id ?? null);
-      setProjectId(r.project_id ?? ""); setProjectItemId(r.project_item_id ?? "");
+      setProjectId(r.project_id ?? ""); setProjectItemId(r.project_item_id ?? ""); setPurchaseId(r.purchase_id ?? "");
+      if (r.kind === "mua_hang") {
+        loadPLines(r.id).then((l) => { setPLines(l.length ? l.map(pFromRow) : [emptyPLine()]); setLoaded(true); });
+        return;
+      }
       if (r.kind === "cong_tac") {
         setTripType(r.trip_type ?? "trong_nuoc"); setTripArea(r.trip_area ?? ""); setVisaType(r.visa_type ?? "khong_yeu_cau"); setTraveler(r.traveler_id ?? "");
         loadTrip(r.id).then((t) => {
@@ -218,6 +246,7 @@ export default function RequestForm() {
     supabase.rpc("loa_pickable").then(({ data }) => setPicks((data ?? []) as LoaPick[]));
   }, [isMoney]);
   const isPay = kind === "thanh_toan";
+  const isBuy = kind === "mua_hang";
   const absence = kind === "nghi_phep" || kind === "ra_ngoai" || kind === "cong_tac";   // vắng mặt: có bàn giao
   // Dòng trống hoàn toàn (vd vừa bấm thêm dòng) thì bỏ qua khi tính và khi lưu
   const filled = lines.filter((l) => l.amount.trim() || l.seller_name.trim() || l.invoice_no.trim() || l.description.trim() || l.invoice_serial.trim());
@@ -236,9 +265,14 @@ export default function RequestForm() {
     e.preventDefault();
     setErr(null);
     if (isPay && !hasLines) { setErr("Nhập ít nhất một dòng chi tiết thanh toán. Tổng tiền tự cộng từ các dòng."); return; }
+    if (isBuy) {
+      const pe = checkPLines(pLines);
+      if (pe) { setErr(pe); return; }
+      if (!pTotal(pLines)) { setErr("Tổng tiền dự kiến phải lớn hơn 0: nhập đơn giá dự kiến."); return; }
+    }
     const amt = isPay ? tot.net : parseMoney(amount);
     if (isMoney && !amt) { setErr(isPay ? "Tiền tạm ứng phải nhỏ hơn tổng thanh toán." : "Nhập số tiền đề nghị."); return; }
-    if (!hasLines && amount && !amt) { setErr("Số tiền chưa đúng định dạng."); return; }
+    if (!hasLines && !isBuy && amount && !amt) { setErr("Số tiền chưa đúng định dạng."); return; }
     if (isPay) {
       if (payMethod === "chuyen_khoan" && !bank.trim()) { setErr("Nhập số tài khoản và ngân hàng nhận tiền."); return; }
       for (let i = 0; i < filled.length; i++) {
@@ -269,8 +303,8 @@ export default function RequestForm() {
       end_time: kind === "ra_ngoai" && t2 && subType === "co_quay_lai" ? t2 : null,
       location: kind === "ra_ngoai" || kind === "cong_tac" ? location.trim() || null : null,
       reason: reason.trim(),
-      amount: kind === "cong_tac" ? (costTotal(costs.filter(costFilled)) || null) : isMoney ? amt : null,
-      payee: isMoney ? payee.trim() || null : null,
+      amount: kind === "cong_tac" ? (costTotal(costs.filter(costFilled)) || null) : isMoney ? amt : isBuy ? pTotal(pLines) : null,
+      payee: isMoney || isBuy ? payee.trim() || null : null,
       bank_info: isMoney ? bank.trim() || null : null,
       building_id: buildingId || null,
       pay_method: isPay ? payMethod : null,
@@ -287,8 +321,9 @@ export default function RequestForm() {
       visa_type: kind === "cong_tac" && tripType === "nuoc_ngoai" ? visaType : null,
       traveler_id: kind === "cong_tac" ? traveler || null : null,
       trip_id: isMoney ? tripId : null,
-      project_id: isMoney ? projectId || null : null,
-      project_item_id: isMoney ? projectItemId || null : null,
+      project_id: isMoney || isBuy ? projectId || null : null,
+      project_item_id: isMoney || isBuy ? projectItemId || null : null,
+      purchase_id: isPay ? purchaseId || null : null,
       settle_due: kind === "tam_ung" ? settleDue || null : null,
     };
     setBusy(true);
@@ -301,6 +336,16 @@ export default function RequestForm() {
     if (kind === "cong_tac") {
       const te = await saveTrip(rid, "ke_hoach", legs, costs);
       if (te) problems.push(friendlyError({ message: te }));
+    }
+    if (isBuy) {
+      const pe = await savePLines(rid, pLines, editing);
+      if (pe) problems.push(pe);
+      if (!editing) {
+        for (const f of pFiles) {
+          try { await uploadFile({ kind: "dinh_kem_de_nghi", requestId: rid }, f); }
+          catch (ex) { problems.push(`${f.name}: ${ex instanceof Error ? ex.message : "không tải lên được"}`); }
+        }
+      }
     }
     if (isPay) {
       // Xoá tạm ứng trước khoản chi để tổng không bao giờ âm giữa chừng
@@ -356,7 +401,23 @@ export default function RequestForm() {
   );
 
   const bankReq = isPay && payMethod === "chuyen_khoan";
-  const total = isPay ? tot.net : parseMoney(amount);
+  const total = isPay ? tot.net : isBuy ? pTotal(pLines) : parseMoney(amount);
+  const pPick = purchases?.find((x) => x.id === purchaseId) ?? null;
+  const PurchaseField = isPay && (purchases?.length || purchaseId) ? (
+    <label className="field dn-span3"><span>Đề nghị mua hàng <small className="muted" style={{ fontWeight: 400 }}>· tham chiếu, không bắt buộc</small></span>
+      <select id="rq-purchase" className="input" value={purchaseId} onChange={(e) => {
+        setPurchaseId(e.target.value);
+        const x = purchases?.find((p) => p.id === e.target.value); if (x) applyPurchase(x);
+      }}>
+        <option value="">Không theo đề nghị mua hàng</option>
+        {(purchases ?? []).map((x) => <option key={x.id} value={x.id}>{x.doc_no ?? "MH"} · {x.reason.slice(0, 60)} · {vnd(x.amount)}</option>)}
+        {purchaseId && !pPick ? <option value={purchaseId}>Đề nghị mua hàng đang gắn</option> : null}
+      </select>
+      {pPick ? <small className={pPick.paid + pPick.pending + (total ?? 0) > pPick.amount ? "err-text" : "muted"}>
+        Duyệt mua {vnd(pPick.amount)} · đã duyệt chi {vnd(pPick.paid)}{pPick.pending ? ` · đang chờ duyệt ${vnd(pPick.pending)}` : ""} · còn {vnd(pPick.amount - pPick.paid - pPick.pending)}
+        {pPick.paid + pPick.pending + (total ?? 0) > pPick.amount ? " · đề nghị này vượt số đã duyệt mua" : ""}</small> : null}
+    </label>
+  ) : null;
   const others = people.filter((p) => p.is_active && p.id !== profile?.id);
   const pick = picks?.find((x) => x.id === loaId) ?? null;
 
@@ -376,7 +437,7 @@ export default function RequestForm() {
   ) : null;
   const pjOpen = projects.filter((x) => (x.status !== "hoan_thanh" && x.status !== "huy") || x.id === projectId);
   const pjItems = projItems.filter((x) => x.project_id === projectId).sort((a, b) => a.sort - b.sort || a.start_date.localeCompare(b.start_date));
-  const ProjectField = isMoney && (pjOpen.length || projectId) ? (
+  const ProjectField = (isMoney || isBuy) && (pjOpen.length || projectId) ? (
     <>
       <label className="field dn-span3"><span>Dự án <small className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</small></span>
         <select id="rq-project" className="input" value={projectId} onChange={(e) => { setProjectId(e.target.value); setProjectItemId(""); }}>
@@ -430,8 +491,8 @@ export default function RequestForm() {
     <>
       <TopBar title={editing ? `Sửa · ${meta.label}` : `Lập ${meta.label.charAt(0).toLowerCase()}${meta.label.slice(1)}`} back
         action={<button type="submit" form={formId} className="tb-action" disabled={busy}>{busy ? "Đang gửi…" : editing ? "Lưu và gửi lại" : "Gửi"}</button>} />
-      <main className={`main ${isMoney ? "main-form" : "main-wide"}`}>
-        <form id={formId} className={`stack dn-form dn-erp${isMoney || kind === "cong_tac" ? " money" : ""}`} onSubmit={submit}
+      <main className={`main ${isMoney || isBuy ? "main-form" : "main-wide"}`}>
+        <form id={formId} className={`stack dn-form dn-erp${isMoney || isBuy || kind === "cong_tac" ? " money" : ""}`} onSubmit={submit}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.target as HTMLElement).tagName === "INPUT") e.preventDefault(); }}>
           <LinkFromNote from={link.from} info={link.info} />
           {tripId && isMoney ? <p className="ok-box" style={{ margin: 0 }}>Lập từ chuyến công tác: <b>{tripLabel ?? "đã gắn"}</b>. {kind === "thanh_toan" ? "Các dòng chi phí đã điền sẵn từ bảng kê; nhập Cost center và tự thêm phần trừ tạm ứng nếu có." : "Số tiền lấy từ dự trù chi phí, sửa được."}</p> : null}
@@ -590,6 +651,40 @@ export default function RequestForm() {
             </section>
           ) : null}
 
+          {/* ---------- Mua hàng ---------- */}
+          {isBuy ? (
+            <>
+              <section className="card dn-sec">
+                <h2 className="dn-h">Thông tin mua hàng</h2>
+                <div className="dn-fields">
+                  <ReadOnly label="Số chứng từ" value={docNo ?? "Tự cấp khi gửi"} num />
+                  <ReadOnly label="Ngày chứng từ" value={ddmmyyyy(today)} num />
+                  <label className="field"><span>Ngày cần hàng <span className="req">*</span></span>
+                    <input id="rq-start" type="date" className="input" value={start} required onChange={(e) => setStart(e.target.value)} /></label>
+                  {BuildingSel}
+                  {ProjectField}
+                  <label className="field dn-span2"><span>Nhà cung cấp đề xuất</span>
+                    <input id="rq-payee" className="input" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="VD: Cửa hàng vật tư An Phát" /></label>
+                  <label className="field dn-full"><span>Mục đích mua <span className="req">*</span></span>
+                    <input id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
+                      placeholder="VD: Mua sơn, vật tư sửa phòng 201 toà 89CMT8 trước khi bàn giao khách" /></label>
+                </div>
+              </section>
+              <section className="card dn-sec">
+                <PurchaseGrid rows={pLines} setRows={setPLines} />
+                <p className="muted small" style={{ margin: 0 }}>Đơn giá dự kiến theo báo giá hoặc giá thị trường. Sau khi được duyệt, lập đề nghị thanh toán và chọn đề nghị mua hàng này để tham chiếu.</p>
+              </section>
+              {!editing ? (
+                <section className="card dn-sec">
+                  <h2 className="dn-h">Báo giá đính kèm</h2>
+                  <input id="rq-pfiles" type="file" className="input" multiple accept="image/*,application/pdf"
+                    onChange={(e) => setPFiles(Array.from(e.target.files ?? []))} />
+                  {pFiles.length ? <small className="muted">{pFiles.length} tệp sẽ tải lên khi gửi.</small> : <small className="muted">Ảnh hoặc PDF báo giá, không bắt buộc.</small>}
+                </section>
+              ) : <p className="muted small" style={{ margin: 0 }}>Báo giá đính kèm thêm hoặc xoá ở trang chi tiết của đề nghị.</p>}
+            </>
+          ) : null}
+
           {/* ---------- Thanh toán ---------- */}
           {isPay ? (
             <>
@@ -599,6 +694,7 @@ export default function RequestForm() {
                   <ReadOnly label="Số chứng từ" value={docNo ?? "Tự cấp khi gửi"} num />
                   <ReadOnly label="Ngày chứng từ" value={ddmmyyyy(today)} num />
                   <ReadOnly label="Loại tiền" value="VND" />
+                  {PurchaseField}
                   {LoaField}
                   {LoaBudget}
                   {ProjectField}
@@ -654,7 +750,7 @@ export default function RequestForm() {
               </div>
             ) : (
               <div className="dn-total-words">
-                {isMoney && total ? <><b className="num">{vnd(total)}</b><small>{vndWords(total)}</small></>
+                {(isMoney || isBuy) && total ? <><b className="num">{isBuy ? "Tổng dự kiến " : ""}{vnd(total)}</b><small>{vndWords(total)}</small></>
                   : <small>{editing ? "Lưu và gửi lại để duyệt lại từ cấp đầu." : "Gửi để bắt đầu luồng duyệt."}</small>}
                 {loaAfter != null ? <small className={loaAfter < 0 ? "err-text" : ""}>LOA còn lại sau đề nghị: {vnd(loaAfter)}</small> : null}
               </div>

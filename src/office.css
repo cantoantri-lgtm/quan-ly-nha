@@ -288,3 +288,6 @@
 .trip-prints { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .trip-prints .btn { font-size: 13.5px; }
 @media (min-width: 900px) { .trip-prints { grid-template-columns: repeat(4, 1fr); } }
+
+/* Danh sách gọn (thanh toán theo đề nghị mua hàng) */
+.plain-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }

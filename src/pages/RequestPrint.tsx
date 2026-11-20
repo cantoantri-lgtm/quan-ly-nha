@@ -7,6 +7,7 @@ import { vnd, vndWords } from "../lib/money";
 import { DUTY_LABEL, LEAVE_SPAN, LEAVE_TYPE, LOA_BUDGET, LOA_CATEGORY, LOA_PAY, LOA_SBU, LOA_TAX, OUT_TYPE, PAY_METHOD, PAY_TYPE, fmtDays, fullDate, hhmm, kindLabel, moneyCur, statusLabel,
   type LoaDept, type LoaDetails, type LoaLine, type Req, type ReqAdvance, type ReqLine, type ReqStep } from "../lib/office";
 import { Empty, TopBar } from "../components/ui";
+import { loadPLines, type PLine } from "../lib/purchase";
 import "../office.css";
 import "../print.css";
 
@@ -18,6 +19,7 @@ export default function RequestPrint() {
   const [r, setR] = useState<Req | null>(null);
   const [lines, setLines] = useState<ReqLine[]>([]);
   const [advs, setAdvs] = useState<ReqAdvance[]>([]);
+  const [pLines, setPLines] = useState<PLine[]>([]);
   const [steps, setSteps] = useState<ReqStep[]>([]);
   const [dept, setDept] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
@@ -39,6 +41,7 @@ export default function RequestPrint() {
         supabase.from("org_staff").select("department_id").eq("profile_id", q.requester_id).maybeSingle(),
       ]);
       setLines((l.data ?? []) as ReqLine[]); setAdvs((a.data ?? []) as ReqAdvance[]); setSteps((s.data ?? []) as ReqStep[]);
+      if (q.kind === "mua_hang") setPLines(await loadPLines(q.id));
       if (q.kind === "loa") {
         const [d, ll, dp] = await Promise.all([
           supabase.from("loa_details").select("*").eq("request_id", q.id).maybeSingle(),
@@ -66,6 +69,7 @@ export default function RequestPrint() {
   const name = (uid: string | null) => people.find((p) => p.id === uid)?.full_name ?? "—";
   const isMoney = r.kind === "thanh_toan" || r.kind === "tam_ung";
   const isLoa = r.kind === "loa";
+  const isBuy = r.kind === "mua_hang";
   const loaTotal = loaLines.reduce((t, l) => t + Number(l.amount), 0);
   const deptName = (did: string | null) => loaDepts.find((x) => x.id === did)?.name ?? "—";
   const gross = lines.reduce((t, l) => t + Number(l.total), 0);
@@ -111,6 +115,10 @@ export default function RequestPrint() {
               <tr><th>Ngày bắt đầu</th><td>{fullDate(r.start_date)}</td></tr>
               <tr><th>Hạn báo cáo kết quả</th><td>{fullDate(loa.report_due)}</td></tr>
               {loa.ref_loa_id ? <tr><th>LOA tham chiếu</th><td>{refNo ?? "—"}</td></tr> : null}
+            </>) : isBuy ? (<>
+              <tr><th>Kính gửi</th><td>Giám đốc và phòng Kế toán</td></tr>
+              <tr><th>Ngày cần hàng</th><td>{fullDate(r.start_date)}</td></tr>
+              {r.payee ? <tr><th>Nhà cung cấp đề xuất</th><td>{r.payee}</td></tr> : null}
             </>) : isMoney ? (<>
               <tr><th>Kính gửi</th><td>Giám đốc và phòng Kế toán</td></tr>
               <tr><th>{r.kind === "thanh_toan" ? "Hạn thanh toán" : "Ngày cần tiền"}</th><td>{fullDate(r.start_date)}</td></tr>
@@ -138,7 +146,7 @@ export default function RequestPrint() {
               {r.handover_to ? <tr><th>Bàn giao cho</th><td>{name(r.handover_to)}</td></tr> : null}
               {r.contact_phone ? <tr><th>SĐT liên hệ</th><td>{r.contact_phone}</td></tr> : null}
             </>)}
-            {isLoa ? null : <tr><th>{isMoney ? "Nội dung" : "Lý do / công việc"}</th><td>{r.reason}</td></tr>}
+            {isLoa ? null : <tr><th>{isMoney ? "Nội dung" : isBuy ? "Mục đích mua" : "Lý do / công việc"}</th><td>{r.reason}</td></tr>}
             {building ? <tr><th>Toà nhà</th><td>{building.code} · {building.name}</td></tr> : null}
           </tbody></table>
 
@@ -167,7 +175,21 @@ export default function RequestPrint() {
               ) : null}
             </>
           ) : null}
-          {isMoney ? (
+          {isBuy && pLines.length ? (
+            <div className="pd-scroll"><table className="pd-grid">
+              <thead><tr><th>Stt</th><th>Tên hàng, dịch vụ</th><th>Quy cách</th><th>ĐVT</th><th>SL</th><th>Đơn giá dự kiến</th><th>Thành tiền</th><th>Ghi chú</th></tr></thead>
+              <tbody>
+                {pLines.map((l) => (
+                  <tr key={l.id}>
+                    <td>{l.line_no}</td><td>{l.item_name}</td><td>{l.spec}</td><td>{l.unit}</td><td className="r">{String(l.quantity).replace(".", ",")}</td>
+                    <td className="r">{vnd(l.unit_price)}</td><td className="r">{vnd(l.amount)}</td><td>{l.note}</td>
+                  </tr>
+                ))}
+                <tr className="pd-sum"><td colSpan={6}>TỔNG TIỀN DỰ KIẾN</td><td className="r">{vnd(r.amount)}</td><td /></tr>
+              </tbody>
+            </table></div>
+          ) : null}
+          {isMoney || isBuy ? (
             <p className="pd-words">Tổng tiền: <b>{vnd(r.amount)}</b> — bằng chữ: <i>{vndWords(r.amount)}</i></p>
           ) : null}
           {isLoa && loaLines.length ? (
