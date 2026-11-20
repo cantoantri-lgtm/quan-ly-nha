@@ -313,7 +313,7 @@ export default function RequestDetail() {
           </>
         ) : null}
 
-        {(isMoney || isBuy) && r.loa_id ? <LoaBudget loaId={r.loa_id} loaNo={r.loa_no} refreshKey={r.updated_at} /> : null}
+        {(isMoney || isBuy) && r.loa_id ? <LoaBudget loaId={r.loa_id} loaNo={r.loa_no} refreshKey={r.updated_at} refOnly={isBuy} /> : null}
 
         {isLoa ? (
           <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} title="Tài liệu đính kèm" docTypes={LOA_DOC_TYPE}

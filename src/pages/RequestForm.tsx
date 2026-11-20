@@ -422,10 +422,10 @@ export default function RequestForm() {
   const others = people.filter((p) => p.is_active && p.id !== profile?.id);
   const pick = picks?.find((x) => x.id === loaId) ?? null;
 
-  const loaAfter = pick && total ? loaLeft(pick) - total : null;
+  const loaAfter = pick && total && !isBuy ? loaLeft(pick) - total : null;   // mua hàng: LOA chỉ tham khảo, không trừ
   const LoaField = isMoney || isBuy ? (
     <div className="field dn-span3">
-      <span>Tờ trình (LOA) <small className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</small></span>
+      <span>Tờ trình (LOA) <small className="muted" style={{ fontWeight: 400 }}>· {isBuy ? "tham khảo, không trừ dự toán" : "không bắt buộc"}</small></span>
       <div className="dn-search">
         <button type="button" id="rq-loa" className="input dn-search-val" onClick={() => setLoaOpen(true)} aria-haspopup="dialog">
           {pick ? `${pick.doc_no ?? "LOA"} · ${pick.subject}` : loaId ? "LOA đang gắn" : <span className="muted">Bấm kính lúp để tìm LOA</span>}
@@ -459,8 +459,8 @@ export default function RequestForm() {
       <span>Dự toán <b>{vnd(pick.amount)}</b></span>
       <span>Đã duyệt chi <b>{vnd(pick.used)}</b></span>
       <span>Đang chờ duyệt <b>{vnd(pick.pending)}</b></span>
-      <span className="hl">Còn lại <b>{vnd(loaLeft(pick))}</b></span>
-      {loaAfter != null ? <span className={loaAfter < 0 ? "over" : ""}>{isBuy ? "Còn lại nếu mua theo đề nghị này" : "Còn lại sau đề nghị này"} <b>{vnd(loaAfter)}</b>{loaAfter < 0 ? " · vượt dự toán, vẫn gửi được, cấp duyệt sẽ thấy cảnh báo" : ""}</span> : null}
+      <span className={`hl${loaLeft(pick) < 0 ? " over" : ""}`}>{isBuy ? "Còn tồn" : "Còn lại"} <b>{vnd(loaLeft(pick))}</b></span>
+      {loaAfter != null ? <span className={loaAfter < 0 ? "over" : ""}>Còn lại sau đề nghị này <b>{vnd(loaAfter)}</b>{loaAfter < 0 ? " · vượt dự toán, vẫn gửi được, cấp duyệt sẽ thấy cảnh báo" : ""}</span> : null}
     </div>
   ) : null;
 

@@ -20,6 +20,7 @@ export default function RequestPrint() {
   const [lines, setLines] = useState<ReqLine[]>([]);
   const [advs, setAdvs] = useState<ReqAdvance[]>([]);
   const [pLines, setPLines] = useState<PLine[]>([]);
+  const [loaRef, setLoaRef] = useState<{ amount: number; used: number; pending: number } | null>(null);   // LOA tham khảo của đề nghị mua hàng
   const [steps, setSteps] = useState<ReqStep[]>([]);
   const [dept, setDept] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
@@ -41,7 +42,14 @@ export default function RequestPrint() {
         supabase.from("org_staff").select("department_id").eq("profile_id", q.requester_id).maybeSingle(),
       ]);
       setLines((l.data ?? []) as ReqLine[]); setAdvs((a.data ?? []) as ReqAdvance[]); setSteps((s.data ?? []) as ReqStep[]);
-      if (q.kind === "mua_hang") setPLines(await loadPLines(q.id));
+      if (q.kind === "mua_hang") {
+        setPLines(await loadPLines(q.id));
+        if (q.loa_id) {
+          const { data: lb } = await supabase.rpc("loa_brief", { p_loa: q.loa_id });
+          const b = ((lb ?? []) as { amount: number; used: number; pending: number }[])[0];
+          setLoaRef(b ? { amount: Number(b.amount), used: Number(b.used), pending: Number(b.pending) } : null);
+        }
+      }
       if (q.kind === "loa") {
         const [d, ll, dp] = await Promise.all([
           supabase.from("loa_details").select("*").eq("request_id", q.id).maybeSingle(),
@@ -119,7 +127,7 @@ export default function RequestPrint() {
               <tr><th>Kính gửi</th><td>Giám đốc và phòng Kế toán</td></tr>
               <tr><th>Ngày cần hàng</th><td>{fullDate(r.start_date)}</td></tr>
               {r.payee ? <tr><th>Nhà cung cấp đề xuất</th><td>{r.payee}</td></tr> : null}
-              {r.loa_no ? <tr><th>LOA tham khảo</th><td>{r.loa_no}</td></tr> : null}
+              {r.loa_no ? <tr><th>LOA tham khảo</th><td>{r.loa_no}{loaRef ? ` · dự toán ${vnd(loaRef.amount)} · còn tồn ${vnd(loaRef.amount - loaRef.used - loaRef.pending)} (ngày in)` : ""}</td></tr> : null}
             </>) : isMoney ? (<>
               <tr><th>Kính gửi</th><td>Giám đốc và phòng Kế toán</td></tr>
               <tr><th>{r.kind === "thanh_toan" ? "Hạn thanh toán" : "Ngày cần tiền"}</th><td>{fullDate(r.start_date)}</td></tr>

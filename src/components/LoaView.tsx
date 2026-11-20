@@ -8,7 +8,7 @@ import { LOA_BUDGET, LOA_CATEGORY, LOA_PAY, LOA_SBU, LOA_TAX, fullDate, kindLabe
   type LoaBrief, type LoaDept, type LoaDetails, type LoaLine, type LoaLinked, type LoaMember, type Req } from "../lib/office";
 
 /** Thanh ngân sách của một LOA: dự toán, đã duyệt chi, đang chờ duyệt, còn lại */
-function BudgetBar({ b }: { b: LoaBrief }) {
+function BudgetBar({ b, leftLabel = "Còn lại" }: { b: LoaBrief; leftLabel?: string }) {
   const total = Number(b.amount ?? 0);
   const left = loaLeft(b);
   const pct = (n: number) => (total > 0 ? Math.min(100, (n / total) * 100) : 0);
@@ -22,14 +22,14 @@ function BudgetBar({ b }: { b: LoaBrief }) {
         <div><dt>Dự toán</dt><dd>{vnd(total)}</dd></div>
         <div><dt><i className="dot used" />Đã duyệt chi</dt><dd>{vnd(b.used)}</dd></div>
         <div><dt><i className="dot pend" />Đang chờ duyệt</dt><dd>{vnd(b.pending)}</dd></div>
-        <div className={left < 0 ? "over" : ""}><dt>{left < 0 ? "Vượt dự toán" : "Còn lại"}</dt><dd>{vnd(Math.abs(left))}</dd></div>
+        <div className={left < 0 ? "over" : ""}><dt>{left < 0 ? "Vượt dự toán" : leftLabel}</dt><dd>{vnd(Math.abs(left))}</dd></div>
       </dl>
     </div>
   );
 }
 
 /** Thẻ LOA trên trang đề nghị thanh toán / tạm ứng: LOA nào, dự toán còn bao nhiêu, có vượt không */
-export function LoaBudget({ loaId, loaNo, refreshKey }: { loaId: string | null; loaNo: string | null; refreshKey?: string }) {
+export function LoaBudget({ loaId, loaNo, refreshKey, refOnly }: { loaId: string | null; loaNo: string | null; refreshKey?: string; refOnly?: boolean }) {
   const [b, setB] = useState<LoaBrief | null | undefined>(undefined);
   useEffect(() => {
     if (!loaId) { setB(null); return; }
@@ -52,12 +52,13 @@ export function LoaBudget({ loaId, loaNo, refreshKey }: { loaId: string | null; 
   return (
     <section className="card loa-card k-loa">
       <div className="row" style={{ justifyContent: "space-between", gap: 8 }}>
-        <b>Tờ trình (LOA) <span className="num">{b.doc_no}</span></b>
+        <b>Tờ trình (LOA) {refOnly ? "tham khảo " : ""}<span className="num">{b.doc_no}</span></b>
         <Link to={`/van-phong/${b.id}`} className="dt-link">Mở LOA →</Link>
       </div>
       <p style={{ margin: 0 }}>{b.subject}</p>
-      <BudgetBar b={b} />
-      {left < 0 ? <div className="error-box"><b>Vượt dự toán LOA {vnd(-left)}.</b> Tổng tạm ứng và thanh toán (kể cả đề nghị đang chờ duyệt) lớn hơn dự toán đã duyệt. Cấp duyệt cân nhắc trước khi duyệt, hoặc yêu cầu lập LOA bổ sung.</div> : null}
+      <BudgetBar b={b} leftLabel={refOnly ? "Còn tồn" : "Còn lại"} />
+      {refOnly ? <p className="muted small" style={{ margin: 0 }}>Chỉ để tham khảo: đề nghị mua hàng không trừ dự toán LOA. Còn tồn = dự toán − đã duyệt chi − đang chờ duyệt (tạm ứng, thanh toán).</p> : null}
+      {left < 0 && !refOnly ? <div className="error-box"><b>Vượt dự toán LOA {vnd(-left)}.</b> Tổng tạm ứng và thanh toán (kể cả đề nghị đang chờ duyệt) lớn hơn dự toán đã duyệt. Cấp duyệt cân nhắc trước khi duyệt, hoặc yêu cầu lập LOA bổ sung.</div> : null}
     </section>
   );
 }
