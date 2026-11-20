@@ -5,7 +5,7 @@ import { useSession } from "../lib/session";
 import { useCanEditBuilding } from "../lib/useCanEdit";
 import { ddmmyyyy, todayVN } from "../lib/dates";
 import { naturalCompare, parseMoney, vnd } from "../lib/money";
-import { Empty, Sheet, TopBar } from "../components/ui";
+import { Empty, Sheet, TopBar, Combo } from "../components/ui";
 import FileGallery from "../components/FileGallery";
 import ContractQR from "../components/ContractQR";
 import { ContractTerm } from "../components/ContractTerm";
@@ -169,13 +169,10 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
           <label className="field" style={{ flex: "1 1 120px" }}><span>Số xe gửi</span>
             <input id="c-veh" className="input num" inputMode="numeric" value={vehicles} onChange={(e) => setVehicles(e.target.value.replace(/\D/g, "").slice(0, 2))} /></label>
         </div>
-        <div className="field"><span>Cách ký</span>
-          <div className="seg" style={{ gridTemplateColumns: "repeat(3, 1fr)" }} role="group">
-            {([["", "Chưa ký"], ["giay", "Ký giấy"], ["dien_tu", "Ký điện tử"]] as ["" | "giay" | "dien_tu", string][]).map(([k, l]) => (
-              <button type="button" key={k} aria-pressed={sign === k} onClick={() => setSign(k)}>{l}</button>
-            ))}
-          </div>
-        </div>
+        <label className="field"><span>Cách ký</span>
+          <select id="c-sign" className="input" value={sign} onChange={(e) => setSign(e.target.value as "" | "giay" | "dien_tu")}>
+            <option value="">Chưa ký</option><option value="giay">Ký giấy</option><option value="dien_tu">Ký điện tử</option>
+          </select></label>
         {err ? <div className="error-box" role="alert">{err}</div> : null}
         <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Lập hợp đồng"}</button>
       </form>
@@ -415,10 +412,8 @@ function AddOccupant({ c, taken, onClose, onSaved }: { c: Contract; taken: strin
   return (
     <Sheet open onClose={onClose} title={`Thêm người ở · phòng ${c.rooms?.code ?? ""}`}>
       <form className="stack" onSubmit={submit}>
-        <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group">
-          <button type="button" aria-pressed={mode === "moi"} onClick={() => setMode("moi")}>Người mới</button>
-          <button type="button" aria-pressed={mode === "co_san"} onClick={() => setMode("co_san")}>Khách đã có trong toà</button>
-        </div>
+        <label className="field"><span>Người ở</span>
+          <Combo value={mode} options={[["moi", "Người mới"], ["co_san", "Khách đã có trong toà"]] as const} onChange={setMode} /></label>
         {mode === "co_san" ? (
           <label className="field"><span>Khách *</span>
             <select className="input" value={pick} onChange={(e) => setPick(e.target.value)}>
@@ -429,10 +424,8 @@ function AddOccupant({ c, taken, onClose, onSaved }: { c: Contract; taken: strin
         ) : (<>
           <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
           <label className="field"><span>Số điện thoại</span><input className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
-          <div className="field"><span>Giấy tờ</span>
-            <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label="Loại giấy tờ">
-              {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={idType === k} onClick={() => { setIdType(k); setIdNo(""); setPhotos({}); }}>{l}</button>)}
-            </div></div>
+          <label className="field"><span>Giấy tờ</span>
+            <Combo value={idType} options={ID_TYPES} onChange={(k) => { setIdType(k); setIdNo(""); setPhotos({}); }} /></label>
           {idType === "passport" ? <label className="field"><span>Quốc tịch *</span><input className="input" value={nation} onChange={(e) => setNation(e.target.value)} placeholder="VD: Hàn Quốc" /></label> : null}
           <label className="field"><span>Số {ID_NAME[idType]} *</span><input className="input num" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" value={idNo}
             onChange={(e) => setIdNo(idType === "passport" ? e.target.value.toUpperCase() : e.target.value)} placeholder={idType === "passport" ? "VD: M12345678" : "12 chữ số"} /></label>

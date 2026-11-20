@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { callAccountFn, normPhone, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { timeAgo } from "../lib/dates";
-import { copyText, Empty, Sheet, tempPassword, TopBar } from "../components/ui";
+import { copyText, Empty, Sheet, tempPassword, TopBar, Combo } from "../components/ui";
 import { FB_STATUS, type Thread } from "./Feedback";
 import { accountIdError, ID_NAME, ID_TYPES, normId, type IdType } from "../lib/idDoc";
 import "../feedback.css";
@@ -184,10 +184,8 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
       <form className="stack" onSubmit={submit}>
         <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></label>
         <label className="field"><span>Số điện thoại (ID đăng nhập) *</span><input className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required /></label>
-        <div className="field"><span>Giấy tờ</span>
-          <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label="Loại giấy tờ">
-            {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={idType === k} onClick={() => { setIdType(k); setCccd(""); }}>{l}</button>)}
-          </div></div>
+        <label className="field"><span>Giấy tờ</span>
+          <Combo value={idType} options={ID_TYPES} onChange={(k) => { setIdType(k); setCccd(""); }} /></label>
         <label className="field"><span>Số {ID_NAME[idType]} ({idType === "passport" ? "6–20 chữ và số" : "12 số"}, mỗi giấy tờ chỉ đăng ký một lần) *</span>
           <input className="input" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" maxLength={idType === "passport" ? 24 : 14} value={cccd}
             onChange={(e) => setCccd(idType === "passport" ? e.target.value.toUpperCase() : e.target.value)} required /></label>

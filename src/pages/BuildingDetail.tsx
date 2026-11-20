@@ -8,7 +8,7 @@ import LeasePanel from "../components/LeasePanel";
 import { KIND_LABEL, type Building } from "../lib/labels";
 import { naturalCompare, parseMoney, vnd, vndShort } from "../lib/money";
 import { todayVN } from "../lib/dates";
-import { copyText, Empty, Sheet, tempPassword, TopBar } from "../components/ui";
+import { copyText, Empty, Sheet, tempPassword, TopBar, Combo } from "../components/ui";
 import { credText } from "./Customers";
 import { accountIdError, ID_NAME, ID_PHOTOS, ID_TYPES, idError, normId, type IdType } from "../lib/idDoc";
 import { googleDirections } from "../lib/geo";
@@ -560,15 +560,11 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
           <FileGallery owner={{ kind: "anh_phong", buildingId: building.id, roomId: room.id! }} title="Ảnh phòng" pdf={false} cover
             hint={'Ảnh có nhãn "Đại diện" dùng làm ảnh chính của phòng.'} canUpload={canEdit} canDelete={canEdit} />
         ) : null}
-        <div className="field"><span>Trạng thái</span>
-          <div className="seg seg-room" role="group">
-            {(Object.keys(ROOM_STATUS) as RoomStatus[]).map((s) => (
-              <button type="button" key={s} className={`st-${s}`} aria-pressed={status === s} onClick={() => setStatus(s)}>{ROOM_STATUS[s]}</button>
-            ))}
-          </div>
+        <label className="field"><span>Trạng thái</span>
+          <Combo id="r-status" value={status} options={ROOM_STATUS as Record<RoomStatus, string>} onChange={setStatus} />
           {isNew && status === "dang_o" ? <small className="muted">Lưu phòng trước, rồi mở lại phòng để nhập khách đang ở, CCCD / hộ chiếu và hợp đồng.</small> : null}
           {!canEdit && status === "dang_o" && room.status !== "dang_o" ? <small style={{ color: "var(--danger)" }}>Chỉ sale phụ trách toà, Giám sát hoặc Quản lý lập hợp đồng để chuyển phòng sang "Đang cho thuê".</small> : null}
-        </div>
+        </label>
         {needTenant ? (
           <section className="fg" aria-label="Khách đang ở">
             <b>Người ở và hợp đồng</b>
@@ -585,11 +581,9 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
                 </label>
                 <label className="field"><span>Họ tên *</span><input className="input" value={x.name} onChange={(e) => setPerson(x.key, { name: e.target.value })} /></label>
                 <label className="field"><span>Số điện thoại{x.key === repKey && makeAcc ? " * (đăng nhập app)" : ""}</span><input className="input" inputMode="tel" value={x.phone} onChange={(e) => setPerson(x.key, { phone: e.target.value })} /></label>
-                <div className="field"><span>Giấy tờ</span>
-                  <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label={`Giấy tờ người ở ${i + 1}`}>
-                    {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={x.idType === k} disabled={!!done.current.tenants[x.key]}
-                      onClick={() => setPerson(x.key, { idType: k, idNo: "", photos: {} })}>{l}</button>)}
-                  </div></div>
+                <label className="field"><span>Giấy tờ</span>
+                  <Combo value={x.idType} options={ID_TYPES} label={`Giấy tờ người ở ${i + 1}`} disabled={!!done.current.tenants[x.key]}
+                    onChange={(k) => setPerson(x.key, { idType: k, idNo: "", photos: {} })} /></label>
                 <div className="row" style={{ alignItems: "flex-start" }}>
                   {x.idType === "passport" ? <label className="field" style={{ flex: "1 1 150px" }}><span>Quốc tịch *</span><input className="input" value={x.nationality} onChange={(e) => setPerson(x.key, { nationality: e.target.value })} placeholder="VD: Hàn Quốc" /></label> : null}
                   <label className="field" style={{ flex: "1 1 150px" }}><span>Số {ID_NAME[x.idType]} *</span>

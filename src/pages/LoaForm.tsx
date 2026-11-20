@@ -7,7 +7,7 @@ import { parseMoney, vndWords } from "../lib/money";
 import { PAUSED_TIP, usePausedKinds, LOA_BUDGET, LOA_CATEGORY, LOA_DOC_TYPE, LOA_PAY, LOA_SBU, LOA_TAX, moneyCur, statusLabel,
   type LoaDept, type LoaDetails, type LoaLine, type LoaMember, type Req } from "../lib/office";
 import { MAX_BYTES, uploadFile } from "../lib/files";
-import { Sheet, TopBar } from "../components/ui";
+import { Sheet, TopBar, Combo } from "../components/ui";
 import { ChainPreview } from "../components/ApprovalChain";
 import FileGallery from "../components/FileGallery";
 import "../office.css";
@@ -19,16 +19,6 @@ type LoaRef = { id: string; doc_no: string | null; reason: string; status: Req["
 const emptyLine = (): LineDraft => ({ description: "", unit: "", quantity: "1", unit_price: "", note: "" });
 const qtyOf = (s: string) => { const n = Number((s || "1").trim().replace(",", ".")); return Number.isFinite(n) ? n : NaN; };
 const lineAmount = (l: LineDraft) => { const q = qtyOf(l.quantity); const p = parseMoney(l.unit_price) ?? 0; return Number.isFinite(q) ? Math.round(q * p) : 0; };
-
-function Choice({ name, value, options, onChange }: { name: string; value: string; options: Record<string, string>; onChange: (v: string) => void }) {
-  return (
-    <div className="opt-grid" role="radiogroup" aria-label={name}>
-      {Object.entries(options).map(([k, l]) => (
-        <button type="button" key={k} role="radio" aria-checked={value === k} className="opt" onClick={() => onChange(k)}>{l}</button>
-      ))}
-    </div>
-  );
-}
 
 function Switch({ id, checked, onChange, children }: { id: string; checked: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
   return (
@@ -310,7 +300,7 @@ export default function LoaForm() {
           {/* ---------- Phân loại, đơn vị ---------- */}
           <section className="card dn-sec">
             <h2 className="dn-h">Phân loại *</h2>
-            <Choice name="Phân loại" value={category} options={LOA_CATEGORY} onChange={setCategory} />
+            <Combo id="loa-cat" label="Phân loại" value={category} options={LOA_CATEGORY} onChange={setCategory} />
             <label className="field"><span>Đơn vị đề xuất cuối cùng *</span>
               <select id="loa-dept" className="input" value={dept} onChange={(e) => setDept(e.target.value)}>
                 <option value="">Chọn phòng ban</option>

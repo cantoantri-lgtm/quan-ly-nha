@@ -8,6 +8,7 @@
 - Không đưa service role key hay khoá Gemini xuống trình duyệt. Việc cần quyền cao đi qua Edge Function.
 - Ngày giờ theo `Asia/Ho_Chi_Minh` (`todayVN()` trong `src/lib/dates.ts`). Tiền VNĐ: `vnd()` / `parseMoney()` trong `src/lib/money.ts`. Công ty nghỉ Chủ nhật.
 - Giao diện ưu tiên điện thoại (~390px), có chế độ tối; dùng token màu trong `:root` của `src/styles.css`, không mã màu cứng.
+- Form nhập liệu: chọn một giá trị trong danh sách thì dùng ô chọn (combo box, `Combo` trong `src/components/ui.tsx`), không dùng nhóm nút, để tiết kiệm diện tích. Nút dạng chip chỉ dùng cho bộ lọc danh sách.
 - Thông báo trong app: gọi `public.notify(...)` từ trigger SQL, không gửi từ client.
 
 ## Kiểm tra trước khi đẩy

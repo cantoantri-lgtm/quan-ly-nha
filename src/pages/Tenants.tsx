@@ -6,7 +6,7 @@ import { useSession } from "../lib/session";
 import { useCanEditBuilding } from "../lib/useCanEdit";
 import { ddmmyyyy } from "../lib/dates";
 import { vnd } from "../lib/money";
-import { Empty, Sheet, TopBar } from "../components/ui";
+import { Empty, Sheet, TopBar, Combo } from "../components/ui";
 import FileGallery from "../components/FileGallery";
 import { ID_NAME, ID_PHOTOS, ID_TYPES, idError, normId, type IdType } from "../lib/idDoc";
 import "../files.css";
@@ -163,11 +163,9 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
           <label className="field" style={{ flex: "1 1 150px" }}><span>Số điện thoại</span><input id="t-phone" className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Ngày sinh</span><input id="t-dob" className="input" type="date" value={dob} onChange={(e) => setDob(e.target.value)} /></label>
         </div>
-        <div className="field"><span>Giấy tờ</span>
-          <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label="Loại giấy tờ">
-            {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={idType === k} onClick={() => setIdType(k)}>{l}</button>)}
-          </div>
-          {tenant && tenant.id_type !== idType ? <small style={{ color: "var(--today)" }}>Đổi loại giấy tờ: nhớ tải lại ảnh đúng loại ở hồ sơ khách.</small> : null}</div>
+        <label className="field"><span>Giấy tờ</span>
+          <Combo id="t-idtype" value={idType} options={ID_TYPES} onChange={setIdType} />
+          {tenant && tenant.id_type !== idType ? <small style={{ color: "var(--today)" }}>Đổi loại giấy tờ: nhớ tải lại ảnh đúng loại ở hồ sơ khách.</small> : null}</label>
         {idType === "passport" ? <label className="field"><span>Quốc tịch *</span><input id="t-nation" className="input" value={nation} onChange={(e) => setNation(e.target.value)} placeholder="VD: Hàn Quốc" /></label> : null}
         <label className="field"><span>Số {ID_NAME[idType]}</span><input id="t-id" className="input num" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" value={idNo}
           onChange={(e) => setIdNo(idType === "passport" ? e.target.value.toUpperCase() : e.target.value.replace(/[^\d\s]/g, ""))} placeholder={idType === "passport" ? "VD: M12345678" : "12 chữ số"} /></label>
@@ -179,11 +177,9 @@ export function TenantSheet({ buildingId, tenant, onClose, onSaved }: {
         <label className="field"><span>Quê quán / thường trú</span><input id="t-home" className="input" value={home} onChange={(e) => setHome(e.target.value)} /></label>
 
         <div className="field"><span>Đánh dấu khách</span>
-          <div className="seg" style={{ gridTemplateColumns: "repeat(3, 1fr)" }} role="group">
-            {([[null, "Không"], ["quen", "Khách quen"], ["luu_y", "Cần lưu ý"]] as [Tenant["flag"], string][]).map(([k, l]) => (
-              <button type="button" key={String(k)} aria-pressed={flag === k} onClick={() => setFlag(k)}>{l}</button>
-            ))}
-          </div>
+          <select id="t-flag" className="input" aria-label="Đánh dấu khách" value={flag ?? ""} onChange={(e) => setFlag((e.target.value || null) as Tenant["flag"])}>
+            <option value="">Không</option><option value="quen">Khách quen</option><option value="luu_y">Cần lưu ý</option>
+          </select>
           {flag ? <input id="t-flagnote" className="input" value={flagNote} onChange={(e) => setFlagNote(e.target.value)} placeholder={flag === "luu_y" ? "VD: hay trả tiền trễ, ồn ào" : "VD: thuê lại lần 3"} /> : null}
         </div>
 

@@ -11,22 +11,12 @@ import { LoaPicker } from "../components/LoaPicker";
 import { CostGrid, LegGrid } from "../components/TripGrids";
 import { TRIP_TYPE, VISA_TYPE, costFilled, costFromRow, costTotal, emptyCost, emptyLeg, legFromRow, loadTrip, saveTrip, type CostDraft, type LegDraft } from "../lib/trip";
 import { LEVEL_SHORT } from "../lib/org";
-import { Icon, TopBar } from "../components/ui";
+import { Icon, TopBar, Combo } from "../components/ui";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
 import { addLink } from "../lib/links";
 import { ChainPreview } from "../components/ApprovalChain";
 import { useLeaveBalance } from "./Office";
 import "../office.css";
-
-function Options({ name, value, options, onChange }: { name: string; value: string; options: Record<string, string>; onChange: (v: string) => void }) {
-  return (
-    <div className="opt-grid" role="radiogroup" aria-label={name}>
-      {Object.entries(options).map(([k, l]) => (
-        <button type="button" key={k} role="radio" aria-checked={value === k} className="opt" onClick={() => onChange(k)}>{l}</button>
-      ))}
-    </div>
-  );
-}
 
 function MoneyInput({ id, value, onChange, label, required }: { id: string; value: string; onChange: (v: string) => void; label: string; required?: boolean }) {
   const n = parseMoney(value);
@@ -465,15 +455,15 @@ export default function RequestForm() {
               <h2 className="dn-h">{kind === "nghi_phep" ? "Thời gian nghỉ" : kind === "ra_ngoai" ? "Thời gian ra ngoài" : "Thời gian công tác"}</h2>
               {kind === "nghi_phep" ? (
                 <div className="dn-fields">
-                  <div className="field"><span>Loại nghỉ</span><Options name="Loại nghỉ" value={subType} options={LEAVE_TYPE} onChange={setSubType} /></div>
-                  <div className="field"><span>Thời gian nghỉ</span><Options name="Thời gian nghỉ" value={span} options={LEAVE_SPAN} onChange={setSpan} />
+                  <label className="field"><span>Loại nghỉ</span><Combo id="rq-sub" value={subType} options={LEAVE_TYPE} onChange={setSubType} /></label>
+                  <label className="field"><span>Thời gian nghỉ</span><Combo id="rq-span" value={span} options={LEAVE_SPAN} onChange={setSpan} />
                     {span === "dau_gio" || span === "cuoi_gio" ? (
                       <small className="muted">Trừ 0,25 ngày phép. Khối văn phòng: {span === "dau_gio" ? "08:00–10:00" : "15:00–17:00"}; khối kinh doanh tính 2 giờ {span === "dau_gio" ? "đầu" : "cuối"} ca đã phân.</small>
-                    ) : null}</div>
+                    ) : null}</label>
                 </div>
               ) : null}
               {kind === "ra_ngoai" ? (
-                <div className="field"><span>Hình thức</span><Options name="Hình thức" value={subType} options={OUT_TYPE} onChange={setSubType} /></div>
+                <label className="field"><span>Hình thức</span><Combo id="rq-out" value={subType} options={OUT_TYPE} onChange={setSubType} /></label>
               ) : null}
               <div className="dn-fields">
                 <label className="field"><span>{multiDay ? "Từ ngày *" : "Ngày *"}</span>

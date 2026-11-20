@@ -463,3 +463,17 @@ export function tempPassword() {
   for (let i = 0; i < 3; i++) s += letters[r(letters.length)];
   return s;
 }
+
+/** Ô chọn một giá trị (combo box) dùng trong form nhập liệu: gọn hơn nhóm nút, nhất là trên điện thoại */
+export function Combo<K extends string>({ id, value, options, onChange, disabled, placeholder, label }: {
+  id?: string; value: K | ""; options: Record<K, string> | readonly (readonly [K, string])[];
+  onChange: (v: K) => void; disabled?: boolean; placeholder?: string; label?: string;
+}) {
+  const list = (Array.isArray(options) ? options : Object.entries(options)) as [K, string][];
+  return (
+    <select id={id} className="input" value={value} disabled={disabled} aria-label={label} onChange={(e) => onChange(e.target.value as K)}>
+      {placeholder != null || !list.some(([k]) => k === value) ? <option value="" disabled={!placeholder}>{placeholder ?? "— Chọn —"}</option> : null}
+      {list.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+    </select>
+  );
+}

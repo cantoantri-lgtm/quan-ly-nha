@@ -17,16 +17,16 @@ export function ContractTerm({ start, end, onStart, onEnd, idPrefix = "c" }: {
   return (
     <div className="stack" style={{ gap: 6 }}>
       <div className="row" style={{ alignItems: "flex-start" }}>
-        <label className="field" style={{ flex: "1 1 150px" }}><span>Hiệu lực từ ngày *</span>
+        <label className="field" style={{ flex: "1 1 140px" }}><span>Hiệu lực từ ngày *</span>
           <input id={`${idPrefix}-start`} className="input" type="date" value={start} onChange={(e) => pickStart(e.target.value)} required /></label>
-        <label className="field" style={{ flex: "1 1 150px" }}><span>Đến ngày *</span>
+        <label className="field" style={{ flex: "1 1 120px" }}><span>Thời hạn</span>
+          <select id={`${idPrefix}-term`} className="input" value={months && TERMS.includes(months) ? String(months) : ""} disabled={!start}
+            onChange={(e) => e.target.value && onEnd(termEndISO(start, Number(e.target.value)))}>
+            <option value="">{end ? (months ? `${months} tháng` : "Tự chọn ngày") : "— Chọn —"}</option>
+            {TERMS.map((n) => <option key={n} value={n}>{n} tháng</option>)}
+          </select></label>
+        <label className="field" style={{ flex: "1 1 140px" }}><span>Đến ngày *</span>
           <input id={`${idPrefix}-end`} className="input" type="date" value={end} min={start || undefined} onChange={(e) => onEnd(e.target.value)} required /></label>
-      </div>
-      <div className="row" style={{ gap: 5, flexWrap: "nowrap", overflowX: "auto" }} role="group" aria-label="Chọn nhanh thời hạn">
-        <span className="small muted" style={{ whiteSpace: "nowrap" }}>Thời hạn</span>
-        {TERMS.map((n) => (
-          <button key={n} type="button" className="chip" style={{ padding: "4px 10px", fontSize: 13 }} aria-pressed={months === n} disabled={!start} onClick={() => onEnd(termEndISO(start, n))}>{n} tháng</button>
-        ))}
       </div>
       {start && end ? (
         end < start ? <small style={{ color: "var(--danger)" }}>Ngày kết thúc phải sau ngày bắt đầu.</small>

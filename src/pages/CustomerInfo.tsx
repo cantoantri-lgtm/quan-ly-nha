@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { todayVN } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
-import { Sheet, TopBar } from "../components/ui";
+import { Sheet, TopBar, Combo } from "../components/ui";
 import { meterPhotoUrls, uploadMeterPhoto, type MeterPhoto, type MeterReading } from "../lib/files";
 import { ID_TYPES, type IdType } from "../lib/idDoc";
 import "../feedback.css";
@@ -189,10 +189,8 @@ function OccSheet({ open, onClose, customerId, onDone }: { open: boolean; onClos
     <Sheet open={open} onClose={onClose} title="Đăng ký người ở">
       <form className="stack" onSubmit={submit}>
         <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></label>
-        <div className="field"><span>Giấy tờ / ID document</span>
-          <div className="seg" style={{ gridTemplateColumns: "1fr 1fr" }} role="group" aria-label="Loại giấy tờ">
-            {ID_TYPES.map(([k, l]) => <button type="button" key={k} aria-pressed={idType === k} onClick={() => { setIdType(k); setCccd(""); }}>{k === "passport" ? "Hộ chiếu / Passport" : l}</button>)}
-          </div></div>
+        <label className="field"><span>Giấy tờ / ID document</span>
+          <Combo value={idType} options={ID_TYPES.map(([k, l]) => [k, k === "passport" ? "Hộ chiếu / Passport" : l] as const)} onChange={(k) => { setIdType(k); setCccd(""); }} /></label>
         <label className="field"><span>{idType === "passport" ? "Số hộ chiếu / Passport No. *" : "Số CCCD (12 số) *"}</span>
           <input className="input" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" maxLength={idType === "passport" ? 24 : 14} value={cccd}
             onChange={(e) => setCccd(idType === "passport" ? e.target.value.toUpperCase() : e.target.value)} required /></label>
