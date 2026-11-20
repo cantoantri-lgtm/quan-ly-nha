@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { addDaysISO, daysBetween, ddmm, ddmmyyyy, todayVN } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
 import { ITEM_STATUS, type Node, type PLog } from "../lib/project";
@@ -180,8 +180,8 @@ export function Gantt({ rows, collapsed, onToggle, selId, onSelect, onOpen, zoom
 }
 
 /** Ngăn chi tiết hạng mục: thông tin, cập nhật tiến độ, nhật ký */
-export function ItemPane({ n, parent, people, canProgress, canEdit, logs, busy, onSave, onEdit, onAddChild, onDelete, onClose }: {
-  n: Node; parent: Node | null; people: Person[]; canProgress: boolean; canEdit: boolean; logs: PLog[]; busy: boolean;
+export function ItemPane({ n, parent, people, canProgress, canEdit, logs, busy, onSave, onEdit, onAddChild, onDelete, onClose, extra }: {
+  n: Node; parent: Node | null; people: Person[]; canProgress: boolean; canEdit: boolean; logs: PLog[]; busy: boolean; extra?: ReactNode;
   onSave: (progress: number, note: string, done?: boolean) => void; onEdit: () => void; onAddChild: () => void; onDelete: () => void; onClose?: () => void;
 }) {
   const [pct, setPct] = useState(n.progress);
@@ -228,6 +228,7 @@ export function ItemPane({ n, parent, people, canProgress, canEdit, logs, busy, 
           </form>
         )
       ) : <p className="muted small" style={{ margin: 0 }}>Chỉ PIC, người hỗ trợ của hạng mục và người quản lý dự án cập nhật được tiến độ.</p>}
+      {extra}
       {canEdit ? (
         <div className="row pj-pane-acts">
           <button type="button" className="btn ghost sm" onClick={onEdit}>{Icon.edit}Sửa</button>

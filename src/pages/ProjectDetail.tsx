@@ -9,6 +9,8 @@ import {
   type BudgetRow, type Node, type PItem, type PLog, type PReq, type Project,
 } from "../lib/project";
 import { Avatar, Avatars, Bar, Gantt, ItemPane, ItemSheet, useIsWide, type ItemDraft, type Zoom } from "../components/ProjectUI";
+import { DeadlineList, ExtendSheet } from "../components/Deadline";
+import { loadDeadlines, type DlReq, type DlTarget } from "../lib/deadline";
 import { Empty, Icon, Sheet, TopBar } from "../components/ui";
 import "../projects.css";
 
@@ -45,18 +47,22 @@ export default function ProjectDetail() {
   const [delItem, setDelItem] = useState<Node | null>(null);
   const [delProject, setDelProject] = useState(false);
   const [scrollKey, setScrollKey] = useState(0);
+  const [dls, setDls] = useState<DlReq[]>([]);
+  const [ext, setExt] = useState<{ target: DlTarget; id: string; title: string; due: string } | null>(null);
 
   const load = useCallback(async () => {
     const d = await loadProject(id!);
     if (!d.project) { setMissing(true); return; }
     setP(d.project); setItems(d.items); setItemMembers(d.itemMembers); setSupporters(d.supporters);
-    const [ce, lg, bd, rq, lo] = await Promise.all([
+    const [ce, lg, bd, rq, lo, dl] = await Promise.all([
       supabase.rpc("project_can_edit", { p_project: id! }),
       supabase.from("project_logs").select("*").eq("project_id", id!).order("at", { ascending: false }).limit(300),
       supabase.rpc("project_budget", { p_project: id! }),
       supabase.rpc("project_requests", { p_project: id! }),
       supabase.rpc("project_loa", { p_project: id! }),
+      loadDeadlines({ project: id! }),
     ]);
+    setDls(dl);
     setCanEdit(ce.data === true);
     setLogs((lg.data ?? []) as PLog[]);
     setBudget(((bd.data ?? []) as BudgetRow[]).map((r) => ({ ...r, budget: r.budget == null ? null : Number(r.budget), spent: Number(r.spent), pending: Number(r.pending) })));
@@ -191,13 +197,28 @@ export default function ProjectDetail() {
   const toggle = (nid: string) => setCollapsed((c) => { const s = new Set(c); if (s.has(nid)) s.delete(nid); else s.add(nid); return s; });
   const allOpen = collapsed.size === 0;
   const parentOf = (n: Node | null) => (n?.parent_id ? byId.get(n.parent_id) ?? null : null);
+  const open = p.status !== "hoan_thanh" && p.status !== "huy";
+  // Xin gia hạn: PIC / hỗ trợ hạng mục (không quản lý dự án) xin cho hạng mục; PIC dự án xin cho cả dự án
+  const pendingOf = (itemId: string | null) => dls.find((r) => r.status === "cho_duyet" && (itemId ? r.item_id === itemId : r.target === "project"));
+  const canExtendProject = open && p.pic_id === me && p.created_by !== me && !isManager && !pendingOf(null);
+  const itemExtra = (n: Node) => {
+    const mine = dls.filter((r) => r.item_id === n.id);
+    const can = open && !canEdit && canProgress(n) && !n.hasKids && n.calc < 100 && !pendingOf(n.id);
+    if (!mine.length && !can) return null;
+    return (
+      <div className="stack" style={{ gap: 8 }}>
+        <DeadlineList list={mine} onChanged={load} />
+        {can ? <button type="button" className="btn secondary sm" style={{ justifySelf: "start" }}
+          onClick={() => setExt({ target: "item", id: n.id, title: `Hạng mục ${n.wbs}. ${n.name}`, due: n.end_date })}>Báo cáo vướng mắc, xin gia hạn</button> : null}
+      </div>
+    );
+  };
   const pane = (n: Node, close?: () => void) => (
-    <ItemPane n={n} parent={parentOf(n)} people={people} canProgress={canProgress(n)} canEdit={canEdit} logs={logs} busy={busy}
+    <ItemPane n={n} parent={parentOf(n)} people={people} canProgress={canProgress(n)} canEdit={canEdit} logs={logs} busy={busy} extra={itemExtra(n)}
       onSave={(pct, note, done) => saveProgress(n, pct, note, done)} onEdit={() => openEdit(n)} onAddChild={() => openNew(n)} onDelete={() => setDelItem(n)} onClose={close} />
   );
   const tabs: [Tab, string][] = [["gantt", "Tiến độ (Gantt)"], ["ngan_sach", "Ngân sách"], ["thanh_vien", "Thành viên"], ["de_nghi", `Đề nghị chi (${reqs.length})`], ["nhat_ky", "Nhật ký"]];
   const statusCls = p.status === "hoan_thanh" ? " done" : p.status === "huy" || p.status === "tam_dung" ? " stop" : " run";
-  const open = p.status !== "hoan_thanh" && p.status !== "huy";
 
   // Người tham gia: PIC dự án, hỗ trợ dự án, PIC và hỗ trợ hạng mục
   const people2 = new Map<string, { roles: Set<string>; items: number }>();
@@ -226,6 +247,7 @@ export default function ProjectDetail() {
             </div>
             <div className="row">
               {canEdit ? <Link className="btn secondary sm" to={`/du-an/${p.id}/sua`}>{Icon.edit}Sửa dự án</Link> : null}
+              {canExtendProject ? <button type="button" className="btn secondary sm" onClick={() => setExt({ target: "project", id: p.id, title: `Dự án ${p.code} · ${p.name}`, due: p.end_date })}>Xin gia hạn dự án</button> : null}
               {open ? <Link className="btn sm" to={`/van-phong/moi/thanh_toan?project=${p.id}`}>{Icon.money}Lập đề nghị thanh toán</Link> : null}
             </div>
           </div>
@@ -246,6 +268,10 @@ export default function ProjectDetail() {
             <span className="row" style={{ gap: 6 }}>{lateN ? <span className="pj-chip late">{lateN} chậm</span> : null}{runN ? <span className="pj-chip run">{runN} đang làm</span> : null}</span>
             <span>{lateN ? `${lateN} hạng mục chậm tiến độ` : "Không có hạng mục chậm"}</span></section>
         </div>
+
+        {dls.some((r) => r.status === "cho_duyet") || dls.some((r) => r.target === "project") ? (
+          <DeadlineList list={dls.filter((r) => r.status === "cho_duyet" || r.target === "project")} onChanged={load} showItem />
+        ) : null}
 
         {tab === "gantt" ? (
           <section className="card stack" style={{ padding: 14 }}>
@@ -380,6 +406,7 @@ export default function ProjectDetail() {
         <Sheet open={paneOpen} onClose={() => setPaneOpen(false)} title={`${sel.wbs}. ${sel.name}`}>{pane(sel)}</Sheet>
       ) : null}
 
+      {ext ? <ExtendSheet open onClose={() => setExt(null)} target={ext.target} id={ext.id} title={ext.title} due={ext.due} onDone={load} /> : null}
       <ItemSheet open={!!mode} onClose={() => setMode(null)} busy={busy} err={err} people={staff} draft={draft} setDraft={setDraft} onSubmit={saveItem}
         title={mode?.kind === "edit" ? `Sửa hạng mục ${mode.node.wbs}` : mode?.parent ? `Thêm cấp con của ${mode.parent.wbs}. ${mode.parent.name}` : "Thêm hạng mục chính"}
         level={mode?.kind === "edit" ? mode.node.level : (mode?.kind === "new" ? (mode.parent?.level ?? 0) + 1 : 1)}

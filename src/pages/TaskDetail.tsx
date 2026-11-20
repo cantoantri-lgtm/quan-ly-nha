@@ -4,9 +4,11 @@ import { RelatedPanel } from "../components/RelatedPanel";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { PRIORITY_LABEL, STATUS_LABEL, STATUS_ORDER, type Task, type TaskStatus } from "../lib/labels";
-import { clock, ddmmyyyy, dueInfo } from "../lib/dates";
+import { clock, ddmmyyyy, dueInfo, todayVN } from "../lib/dates";
 import { dirLine, useDirectory } from "../lib/directory";
 import { Empty, Sheet, TopBar } from "../components/ui";
+import { DeadlineList, ExtendSheet } from "../components/Deadline";
+import { loadDeadlines, type DlReq } from "../lib/deadline";
 
 type Detail = Task & {
   assignee: { full_name: string; phone: string | null } | null;
@@ -31,14 +33,18 @@ export default function TaskDetail() {
   const [newStep, setNewStep] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [dls, setDls] = useState<DlReq[]>([]);
+  const [extending, setExtending] = useState(false);
 
   const load = useCallback(async () => {
-    const [a, b, c, m] = await Promise.all([
+    const [a, b, c, m, dl] = await Promise.all([
       supabase.from("tasks").select("*, assignee:profiles!tasks_assignee_id_fkey(full_name,phone), creator:profiles!tasks_created_by_fkey(full_name), building:buildings(code,name)").eq("id", id!).maybeSingle(),
       supabase.from("tasks").select("*").eq("parent_id", id!).order("sort_order").order("created_at"),
       supabase.from("task_updates").select("id,note,status_after,created_at, author:profiles!task_updates_author_id_fkey(full_name)").eq("task_id", id!).order("created_at", { ascending: false }),
       supabase.from("task_assignees").select("user_id").eq("task_id", id!).order("created_at"),
+      loadDeadlines({ task: id! }),
     ]);
+    setDls(dl);
     setMembers(((m.data ?? []) as { user_id: string }[]).map((x) => x.user_id));
     if (!a.data) { setNotFound(true); return; }
     setT(a.data as Detail);
@@ -68,6 +74,9 @@ export default function TaskDetail() {
   const canUpdate = isOwner || isAssignee;
   const d = dueInfo(t.due_date, t.status === "xong");
   const doneSteps = steps.filter((s) => s.status === "xong").length;
+  // Người được giao (không phải người giao) xin gia hạn khi chưa xong và chưa có đề xuất đang chờ
+  const pendingDl = dls.find((x) => x.status === "cho_duyet");
+  const canExtend = isAssignee && t.created_by !== profile.id && t.status !== "xong" && !pendingDl;
 
   async function setStatus(s: TaskStatus) {
     if (!t || s === t.status) return;
@@ -155,7 +164,7 @@ export default function TaskDetail() {
           })}</dd></>) : null}
           <dt>Người giao</dt><dd>{t.creator?.full_name ?? "—"}</dd>
           {t.building ? (<><dt>Toà nhà</dt><dd>{t.building.code} · {t.building.name}</dd></>) : null}
-          <dt>Hạn</dt><dd>{t.due_date ? ddmmyyyy(t.due_date) : "Không đặt hạn"}</dd>
+          <dt>Hạn</dt><dd>{t.due_date ? ddmmyyyy(t.due_date) : "Không đặt hạn"}{pendingDl ? <> <span className="dl-tag">xin gia hạn → {ddmmyyyy(pendingDl.new_due)}</span></> : null}</dd>
           {t.completed_at ? (<><dt>Hoàn thành</dt><dd>{clock(t.completed_at)}</dd></>) : null}
           {t.description ? (<><dt>Mô tả</dt><dd className="desc">{t.description}</dd></>) : null}
         </dl>
@@ -195,6 +204,14 @@ export default function TaskDetail() {
           ) : null}
         </section>
 
+        <DeadlineList list={dls} onChanged={load} />
+        {canExtend ? (
+          <div className="dl-ask">
+            <span>{t.status === "vuong" || (t.due_date && t.due_date < todayVN()) ? "Việc đang vướng hoặc trễ hạn?" : "Không kịp hạn?"} Báo cáo vướng mắc, đề xuất phương án và hạn mới cho {t.creator?.full_name ?? "người giao"} duyệt.</span>
+            <button type="button" className="btn secondary sm" onClick={() => setExtending(true)}>Xin gia hạn</button>
+          </div>
+        ) : null}
+
         <div className="section-title">Cập nhật tiến độ</div>
         {canUpdate ? (
           <form className="card stack" style={{ padding: 14 }} onSubmit={sendUpdate}>
@@ -229,6 +246,8 @@ export default function TaskDetail() {
         <RelatedPanel type="task" id={t.id} />
       </main>
 
+      <ExtendSheet open={extending} onClose={() => setExtending(false)} target="task" id={t.id} title={t.title} due={t.due_date}
+        report0={note.trim()} onDone={load} />
       <Sheet open={confirmDel} onClose={() => setConfirmDel(false)} title="Xoá việc này?">
         <p className="muted" style={{ marginTop: 0 }}>Việc "{t.title}" cùng các bước và cập nhật sẽ bị xoá hẳn, không khôi phục được.</p>
         <div className="row">

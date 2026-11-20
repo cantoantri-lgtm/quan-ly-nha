@@ -25,6 +25,7 @@ export default function ProjectForm() {
   const [sup, setSup] = useState<string[]>([]);
   const [start, setStart] = useState(todayVN());
   const [end, setEnd] = useState(addDaysISO(todayVN(), 60));
+  const [lockEnd, setLockEnd] = useState(false);   // PIC không phải người giao dự án: đổi hạn qua "Xin gia hạn"
   const [budget, setBudget] = useState("");
   const [loaId, setLoaId] = useState("");
   const [building, setBuilding] = useState("");
@@ -47,6 +48,7 @@ export default function ProjectForm() {
       const p = d.project;
       if (!p) { setErr("Không tìm thấy dự án hoặc bạn không có quyền sửa."); setReady(true); return; }
       setName(p.name); setDesc(p.description ?? ""); setPic(p.pic_id); setSup(d.supporters); setStart(p.start_date); setEnd(p.end_date);
+      setLockEnd(!isManager && p.created_by !== profile?.id);
       setBudget(p.budget ? new Intl.NumberFormat("vi-VN").format(p.budget) : ""); setLoaId(p.loa_id ?? ""); setBuilding(p.building_id ?? ""); setStatus(p.status);
       if (p.loa_id) {
         const { data } = await supabase.rpc("project_loa", { p_project: p.id });
@@ -55,7 +57,7 @@ export default function ProjectForm() {
       }
       setReady(true);
     })();
-  }, [editing, id]);
+  }, [editing, id]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!editing && !(isManager || isSupervisor)) return <Navigate to="/du-an" replace />;
   const loa = picks?.find((x) => x.id === loaId);
@@ -96,9 +98,10 @@ export default function ProjectForm() {
               <textarea id="pj-desc" className="input" value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={4000} placeholder="Kết quả cần đạt, phạm vi công việc, tiêu chí nghiệm thu…" /></label>
             <div className="row" style={{ alignItems: "flex-start" }}>
               <label className="field" style={{ flex: "1 1 150px" }}><span>Bắt đầu <span className="req">*</span></span>
-                <input id="pj-start" type="date" className="input" value={start} required onChange={(e) => { setStart(e.target.value); if (end < e.target.value) setEnd(e.target.value); }} /></label>
+                <input id="pj-start" type="date" className="input" value={start} required onChange={(e) => { setStart(e.target.value); if (end < e.target.value && !lockEnd) setEnd(e.target.value); }} /></label>
               <label className="field" style={{ flex: "1 1 150px" }}><span>Kết thúc <span className="req">*</span></span>
-                <input id="pj-end" type="date" className="input" value={end} min={start} required onChange={(e) => setEnd(e.target.value)} /></label>
+                <input id="pj-end" type="date" className="input" value={end} min={start} required disabled={lockEnd} onChange={(e) => setEnd(e.target.value)} />
+                {lockEnd ? <small className="muted">Muốn lùi hạn: bấm "Xin gia hạn dự án" ở trang dự án để người giao duyệt.</small> : null}</label>
             </div>
             {editing ? (
               <label className="field"><span>Trạng thái</span>

@@ -1,0 +1,27 @@
+/* ---------- Xin gia hạn ---------- */
+.dl-box { display: grid; gap: 10px; }
+.dl-card { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--today); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; }
+.dl-card.da_duyet { border-left-color: var(--s-done); }
+.dl-card.tu_choi { border-left-color: var(--late); }
+.dl-card.da_huy { border-left-color: var(--line); opacity: .8; }
+.dl-card header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dl-card header b { font-size: 15px; }
+.dl-chip { font-size: 12px; font-weight: 650; border-radius: 999px; padding: 2px 10px; white-space: nowrap; background: var(--today-bg); color: var(--today); }
+.dl-chip.da_duyet { background: var(--s-done-bg); color: var(--s-done); }
+.dl-chip.tu_choi { background: var(--late-bg); color: var(--late); }
+.dl-chip.da_huy { background: var(--surface-2); color: var(--muted); }
+.dl-dates { margin: 0; font-size: 14px; }
+.dl-dates s { color: var(--muted); }
+.dl-kv { display: grid; grid-template-columns: 92px 1fr; gap: 4px 10px; margin: 0; font-size: 14px; }
+.dl-kv dt { color: var(--muted); }
+.dl-kv dd { margin: 0; white-space: pre-wrap; }
+.dl-decide { border-top: 1px dashed var(--line); padding-top: 10px; }
+.dl-cancel { justify-self: start; }
+.dl-hist > summary { cursor: pointer; color: var(--muted); font-size: 13.5px; padding: 4px 0; }
+.dl-hist[open] > summary { margin-bottom: 8px; }
+.dl-hist .dl-card + .dl-card { margin-top: 8px; }
+.dl-late { color: var(--late); }
+.dl-ask { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 14px;
+  background: var(--near-bg); border: 1px solid var(--line); border-radius: var(--radius); font-size: 14px; }
+.dl-tag { font-size: 12px; font-weight: 650; border-radius: 999px; padding: 1px 8px; background: var(--today-bg); color: var(--today); }
+@media (max-width: 480px) { .dl-kv { grid-template-columns: 1fr; } .dl-kv dt { margin-top: 4px; } }

@@ -3,13 +3,14 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { PRIORITY_LABEL, STATUS_LABEL, type Task } from "../lib/labels";
-import { daysBetween, dueInfo, dueLevel, todayVN } from "../lib/dates";
+import { daysBetween, ddmm, dueInfo, dueLevel, todayVN } from "../lib/dates";
 import { Empty, Icon, TopBar } from "../components/ui";
 import "../projects.css";
+import "../deadline.css";
 
 type Row = Task & { assignee: { full_name: string } | null; creator: { full_name: string } | null; building: { code: string } | null; members: { user_id: string }[] | null };
 type Tab = "mine" | "given" | "all";
-type Filter = "open" | "late" | "block" | "done";
+type Filter = "open" | "late" | "block" | "ext" | "done";
 
 const SELECT = "*, assignee:profiles!tasks_assignee_id_fkey(full_name), creator:profiles!tasks_created_by_fkey(full_name), building:buildings(code), members:task_assignees(user_id)";
 
@@ -22,6 +23,7 @@ export default function Tasks() {
   const bFilter = params.get("toa") || "";
   const [rows, setRows] = useState<Row[]>([]);
   const [steps, setSteps] = useState<Record<string, { total: number; done: number }>>({});
+  const [ext, setExt] = useState<Record<string, string>>({});   // việc đang xin gia hạn → hạn đề xuất
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const nav = useNavigate();
@@ -54,6 +56,8 @@ export default function Tasks() {
     const all = [...(open.data as Row[]), ...(done.data as Row[])];
     setRows(all);
     const ids = all.map((r) => r.id);
+    const { data: dl } = await supabase.from("deadline_requests").select("task_id,new_due").eq("status", "cho_duyet").eq("target", "task");
+    setExt(Object.fromEntries(((dl ?? []) as { task_id: string; new_due: string }[]).map((x) => [x.task_id, x.new_due])));
     if (ids.length) {
       const { data } = await supabase.from("tasks").select("parent_id,status").in("parent_id", ids);
       const m: Record<string, { total: number; done: number }> = {};
@@ -81,12 +85,13 @@ export default function Tasks() {
     open: rows.filter((r) => r.status !== "xong").length,
     late: rows.filter(isLate).length,
     block: rows.filter((r) => r.status === "vuong").length,
+    ext: rows.filter((r) => r.status !== "xong" && ext[r.id]).length,
     done: rows.filter((r) => r.status === "xong").length,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [rows, today]);
+  }), [rows, today, ext]);
 
   const shown = rows.filter((r) =>
-    filter === "open" ? r.status !== "xong" : filter === "late" ? isLate(r) : filter === "block" ? r.status === "vuong" : r.status === "xong");
+    filter === "open" ? r.status !== "xong" : filter === "late" ? isLate(r) : filter === "block" ? r.status === "vuong" : filter === "ext" ? r.status !== "xong" && !!ext[r.id] : r.status === "xong");
 
   return (
     <>
@@ -105,7 +110,7 @@ export default function Tasks() {
         ) : null}
 
         <div className="chips" role="group" aria-label="Lọc theo trạng thái">
-          {([["open", "Đang mở"], ["late", "Trễ hạn"], ["block", "Vướng"], ["done", "Đã xong"]] as [Filter, string][]).map(([k, l]) => (
+          {([["open", "Đang mở"], ["late", "Trễ hạn"], ["block", "Vướng"], ["ext", "Xin gia hạn"], ["done", "Đã xong"]] as [Filter, string][]).filter(([k]) => k !== "ext" || counts.ext > 0 || filter === "ext").map(([k, l]) => (
             <button key={k} className="chip" aria-pressed={filter === k} onClick={() => setParam("loc", k === "open" ? "" : k)}>
               {l}<span className="n">{counts[k]}</span>
             </button>
@@ -141,6 +146,7 @@ export default function Tasks() {
                     {tab === "mine" && r.members?.length ? <span>Nhóm {r.members.length + 1} người</span> : null}
                     {tab === "mine" && r.creator && r.created_by !== profile?.id ? <span>Giao bởi {r.creator.full_name}</span> : null}
                     {d ? <span className={`due ${d.tone}`}>{d.text}</span> : null}
+                    {ext[r.id] && r.status !== "xong" ? <span className="dl-tag">xin gia hạn → {ddmm(ext[r.id])}</span> : null}
                     {r.priority === "cao" || r.priority === "gap" ? <span className="prio">{PRIORITY_LABEL[r.priority]}</span> : null}
                     {s ? <span className="num">{s.done}/{s.total} bước</span> : null}
                   </div>
