@@ -25,7 +25,7 @@ export default function ProjectForm() {
   const [sup, setSup] = useState<string[]>([]);
   const [start, setStart] = useState(todayVN());
   const [end, setEnd] = useState(addDaysISO(todayVN(), 60));
-  const [lockEnd, setLockEnd] = useState(false);   // PIC không phải người giao dự án: đổi hạn qua "Xin gia hạn"
+  const [lockEnd, setLockEnd] = useState(false);   // PIC không phải người giao dự án: đổi hạn qua "Xin gia hạn", không tự đổi PIC
   const [budget, setBudget] = useState("");
   const [loaId, setLoaId] = useState("");
   const [building, setBuilding] = useState("");
@@ -112,11 +112,11 @@ export default function ProjectForm() {
           </section>
           <section className="card stack pj-sec">
             <label className="field"><span>Người phụ trách (PIC) <span className="req">*</span></span>
-              <select id="pj-pic" className="input" value={pic} onChange={(e) => { setPic(e.target.value); setSup(sup.filter((x) => x !== e.target.value)); }} required>
+              <select id="pj-pic" className="input" value={pic} onChange={(e) => { setPic(e.target.value); setSup(sup.filter((x) => x !== e.target.value)); }} required disabled={lockEnd}>
                 <option value="">Chọn người…</option>
                 {staff.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
               </select>
-              <small className="muted">PIC dự án sửa được kế hoạch, hạng mục và ngân sách hạng mục.</small></label>
+              <small className="muted">{lockEnd ? "Chỉ người giao dự án đổi được PIC." : "PIC dự án sửa được kế hoạch, hạng mục và ngân sách hạng mục. Đổi PIC dự án đang chạy: dùng nút \"Đổi PIC\" ở trang dự án để ghi nhật ký."}</small></label>
             <PeoplePick id="pj-sup" label="Người hỗ trợ" people={staff} value={sup} onChange={setSup} exclude={pic ? [pic] : []} />
           </section>
           <section className="card stack pj-sec">

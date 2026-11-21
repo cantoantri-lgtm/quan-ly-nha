@@ -9,6 +9,8 @@ import { dirLine, useDirectory } from "../lib/directory";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import { DeadlineList, ExtendSheet } from "../components/Deadline";
 import { loadDeadlines, type DlReq } from "../lib/deadline";
+import { ReassignSheet } from "../components/Reassign";
+import { assignableFor, changeTaskMain } from "../lib/reassign";
 
 type Detail = Task & {
   assignee: { full_name: string; phone: string | null } | null;
@@ -35,6 +37,12 @@ export default function TaskDetail() {
   const [confirmDel, setConfirmDel] = useState(false);
   const [dls, setDls] = useState<DlReq[]>([]);
   const [extending, setExtending] = useState(false);
+  const [reassign, setReassign] = useState(false);
+  const [bMembers, setBMembers] = useState<{ building_id: string; user_id: string }[]>([]);
+  useEffect(() => {
+    if (!reassign) return;
+    supabase.from("building_members").select("building_id,user_id").then(({ data }) => setBMembers(data ?? []));
+  }, [reassign]);
 
   const load = useCallback(async () => {
     const [a, b, c, m, dl] = await Promise.all([
@@ -77,6 +85,8 @@ export default function TaskDetail() {
   // Người được giao (không phải người giao) xin gia hạn khi chưa xong và chưa có đề xuất đang chờ
   const pendingDl = dls.find((x) => x.status === "cho_duyet");
   const canExtend = isAssignee && t.created_by !== profile.id && t.status !== "xong" && !pendingDl;
+  // Người giao đổi người phụ trách chính (quyền ở SQL 082: task_change_main)
+  const canReassign = isOwner && t.status !== "xong";
 
   async function setStatus(s: TaskStatus) {
     if (!t || s === t.status) return;
@@ -157,7 +167,8 @@ export default function TaskDetail() {
         <dl className="card kv">
           <dt>{members.length ? "Phụ trách chính" : "Người làm"}</dt>
           <dd>{t.assignee?.full_name ?? "—"}{t.assignee?.phone && t.assignee_id !== profile.id ? <> · <a href={`tel:${t.assignee.phone}`}>{t.assignee.phone}</a></> : null}
-            {t.assignee_id && dir.get(t.assignee_id) ? <small className="muted kv-sub">{dirLine(dir.get(t.assignee_id))}</small> : null}</dd>
+            {t.assignee_id && dir.get(t.assignee_id) ? <small className="muted kv-sub">{dirLine(dir.get(t.assignee_id))}</small> : null}
+            {canReassign ? <button type="button" className="btn ghost sm" style={{ marginTop: 4 }} onClick={() => setReassign(true)}>Đổi người phụ trách</button> : null}</dd>
           {members.length ? (<><dt>Cùng làm</dt><dd>{members.map((uid) => {
             const d = dir.get(uid);
             return <span key={uid} className="kv-person">{people.find((p) => p.id === uid)?.full_name ?? "—"}{d ? <small className="muted"> · {d.job_title}</small> : null}</span>;
@@ -248,6 +259,13 @@ export default function TaskDetail() {
 
       <ExtendSheet open={extending} onClose={() => setExtending(false)} target="task" id={t.id} title={t.title} due={t.due_date}
         report0={note.trim()} onDone={load} />
+      {canReassign ? (
+        <ReassignSheet open={reassign} onClose={() => setReassign(false)} title="Đổi người phụ trách chính" what={t.title}
+          current={t.assignee_id} currentName={t.assignee?.full_name ?? "chưa có"}
+          candidates={assignableFor({ me: profile, people, members: bMembers, buildingId: t.building_id ?? "", isManager, dir })}
+          keepLabel={`Giữ ${t.assignee?.full_name ?? "người cũ"} lại cùng làm`}
+          onSave={(u, keep, n) => changeTaskMain(t.id, u, keep, n)} onDone={load} />
+      ) : null}
       <Sheet open={confirmDel} onClose={() => setConfirmDel(false)} title="Xoá việc này?">
         <p className="muted" style={{ marginTop: 0 }}>Việc "{t.title}" cùng các bước và cập nhật sẽ bị xoá hẳn, không khôi phục được.</p>
         <div className="row">

@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { PRIORITY_LABEL, ROLE_LABEL, ROLE_RANK, type Priority, type Task } from "../lib/labels";
+import { PRIORITY_LABEL, ROLE_LABEL, type Priority, type Task } from "../lib/labels";
 import { TopBar } from "../components/ui";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
 import { addLink } from "../lib/links";
 import { ddmmyyyy } from "../lib/dates";
 import { dirLine, useDirectory } from "../lib/directory";
+import { assignableFor } from "../lib/reassign";
 
 export default function TaskForm() {
   const { id } = useParams();
@@ -69,28 +70,9 @@ export default function TaskForm() {
   }, [id]);
 
   // Người được giao: cấp dưới (hoặc chính mình). Giám sát chỉ thấy nhân viên cùng toà.
-  const assignable = useMemo(() => {
-    if (!profile) return [];
-    const myRank = ROLE_RANK[profile.role];
-    return people.filter((p) => {
-      if (!p.is_active) return false;
-      if (p.id === profile.id) return true;
-      if (ROLE_RANK[p.role] >= myRank) return false;
-      if (buildingId && members.length) return members.some((m) => m.building_id === buildingId && m.user_id === p.id);
-      if (!isManager) return members.some((m) => m.user_id === p.id);
-      return true;
-    }).sort((a, b) => {
-      if (a.id === profile.id) return -1;
-      if (b.id === profile.id) return 1;
-      // Xếp theo phòng ban rồi tên; người chưa có vị trí xuống cuối
-      const da = dir.get(a.id), db = dir.get(b.id);
-      const sa = da ? da.dept_sort : 9999, sb = db ? db.dept_sort : 9999;
-      if (sa !== sb) return sa - sb;
-      const ka = `${da?.department ?? ""}|${da?.team ?? ""}`, kb = `${db?.department ?? ""}|${db?.team ?? ""}`;
-      if (ka !== kb) return ka.localeCompare(kb, "vi");
-      return a.full_name.localeCompare(b.full_name, "vi");
-    });
-  }, [people, profile, buildingId, members, isManager, dir]);
+  const assignable = useMemo(
+    () => (profile ? assignableFor({ me: profile, people, members, buildingId, isManager, dir }) : []),
+    [people, profile, buildingId, members, isManager, dir]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();

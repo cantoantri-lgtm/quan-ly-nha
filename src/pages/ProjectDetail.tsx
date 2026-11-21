@@ -11,6 +11,8 @@ import {
 import { Avatar, Avatars, Bar, Gantt, ItemPane, ItemSheet, useIsWide, type ItemDraft, type Zoom } from "../components/ProjectUI";
 import { DeadlineList, ExtendSheet } from "../components/Deadline";
 import { loadDeadlines, type DlReq, type DlTarget } from "../lib/deadline";
+import { ReassignSheet } from "../components/Reassign";
+import { changeProjectPic } from "../lib/reassign";
 import { Empty, Icon, Sheet, TopBar } from "../components/ui";
 import "../projects.css";
 
@@ -49,6 +51,7 @@ export default function ProjectDetail() {
   const [scrollKey, setScrollKey] = useState(0);
   const [dls, setDls] = useState<DlReq[]>([]);
   const [ext, setExt] = useState<{ target: DlTarget; id: string; title: string; due: string } | null>(null);
+  const [picSheet, setPicSheet] = useState(false);
 
   const load = useCallback(async () => {
     const d = await loadProject(id!);
@@ -201,6 +204,8 @@ export default function ProjectDetail() {
   // Xin gia hạn: PIC / hỗ trợ hạng mục (không quản lý dự án) xin cho hạng mục; PIC dự án xin cho cả dự án
   const pendingOf = (itemId: string | null) => dls.find((r) => r.status === "cho_duyet" && (itemId ? r.item_id === itemId : r.target === "project"));
   const canExtendProject = open && p.pic_id === me && p.created_by !== me && !isManager && !pendingOf(null);
+  // Chỉ người giao dự án (hoặc Quản lý) đổi PIC: SQL 082 project_change_pic
+  const canChangePic = open && (isManager || p.created_by === me);
   const itemExtra = (n: Node) => {
     const mine = dls.filter((r) => r.item_id === n.id);
     const can = open && !canEdit && canProgress(n) && !n.hasKids && n.calc < 100 && !pendingOf(n.id);
@@ -247,6 +252,7 @@ export default function ProjectDetail() {
             </div>
             <div className="row">
               {canEdit ? <Link className="btn secondary sm" to={`/du-an/${p.id}/sua`}>{Icon.edit}Sửa dự án</Link> : null}
+              {canChangePic ? <button type="button" className="btn secondary sm" onClick={() => setPicSheet(true)}>Đổi PIC</button> : null}
               {canExtendProject ? <button type="button" className="btn secondary sm" onClick={() => setExt({ target: "project", id: p.id, title: `Dự án ${p.code} · ${p.name}`, due: p.end_date })}>Xin gia hạn dự án</button> : null}
               {open ? <Link className="btn sm" to={`/van-phong/moi/thanh_toan?project=${p.id}`}>{Icon.money}Lập đề nghị thanh toán</Link> : null}
             </div>
@@ -407,6 +413,13 @@ export default function ProjectDetail() {
       ) : null}
 
       {ext ? <ExtendSheet open onClose={() => setExt(null)} target={ext.target} id={ext.id} title={ext.title} due={ext.due} onDone={load} /> : null}
+      {canChangePic ? (
+        <ReassignSheet open={picSheet} onClose={() => setPicSheet(false)} title="Đổi người phụ trách (PIC) dự án" what={`${p.code} · ${p.name}`}
+          current={p.pic_id} currentName={name(p.pic_id)}
+          candidates={staff.filter((u) => u.role === "quan_ly" || u.role === "giam_sat" || u.role === "nhan_vien")}
+          keepLabel={`Giữ ${name(p.pic_id)} lại làm người hỗ trợ`}
+          onSave={(u, keep, n) => changeProjectPic(p.id, u, keep, n)} onDone={load} />
+      ) : null}
       <ItemSheet open={!!mode} onClose={() => setMode(null)} busy={busy} err={err} people={staff} draft={draft} setDraft={setDraft} onSubmit={saveItem}
         title={mode?.kind === "edit" ? `Sửa hạng mục ${mode.node.wbs}` : mode?.parent ? `Thêm cấp con của ${mode.parent.wbs}. ${mode.parent.name}` : "Thêm hạng mục chính"}
         level={mode?.kind === "edit" ? mode.node.level : (mode?.kind === "new" ? (mode.parent?.level ?? 0) + 1 : 1)}
