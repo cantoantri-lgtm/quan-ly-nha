@@ -12,7 +12,7 @@ import { copyText, Empty, Sheet, tempPassword, TopBar, Combo } from "../componen
 import { credText } from "./Customers";
 import { accountIdError, ID_NAME, ID_PHOTOS, ID_TYPES, idError, normId, type IdType } from "../lib/idDoc";
 import { googleDirections } from "../lib/geo";
-import { BuildingSheet } from "./Buildings";
+import { BuildingSheet, BuildingStatusTag } from "./Buildings";
 import FileGallery from "../components/FileGallery";
 import { uploadFile } from "../lib/files";
 import RoomTypeCard from "../components/RoomTypeCard";
@@ -141,7 +141,12 @@ export default function BuildingDetail() {
       <main className="main stack">
         <section className="card building-head">
           <div>
-            <h2>{building.name}</h2>
+            <h2>{building.name} <BuildingStatusTag b={building} full /></h2>
+            {building.status && building.status !== "hoat_dong" ? (
+              <p className="small" style={{ margin: "4px 0", color: "var(--muted)" }}>
+                {building.status_note ? `${building.status_note}. ` : ""}Phòng trống của toà đang ẩn khỏi danh sách Phòng trống, bản đồ và website.
+              </p>
+            ) : null}
             <p className="muted small">{KIND_LABEL[building.kind]}{building.address ? ` · ${building.address}` : ""}{building.total_floors ? ` · ${building.total_floors} tầng` : ""}</p>
             {building.lat != null && building.lng != null ? (
               <p className="small" style={{ marginTop: 6 }}>

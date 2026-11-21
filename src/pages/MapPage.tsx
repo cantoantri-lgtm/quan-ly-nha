@@ -6,7 +6,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "../map.css";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { KIND_LABEL } from "../lib/labels";
+import { BUILDING_STATUS, KIND_LABEL, type BuildingStatus } from "../lib/labels";
 import { naturalCompare } from "../lib/money";
 import { DEFAULT_CENTER, currentPosition, fmtLatLng, googleDirections, googlePlace, parseLatLng, round6, type LatLng } from "../lib/geo";
 import { Empty, TopBar } from "../components/ui";
@@ -20,7 +20,7 @@ const STYLE_URL = () => `https://tiles.openfreemap.org/styles/${darkMode() ? "da
 
 type Spot = {
   id: string; code: string; name: string; address: string | null; kind: string;
-  lat: number | null; lng: number | null; total_rooms: number; vacant_rooms: number; can_open: boolean;
+  lat: number | null; lng: number | null; total_rooms: number; vacant_rooms: number; can_open: boolean; status?: string;
   /** Ảnh đại diện toà (có thể rỗng) */
   photo_path: string | null; photo_store: "supabase" | "r2" | null; photo_thumb: boolean | null;
 };
@@ -147,7 +147,9 @@ export default function MapPage() {
       (photos[s.id] ? `<img class="mp-photo" src="${esc(photos[s.id])}" alt="Ảnh toà ${esc(s.name)}" loading="lazy" decoding="async">` : "") +
       `<b class="mp-name">${esc(s.name)}</b>` +
       `<span class="mp-sub">${esc(s.code)} · ${esc(KIND_LABEL[s.kind] ?? s.kind)}${s.address ? ` · ${esc(s.address)}` : ""}</span>` +
-      `<span class="mp-vacant ${s.vacant_rooms > 0 ? "ok" : "zero"}"><b class="num">${s.vacant_rooms}</b> phòng trống <span class="mp-of">/ ${s.total_rooms} phòng</span></span>`;
+      (s.status && s.status !== "hoat_dong"
+        ? `<span class="mp-vacant zero">${esc(BUILDING_STATUS[s.status as BuildingStatus] ?? s.status)} · tạm ẩn phòng trống <span class="mp-of">/ ${s.total_rooms} phòng</span></span>`
+        : `<span class="mp-vacant ${s.vacant_rooms > 0 ? "ok" : "zero"}"><b class="num">${s.vacant_rooms}</b> phòng trống <span class="mp-of">/ ${s.total_rooms} phòng</span></span>`);
     const act = document.createElement("div");
     act.className = "mp-actions";
     const link = (cls: string, href: string, text: string) => {
@@ -177,8 +179,8 @@ export default function MapPage() {
     markers.current = {};
     located.filter((s) => !onlyVacant || s.vacant_rooms > 0).forEach((s) => {
       const el = pinEl(
-        `<div class="pin ${s.vacant_rooms > 0 ? "ok" : "zero"}"><b>${s.vacant_rooms}</b></div><span class="pin-code">${esc(s.code)}</span>`,
-        `${s.name}: ${s.vacant_rooms} phòng trống`);
+        `<div class="pin ${s.vacant_rooms > 0 ? "ok" : "zero"}"><b>${s.status && s.status !== "hoat_dong" ? "–" : s.vacant_rooms}</b></div><span class="pin-code">${esc(s.code)}</span>`,
+        s.status && s.status !== "hoat_dong" ? `${s.name}: ${BUILDING_STATUS[s.status as BuildingStatus] ?? s.status}` : `${s.name}: ${s.vacant_rooms} phòng trống`);
       const popup = new Popup({ offset: 42, maxWidth: "290px", focusAfterOpen: false, anchor: "bottom" }).setDOMContent(popupEl(s));
       // Mở khung thông tin: dời bản đồ để ghim nằm dưới giữa, khung hiện trọn phía trên
       popup.on("open", () => m.easeTo({ center: ll(s), offset: [0, Math.min(140, m.getContainer().clientHeight / 2 - 40)], duration: 250 }));
@@ -304,6 +306,7 @@ export default function MapPage() {
                 <div className="grow">
                   <div className="name">{s.name}</div>
                   <div className="sub">
+                    {s.status && s.status !== "hoat_dong" ? <span style={{ color: s.status === "sua_chua" ? "var(--today)" : "var(--danger)" }}>{BUILDING_STATUS[s.status as BuildingStatus]} · </span> : null}
                     {hasPos(s) ? (s.address || KIND_LABEL[s.kind]) : <span style={{ color: "var(--today)" }}>Chưa có vị trí{isManager ? " · bấm để đặt" : ""}</span>}
                   </div>
                 </div>

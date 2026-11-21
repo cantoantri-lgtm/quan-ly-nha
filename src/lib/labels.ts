@@ -26,6 +26,14 @@ export const PRIORITY_LABEL: Record<Priority, string> = {
   gap: "Gấp",
 };
 
+/** Tình trạng hoạt động của toà (SQL 083). Toà không "hoat_dong" thì phòng trống bị ẩn khỏi app, bản đồ, website */
+export type BuildingStatus = "hoat_dong" | "sua_chua" | "ngung";
+export const BUILDING_STATUS: Record<BuildingStatus, string> = {
+  hoat_dong: "Đang hoạt động",
+  sua_chua: "Đang sửa chữa",
+  ngung: "Ngưng hoạt động",
+};
+
 export const KIND_LABEL: Record<string, string> = {
   khach_san: "Khách sạn",
   can_ho: "Căn hộ cho thuê",
@@ -52,6 +60,9 @@ export type Building = {
   public_note?: string | null;
   lat?: number | null;
   lng?: number | null;
+  status?: BuildingStatus;
+  status_note?: string | null;
+  status_since?: string | null;
 };
 
 export type Task = {

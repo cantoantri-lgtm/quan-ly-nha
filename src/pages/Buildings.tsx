@@ -2,8 +2,9 @@ import { useEffect, useState, type ClipboardEvent, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { KIND_LABEL, type Building } from "../lib/labels";
-import { Empty, Sheet, TopBar } from "../components/ui";
+import { BUILDING_STATUS, KIND_LABEL, type Building, type BuildingStatus } from "../lib/labels";
+import { ddmmyyyy } from "../lib/dates";
+import { Combo, Empty, Sheet, TopBar } from "../components/ui";
 import BuildingBank from "../components/BuildingBank";
 import { currentPosition, googlePlace, parseLatLng, round6 } from "../lib/geo";
 
@@ -39,7 +40,7 @@ export default function Buildings() {
               <div key={b.id} className="list-row" role="button" tabIndex={0} onClick={() => nav(`/toa/${b.id}`)} onKeyDown={(e) => e.key === "Enter" && nav(`/toa/${b.id}`)}>
                 <span className="tag" style={{ fontSize: 13 }}>{b.code}</span>
                 <div className="grow">
-                  <div className="name">{b.name}</div>
+                  <div className="name">{b.name} <BuildingStatusTag b={b} /></div>
                   <div className="sub">{b.lat == null ? <span style={{ color: "var(--today)" }}>Chưa có vị trí · </span> : null}{KIND_LABEL[b.kind]}{b.address ? ` · ${b.address}` : ""}</div>
                 </div>
                 <span className="muted small num" style={{ textAlign: "right" }}>{roomCounts[b.id] ?? 0} phòng<br />{counts[b.id] ?? 0} người</span>
@@ -67,6 +68,8 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount, l
   const [address, setAddress] = useState(value.address ?? "");
   const [pubNote, setPubNote] = useState(value.public_note ?? "");
   const [kind, setKind] = useState(value.kind ?? "hon_hop");
+  const [status, setStatus] = useState<BuildingStatus>(value.status ?? "hoat_dong");
+  const [statusNote, setStatusNote] = useState(value.status_note ?? "");
   const [floors, setFloors] = useState(value.total_floors?.toString() ?? "");
   const [lat, setLat] = useState(value.lat != null ? String(value.lat) : "");
   const [lng, setLng] = useState(value.lng != null ? String(value.lng) : "");
@@ -118,6 +121,8 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount, l
     const row = {
       code: code.trim().toUpperCase(), name: name.trim(), address: address.trim() || null, public_note: pubNote.trim() || null, kind, total_floors: floors ? Number(floors) : null,
       lat: hasBoth ? round6(latN) : null, lng: hasBoth ? round6(lngN) : null,
+      // Tình trạng: chỉ Quản lý đổi (tg_buildings_guard); người khác không gửi lên
+      ...(limited ? {} : { status, status_note: status === "hoat_dong" ? null : statusNote.trim() || null }),
     };
     const { error } = value.id
       ? await supabase.from("buildings").update(row).eq("id", value.id)
@@ -164,6 +169,14 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount, l
           <select id="b-kind" className="input" value={kind} onChange={(e) => setKind(e.target.value)} disabled={limited}>
             {Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select></label>
+        <label className="field"><span>Tình trạng hoạt động</span>
+          <Combo id="b-status" value={status} options={BUILDING_STATUS} onChange={setStatus} disabled={limited} label="Tình trạng hoạt động" />
+          <small className="muted">{limited ? "Chỉ Quản lý đổi tình trạng toà." : "Sửa chữa hoặc ngưng hoạt động: phòng trống của toà ẩn khỏi danh sách Phòng trống, bản đồ và website. Nhân sự của toà nhận thông báo."}</small></label>
+        {status !== "hoat_dong" ? (
+          <label className="field"><span>Ghi chú tình trạng</span>
+            <input id="b-status-note" className="input" value={statusNote} onChange={(e) => setStatusNote(e.target.value)} disabled={limited}
+              maxLength={200} placeholder="VD: Sửa hệ thống nước, dự kiến mở lại 15/12" /></label>
+        ) : null}
         {err ? <div className="error-box" role="alert">{err}</div> : null}
         <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Lưu"}</button>
         {value.id && onDeleted ? (
@@ -182,5 +195,17 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount, l
       </form>
       {value.id && onDeleted ? <BuildingBank buildingId={value.id} /> : null}
     </Sheet>
+  );
+}
+
+/** Nhãn tình trạng toà khi không hoạt động; đang hoạt động thì không hiện gì */
+export function BuildingStatusTag({ b, full = false }: { b: Pick<Building, "status" | "status_note" | "status_since">; full?: boolean }) {
+  if (!b.status || b.status === "hoat_dong") return null;
+  const color = b.status === "sua_chua" ? "var(--today)" : "var(--danger)";
+  return (
+    <span className="tag" style={{ color, borderColor: color, marginLeft: 4, verticalAlign: "middle" }}
+      title={b.status_note ?? undefined}>
+      {BUILDING_STATUS[b.status]}{full && b.status_since ? ` từ ${ddmmyyyy(b.status_since)}` : ""}
+    </span>
   );
 }
