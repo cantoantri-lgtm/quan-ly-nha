@@ -25,9 +25,22 @@ export function normPhone(p: string) {
 }
 export const phoneToEmail = (p: string) => `${normPhone(p)}@${EMAIL_DOMAIN}`;
 
-/** Gọi Edge Function quản lý tài khoản; trả lỗi tiếng Việt từ server nếu có. */
-export async function callAccountFn<T = unknown>(body: Record<string, unknown>): Promise<T> {
+/** Đăng xuất trên thiết bị này. Không dùng mặc định "global": nó huỷ phiên ở mọi thiết bị khác,
+ *  các tab còn lại vẫn trông như đang đăng nhập nhưng Edge Function trả 401 "phiên đã hết". */
+export const signOutHere = () => supabase.auth.signOut({ scope: "local" });
+
+/** Gọi Edge Function quản lý tài khoản; trả lỗi tiếng Việt từ server nếu có.
+ *  Phiên bị huỷ (401): thử làm mới một lần; không được thì đăng xuất để người dùng đăng nhập lại. */
+export async function callAccountFn<T = unknown>(body: Record<string, unknown>, retried = false): Promise<T> {
   const { data, error } = await supabase.functions.invoke("quan-ly-tai-khoan", { body });
+  if (error && (error as { context?: Response }).context?.status === 401) {
+    if (!retried) {
+      const { data: r } = await supabase.auth.refreshSession();
+      if (r.session) return callAccountFn<T>(body, true);
+    }
+    await signOutHere();
+    throw new Error("Phiên đăng nhập đã hết. Anh/chị đăng nhập lại rồi thử lại.");
+  }
   if (error) {
     let msg = "Không kết nối được máy chủ. Thử lại sau ít phút.";
     try {

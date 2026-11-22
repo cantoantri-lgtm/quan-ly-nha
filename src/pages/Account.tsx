@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { signOutHere } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { ROLE_LABEL } from "../lib/labels";
 import { Avatar, TopBar } from "../components/ui";
@@ -42,7 +42,7 @@ export default function Account() {
             <ChangePassword />
           </>
         )}
-        <button className="btn secondary block" style={{ marginTop: 16 }} onClick={() => supabase.auth.signOut()}>Đăng xuất</button>
+        <button className="btn secondary block" style={{ marginTop: 16 }} onClick={() => signOutHere()}>Đăng xuất</button>
         <p className="muted small" style={{ textAlign: "center" }}>Next Living · thuộc Next Vision · phiên bản 0.1</p>
       </main>
     </>

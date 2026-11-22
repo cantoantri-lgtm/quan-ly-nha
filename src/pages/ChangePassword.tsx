@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { supabase, signOutHere } from "../lib/supabase";
 import { useSession } from "../lib/session";
 
 export default function ChangePassword({ forced = false }: { forced?: boolean }) {
@@ -48,7 +48,7 @@ export default function ChangePassword({ forced = false }: { forced?: boolean })
       {err ? <div className="error-box" role="alert">{err}</div> : null}
       <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Lưu mật khẩu"}</button>
       {forced ? (
-        <button type="button" className="btn ghost" onClick={() => supabase.auth.signOut()}>Đăng xuất</button>
+        <button type="button" className="btn ghost" onClick={() => signOutHere()}>Đăng xuất</button>
       ) : null}
     </form>
   );

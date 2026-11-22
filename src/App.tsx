@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { useSession } from "./lib/session";
-import { supabase } from "./lib/supabase";
+import { signOutHere } from "./lib/supabase";
 import { AppHeader, BottomNav, Toast } from "./components/ui";
 import { OpenTabs, StatusBar } from "./components/DesktopShell";
 import Login from "./pages/Login";
@@ -106,7 +106,7 @@ export default function App() {
         <div className="auth-card">
           <h2 style={{ fontSize: 20 }}>Tài khoản chưa được kích hoạt</h2>
           <p className="muted" style={{ margin: 0 }}>Tài khoản này đã bị khoá hoặc chưa được quản lý cấp quyền. Liên hệ quản lý để được hỗ trợ.</p>
-          <button className="btn" onClick={() => supabase.auth.signOut()}>Đăng xuất</button>
+          <button className="btn" onClick={() => signOutHere()}>Đăng xuất</button>
         </div>
       </div>
     );
