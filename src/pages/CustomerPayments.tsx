@@ -22,30 +22,30 @@ const STATUS: Record<Status, string> = { chua_thanh_toan: "Chưa thanh toán", c
 const monthLabel = (p: string | null) => (p ? `T${p.slice(5, 7)}/${p.slice(0, 4)}` : "");
 const dmy = (d: string | null) => (d ? d.slice(8, 10) + "/" + d.slice(5, 7) : "");
 
-/** Nội dung chuyển khoản theo khoản, tiền tính nghìn đồng, không dấu (giống hoá đơn tiền phòng, SQL 088):
- *  "<mã KH> 3500KT 420KD 200KN 150KDV" · KT trọ · KD điện · KN nước · KDV dịch vụ · KC cọc · KK khác.
- *  Mã KH luôn đứng đầu để hệ thống tự đối soát; quá 50 ký tự thì "<mã> <tổng>K". */
+/** Nội dung chuyển khoản theo khoản, số tiền mặc định là nghìn đồng, không dấu (giống hoá đơn tiền phòng, SQL 089):
+ *  "<mã KH> 3500T 420D 200N 150DV" · T trọ · D điện · N nước · DV dịch vụ · C cọc · PS khác.
+ *  Mã KH luôn đứng đầu để hệ thống tự đối soát; quá 50 ký tự thì "<mã> TONG <tổng>". */
 export function transferContent(b: Pick<Bill, "kind" | "amount" | "pay_code" | "lines">): string {
-  const sum = { KT: 0, KD: 0, KN: 0, KDV: 0, KC: 0, KK: 0 };
+  const sum = { T: 0, D: 0, N: 0, DV: 0, C: 0, PS: 0 };
   if (b.lines?.length) {
     for (const l of b.lines) {
-      if (l.label.startsWith("Tiền phòng")) sum.KT += l.amount;
-      else if (l.label === "Tiền điện") sum.KD += l.amount;
-      else if (l.label === "Tiền nước") sum.KN += l.amount;
-      else if (l.label === "Phí dịch vụ") sum.KDV += l.amount;
-      else sum.KK += l.amount;
+      if (l.label.startsWith("Tiền phòng")) sum.T += l.amount;
+      else if (l.label === "Tiền điện") sum.D += l.amount;
+      else if (l.label === "Tiền nước") sum.N += l.amount;
+      else if (l.label === "Phí dịch vụ") sum.DV += l.amount;
+      else sum.PS += l.amount;
     }
-  } else if (b.kind === "tien_phong") sum.KT = b.amount;
-  else if (b.kind === "tien_coc") sum.KC = b.amount;
-  else if (b.kind === "dien") sum.KD = b.amount;
-  else if (b.kind === "nuoc") sum.KN = b.amount;
-  else if (b.kind === "phi_dich_vu") sum.KDV = b.amount;
-  else sum.KK = b.amount;
+  } else if (b.kind === "tien_phong") sum.T = b.amount;
+  else if (b.kind === "tien_coc") sum.C = b.amount;
+  else if (b.kind === "dien") sum.D = b.amount;
+  else if (b.kind === "nuoc") sum.N = b.amount;
+  else if (b.kind === "phi_dich_vu") sum.DV = b.amount;
+  else sum.PS = b.amount;
   const k = (a: number) => (a % 1000 === 0 ? String(a / 1000) : (Math.round(a / 100) / 10).toFixed(1));
   const used = (Object.entries(sum) as [string, number][]).filter(([, a]) => a !== 0);
   const full = [b.pay_code, ...used.map(([c, a]) => `${k(a)}${c}`)].join(" ");
   if (full.length <= BANK_NOTE_MAX) return full;
-  return `${b.pay_code} ${k(used.reduce((t, [, a]) => t + a, 0))}K`;
+  return `${b.pay_code} TONG ${k(used.reduce((t, [, a]) => t + a, 0))}`;
 }
 export const BANK_NOTE_MAX = 50;
 
