@@ -11,7 +11,7 @@ type Row = {
   invoice_id: string; collected_at: string; building_code: string; room_code: string; tenant_name: string; phone: string | null;
   id_number: string | null; id_address: string | null; amount: number; content: string; paid_via: string | null;
   collected_by_name: string | null; contract_code: string | null;
-  lines: InvLine[] | null; vat_amount: number | null;
+  lines: InvLine[] | null; vat_amount: number | null; txn_ref: string | null;
 };
 
 /** Danh sách khoản thu tiền thuê trong ngày để xuất hoá đơn GTGT (chỉ Quản lý / Kế toán) */
@@ -96,11 +96,11 @@ export default function VatDaily() {
         { header: "STT", width: 6 }, { header: "Họ tên khách", width: 26 }, { header: "Số CCCD / Hộ chiếu", width: 18, style: { numFmt: "@" } },
         { header: "Địa chỉ trên CCCD / hộ chiếu", width: 44 }, { header: "Số điện thoại", width: 15, style: { numFmt: "@" } },
         { header: "Toà", width: 10 }, { header: "Phòng", width: 9 }, { header: "Nội dung", width: 40 },
-        { header: "Số tiền (VNĐ)", width: 16, style: { numFmt: "#,##0" } }, { header: "Hình thức", width: 14 }, { header: "Người ghi nhận", width: 20 },
+        { header: "Số tiền (VNĐ)", width: 16, style: { numFmt: "#,##0" } }, { header: "Hình thức", width: 14 }, { header: "Mã giao dịch", width: 20, style: { numFmt: "@" } }, { header: "Người ghi nhận", width: 20 },
       ];
       rows.forEach((r, i) => ws.addRow([
         i + 1, r.tenant_name, r.id_number ?? "", r.id_address ?? "", r.phone ?? "", r.building_code, r.room_code, r.content,
-        Number(r.amount), r.paid_via === "chuyen_khoan" ? "Chuyển khoản" : "Nhân viên ghi nhận", r.collected_by_name ?? "",
+        Number(r.amount), r.paid_via === "chuyen_khoan" ? "Chuyển khoản" : "Nhân viên ghi nhận", r.txn_ref ?? "", r.collected_by_name ?? "",
       ]));
       const t = ws.addRow(["", "TỔNG", "", "", "", "", "", "", total]); t.font = { bold: true };
       ws.getRow(1).font = { bold: true };
@@ -145,7 +145,7 @@ export default function VatDaily() {
                     <td>{r.id_address ?? <span className="muted">Thiếu</span>}</td>
                     <td className="num">{r.phone ?? ""}</td>
                     <td>{r.building_code} · {r.room_code}</td>
-                    <td className="r num">{vnd(Number(r.amount))}</td>
+                    <td className="r num">{vnd(Number(r.amount))}{r.txn_ref ? <div className="t2">GD {r.txn_ref}</div> : null}</td>
                     <td>{r.lines?.length ? <InvoiceLines lines={r.lines} /> : r.content}</td>
                   </tr>
                 ))}

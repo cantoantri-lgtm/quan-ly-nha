@@ -13,6 +13,7 @@ import "../table.css";
 type Invoice = {
   id: string; contract_id: string; period: string; amount: number; due_date: string; status: "chua_thu" | "da_thu" | "huy";
   collected_at: string | null; paid_via: "thu_cong" | "chuyen_khoan" | null; pay_code: string; note: string | null;
+  txn_ref: string | null; txn_at: string | null;   // mã giao dịch ngân hàng do SePay gửi (SQL 084)
   lines: InvLine[] | null; vat_amount: number | null;
   contracts: { rooms: { code: string } | null; tenants: { full_name: string; phone: string | null } | null } | null;
 };
@@ -24,6 +25,12 @@ const monthLabel = (k: string) => `Tháng ${Number(k.slice(5, 7))}/${k.slice(0, 
 const shiftMonth = (k: string, n: number) => { const d = new Date(Number(k.slice(0, 4)), Number(k.slice(5, 7)) - 1 + n, 1); return monthKey(d); };
 
 export function payLink(code: string) { return `${window.location.origin}/thanh-toan/${code}`; }
+/** Giờ tiền về theo giờ Việt Nam, dạng 22/11 09:41 */
+const fmtTime = (iso: string) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
+    .formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return `${p.hour}:${p.minute} ${p.day}/${p.month}`;
+};
 
 export default function Invoices() {
   const { id } = useParams();
@@ -39,7 +46,7 @@ export default function Invoices() {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("invoices")
-      .select("id,contract_id,period,amount,due_date,status,collected_at,paid_via,pay_code,note,lines,vat_amount, contracts(rooms(code), tenants(full_name,phone))")
+      .select("id,contract_id,period,amount,due_date,status,collected_at,paid_via,pay_code,note,lines,vat_amount,txn_ref,txn_at, contracts(rooms(code), tenants(full_name,phone))")
       .eq("building_id", id!).eq("period", period).neq("status", "huy");
     setList(((data as unknown as Invoice[]) ?? []).sort((a, b) => naturalCompare(room(a), room(b))));
     setLoading(false);
@@ -100,7 +107,8 @@ export default function Invoices() {
                 <div key={i.id} className="list-row" role="button" tabIndex={0} onClick={() => setOpenId(i.id)} onKeyDown={(e) => e.key === "Enter" && setOpenId(i.id)}>
                   <div className="grow">
                     <div className="name">Phòng {room(i)} · {i.contracts?.tenants?.full_name}</div>
-                    <div className="sub">Hạn {ddmm(i.due_date)}{i.paid_via === "chuyen_khoan" ? " · khách chuyển khoản" : ""}</div>
+                    <div className="sub">Hạn {ddmm(i.due_date)}{i.status === "da_thu" ? (i.paid_via === "chuyen_khoan" ? " · chuyển khoản" : " · thu tay") : ""}</div>
+                    {i.status === "da_thu" && i.txn_ref ? <div className="sub num">Mã GD {i.txn_ref}</div> : null}
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div className="num" style={{ fontWeight: 600 }}>{vnd(i.amount)}</div>
@@ -145,6 +153,13 @@ function InvoiceSheet({ inv, bank, canUndo, onClose, onChanged }: { inv: Invoice
           <b className="num" style={{ fontSize: 20 }}>{vnd(inv.amount)}</b>
           {inv.status === "da_thu" ? <span className="paid-stamp">Đã thu{inv.paid_via === "chuyen_khoan" ? " · chuyển khoản" : ""}</span> : <span className="tag">Hạn {ddmm(inv.due_date)}</span>}
         </div>
+        {inv.status === "da_thu" && inv.paid_via === "chuyen_khoan" && inv.txn_ref ? (
+          <div className="row small" style={{ gap: 6, flexWrap: "wrap" }}>
+            <span className="muted">Mã giao dịch</span><b className="num">{inv.txn_ref}</b>
+            {inv.txn_at ? <span className="muted">· tiền về {fmtTime(inv.txn_at)}</span> : null}
+            <button type="button" className="btn ghost sm" onClick={async () => { await copyText(inv.txn_ref!); toast("Đã chép mã giao dịch."); }}>Chép</button>
+          </div>
+        ) : null}
         {inv.note ? <p className="muted small" style={{ margin: 0 }}>{inv.note}</p> : null}
         {inv.lines?.length ? <InvoiceLines lines={inv.lines} /> : null}
 

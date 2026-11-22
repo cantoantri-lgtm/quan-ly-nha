@@ -13,7 +13,7 @@ type Status = "chua_thanh_toan" | "cho_xac_nhan" | "da_thanh_toan" | "huy";
 type Bill = {
   id: string; customer_id: string; kind: Kind; period: string | null; amount: number; due_date: string | null;
   status: Status; pay_code: string; note: string | null; reported_at: string | null; reported_note: string | null;
-  confirmed_at: string | null; created_at: string; lines: { label: string; amount: number; detail?: string }[] | null; building_id: string | null; room_id: string | null;
+  confirmed_at: string | null; txn_ref?: string | null; created_at: string; lines: { label: string; amount: number; detail?: string }[] | null; building_id: string | null; room_id: string | null;
   customer?: { full_name: string; phone: string | null } | null;
 };
 const KIND: Record<Kind, string> = { tien_phong: "Tiền phòng", dien: "Tiền điện", nuoc: "Tiền nước", phi_dich_vu: "Phí dịch vụ", tien_coc: "Tiền cọc", phieu_thu: "Phiếu thu tháng" };
@@ -184,6 +184,7 @@ export function StaffPayments() {
             <p style={{ margin: 0 }}>{sel.customer?.full_name} · {sel.customer?.phone}</p>
             <p style={{ margin: 0 }}><b className="num">{vnd(sel.amount)}</b> · {STATUS[sel.status]}</p>
             <p className="muted small" style={{ margin: 0 }}>Nội dung chuyển khoản: <b>{sel.pay_code}</b>{sel.due_date ? ` · hạn ${dmy(sel.due_date)}` : ""}</p>
+            {sel.status === "da_thanh_toan" && sel.txn_ref ? <p className="small" style={{ margin: 0 }}>Ngân hàng báo có · mã giao dịch <b className="num">{sel.txn_ref}</b></p> : null}
             {sel.note ? <p className="muted small" style={{ margin: 0 }}>Ghi chú: {sel.note}</p> : null}
             {sel.lines?.length ? (
               <div className="card" style={{ padding: 12 }}>
