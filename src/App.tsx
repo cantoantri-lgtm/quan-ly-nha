@@ -39,6 +39,7 @@ import Invoices from "./pages/Invoices";
 import PayPage from "./pages/PayPage";
 import Roster from "./pages/Roster";
 import BuildingExpenses from "./pages/BuildingExpenses";
+import BuildingCash from "./pages/BuildingCash";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 import VacantRooms from "./pages/VacantRooms";
 import VatDaily from "./pages/VatDaily";
@@ -202,6 +203,7 @@ export default function App() {
         <Route path="lich-xem-phong" element={<Viewings />} />
         <Route path="khach-hang/:id" element={<CustomerInfo />} />
         <Route path="thu-tien-khach" element={<StaffPayments />} />
+        <Route path="thu-chi-toa" element={<BuildingCash />} />
         <Route path="phan-anh" element={<FeedbackInbox />} />
         <Route path="phan-anh/:id" element={<FeedbackThread />} />
         <Route path="thong-bao" element={<Notifications />} />

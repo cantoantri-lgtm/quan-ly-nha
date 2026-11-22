@@ -16,8 +16,10 @@ const ym = (iso: string) => iso.slice(0, 7);
 const shiftMonth = (m: string, n: number) => { const d = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 + n, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
 const COLOR: Record<SettleStatus, string> = { chua_quyet_toan: "var(--danger)", cho_quyet_toan: "var(--today)", da_quyet_toan: "var(--s-done)" };
 
-export default function BuildingExpenses() {
-  const { id = "" } = useParams();
+/** Dùng làm trang riêng (/toa/:id/chi-phi) hoặc nhúng trong "Thu & chi toà nhà" (embedded) */
+export default function BuildingExpenses({ buildingId, embedded }: { buildingId?: string; embedded?: boolean } = {}) {
+  const params = useParams();
+  const id = buildingId ?? params.id ?? "";
   const { buildings, profile, people, isManager, isAccountant, toast } = useSession();
   const payer = isManager || isAccountant;
   const b = buildings.find((x: { id: string }) => x.id === id);
@@ -46,10 +48,12 @@ export default function BuildingExpenses() {
     if (error) toast(friendlyError(error)); else { toast("Đã xoá."); load(); }
   }
 
+  const Wrap = embedded ? "div" : "main";
   return (
     <>
-      <TopBar title={`Chi phí toà · ${b?.code ?? ""}`} back action={<button className="btn sm" onClick={() => setEdit("new")}>+ Ghi chi</button>} />
-      <main className="main stack">
+      {embedded ? null : <TopBar title={`Chi phí toà · ${b?.code ?? ""}`} back action={<button className="btn sm" onClick={() => setEdit("new")}>+ Ghi chi</button>} />}
+      <Wrap className={embedded ? "stack" : "main stack"}>
+        {embedded ? <button className="btn" onClick={() => setEdit("new")}>+ Ghi khoản chi</button> : null}
         <p className="muted small" style={{ margin: 0 }}>
           Ghi các khoản bạn tự ứng tiền chi cho toà (rác, sửa chữa, mua đồ…). Khi lập đề nghị thanh toán hoặc tạm ứng, chọn các khoản này để công ty hoàn tiền.
           Kế toán chi xong thì khoản chuyển sang "Đã quyết toán".
@@ -96,7 +100,7 @@ export default function BuildingExpenses() {
             </div>
           );
         })}
-      </main>
+      </Wrap>
       <ExpenseSheet open={edit !== null} item={edit === "new" ? null : edit} buildingId={id} payer={payer}
         onClose={() => setEdit(null)} onDone={() => { setEdit(null); load(); }} />
     </>

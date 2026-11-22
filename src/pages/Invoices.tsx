@@ -33,8 +33,10 @@ const fmtTime = (iso: string) => {
   return `${p.hour}:${p.minute} ${p.day}/${p.month}`;
 };
 
-export default function Invoices() {
-  const { id } = useParams();
+/** Thu tiền phòng của một toà. Dùng làm trang riêng (/toa/:id/hoa-don) hoặc nhúng trong "Thu & chi toà nhà" (embedded) */
+export default function Invoices({ buildingId, embedded }: { buildingId?: string; embedded?: boolean } = {}) {
+  const params = useParams();
+  const id = buildingId ?? params.id;
   const { buildings, isManager, toast } = useSession();
   const building = buildings.find((b) => b.id === id);
   const [period, setPeriod] = useState(() => monthKey(new Date(todayVN() + "T00:00:00")));
@@ -74,13 +76,14 @@ export default function Invoices() {
     load();
   }
 
-  if (!building) return (<><TopBar title="Hoá đơn" back /><main className="main"><Empty title="Không tìm thấy toà này" /></main></>);
+  if (!building) return embedded ? <Empty title="Không tìm thấy toà này" /> : (<><TopBar title="Hoá đơn" back /><main className="main"><Empty title="Không tìm thấy toà này" /></main></>);
+  const Wrap = embedded ? "div" : "main";
   const today = todayVN();
 
   return (
     <>
-      <TopBar title={`Thu tiền phòng · ${building.code}`} back={`/toa/${building.id}`} />
-      <main className="main stack">
+      {embedded ? null : <TopBar title={`Thu tiền phòng · ${building.code}`} back={`/toa/${building.id}`} />}
+      <Wrap className={embedded ? "stack" : "main stack"}>
         <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
           <button className="btn ghost sm" onClick={() => setPeriod(shiftMonth(period, -1))} aria-label="Tháng trước">‹ Trước</button>
           <b>{monthLabel(period)}</b>
@@ -120,7 +123,7 @@ export default function Invoices() {
             })}
           </section>
         )}
-      </main>
+      </Wrap>
       {opened ? <InvoiceSheet inv={opened} bank={bank} canUndo={isManager} onClose={() => setOpenId(null)} onChanged={load} /> : null}
     </>
   );

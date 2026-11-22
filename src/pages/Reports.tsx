@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { todayVN } from "../lib/dates";
@@ -29,7 +30,8 @@ type PR = { building_id: string; building_name: string; thu: number; chi: number
 export default function Reports() {
   const { isManager, isAccountant, isLeadUp } = useSession();
   const fin = isManager || isAccountant;   // Quản lý, Kế toán: chi phí, lợi nhuận, mọi toà
-  const [tab, setTab] = useState<Tab>("thu_chi");
+  const [qs] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => (qs.get("tab") === "so_thu_chi" ? "so_thu_chi" : "thu_chi"));
   const [from, setFrom] = useState(() => monthStart(todayVN()));
   const [to, setTo] = useState(() => todayVN());
   const [groups, setGroups] = useState<Partial<Record<Tab, Group>>>({});
