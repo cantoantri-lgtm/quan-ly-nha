@@ -36,7 +36,7 @@ export function vietQrPayload(o: { bin: string; account: string; amount?: number
   let s = tlv("00", "01") + tlv("01", o.amount ? "12" : "11") + tlv("38", acct) + tlv("53", "704");
   if (o.amount && o.amount > 0) s += tlv("54", String(Math.round(o.amount)));
   s += tlv("58", "VN");
-  if (o.content) s += tlv("62", tlv("08", o.content.replace(/[^A-Za-z0-9 ]/g, "").slice(0, o.maxLen ?? 25)));
+  if (o.content) s += tlv("62", tlv("08", o.content.replace(/[^A-Za-z0-9 .]/g, "").slice(0, o.maxLen ?? 25)));
   s += "6304";
   return s + crc16(s);
 }

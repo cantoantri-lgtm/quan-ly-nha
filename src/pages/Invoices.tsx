@@ -14,6 +14,7 @@ type Invoice = {
   id: string; contract_id: string; period: string; amount: number; due_date: string; status: "chua_thu" | "da_thu" | "huy";
   collected_at: string | null; paid_via: "thu_cong" | "chuyen_khoan" | null; pay_code: string; note: string | null;
   txn_ref: string | null; txn_at: string | null;   // mã giao dịch ngân hàng do SePay gửi (SQL 084)
+  transfer_note: string | null;                    // nội dung chuyển khoản không dấu (SQL 087)
   lines: InvLine[] | null; vat_amount: number | null;
   contracts: { rooms: { code: string } | null; tenants: { full_name: string; phone: string | null } | null } | null;
 };
@@ -46,7 +47,7 @@ export default function Invoices() {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("invoices")
-      .select("id,contract_id,period,amount,due_date,status,collected_at,paid_via,pay_code,note,lines,vat_amount,txn_ref,txn_at, contracts(rooms(code), tenants(full_name,phone))")
+      .select("id,contract_id,period,amount,due_date,status,collected_at,paid_via,pay_code,note,lines,vat_amount,txn_ref,txn_at,transfer_note, contracts(rooms(code), tenants(full_name,phone))")
       .eq("building_id", id!).eq("period", period).neq("status", "huy");
     setList(((data as unknown as Invoice[]) ?? []).sort((a, b) => naturalCompare(room(a), room(b))));
     setLoading(false);
@@ -166,7 +167,7 @@ function InvoiceSheet({ inv, bank, canUndo, onClose, onChanged }: { inv: Invoice
         {inv.status !== "da_thu" ? (
           bank ? (
             <>
-              <PayQR bank={bank} amount={inv.amount} code={inv.pay_code} toast={toast} />
+              <PayQR bank={bank} amount={inv.amount} code={inv.transfer_note ?? inv.pay_code} maxLen={50} toast={toast} />
               <div className="row">
                 <button className="btn secondary sm" onClick={async () => { await copyText(link); toast("Đã chép link thanh toán. Dán gửi khách qua Zalo."); }}>Chép link gửi khách</button>
                 {inv.contracts?.tenants?.phone ? <a className="btn ghost sm" href={`sms:${inv.contracts.tenants.phone}?body=${encodeURIComponent(`Tiền phòng ${room(inv)} ${monthLabel(inv.period)}: ${link}`)}`}>Nhắn tin</a> : null}

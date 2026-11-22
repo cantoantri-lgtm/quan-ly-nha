@@ -6,7 +6,7 @@ import PayQR from "../components/PayQR";
 import type { PaySettings } from "../lib/vietqr";
 import "../files.css";
 
-type Info = { pay_code: string; amount: number; status: string; period: string; due_date: string; room: string; building: string } & Partial<PaySettings>;
+type Info = { pay_code: string; amount: number; status: string; period: string; due_date: string; room: string; building: string; transfer_note?: string | null } & Partial<PaySettings>;
 
 /** Trang công khai cho khách thuê: xem số tiền và quét QR. Không cần đăng nhập, không hiện tên khách. */
 export default function PayPage() {
@@ -39,7 +39,7 @@ export default function PayPage() {
                 <p className="muted small" style={{ margin: 0 }}>Cảm ơn bạn. Hoá đơn này đã được thanh toán.</p>
               </div>
             ) : info.account_no && info.bank_bin ? (
-              <PayQR bank={info as PaySettings} amount={info.amount} code={info.pay_code} toast={() => undefined} />
+              <PayQR bank={info as PaySettings} amount={info.amount} code={info.transfer_note ?? info.pay_code} maxLen={50} toast={() => undefined} />
             ) : <p className="muted" style={{ margin: 0 }}>Số tiền cần đóng: <b>{vnd(info.amount)}</b>. Vui lòng liên hệ quản lý toà để nhận thông tin chuyển khoản.</p>}
           </>
         )}
