@@ -7,6 +7,7 @@ import { parseMoney, vnd } from "../lib/money";
 import { Sheet, TopBar, Combo } from "../components/ui";
 import { meterPhotoUrls, uploadMeterPhoto, type MeterPhoto, type MeterReading } from "../lib/files";
 import { ID_TYPES, type IdType } from "../lib/idDoc";
+import { invMonth, loadCustInvoices, payHref, type CustInvoice } from "../lib/custInvoices";
 import "../feedback.css";
 
 type Lease = {
@@ -38,6 +39,7 @@ export default function CustomerInfo() {
   const [readings, setReadings] = useState<MeterReading[]>([]);
   const [cycle, setCycle] = useState<Cycle[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
+  const [invs, setInvs] = useState<CustInvoice[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [err, setErr] = useState("");
   const [sheet, setSheet] = useState<"" | "occ" | "meter" | "lease" | "stmt">("");
@@ -48,12 +50,14 @@ export default function CustomerInfo() {
     if (error) { setErr(error.message); return; }
     const o = data as Overview; setOv(o); setErr("");
     const c = o.customer.id;
-    const [a, b, d, e] = await Promise.all([
+    const [a, b, d, e, f] = await Promise.all([
       supabase.rpc("occupants_list", { p_customer: c }),
       supabase.from("meter_readings").select("*").eq("customer_id", c).order("read_on", { ascending: false }).order("created_at", { ascending: false }).limit(30),
       supabase.rpc("meter_cycle", { p_customer: c }),
       supabase.from("customer_bills").select("id,kind,period,amount,due_date,status").eq("customer_id", c).in("status", ["chua_thanh_toan", "cho_xac_nhan"]).order("due_date", { nullsFirst: false }),
+      loadCustInvoices(c),
     ]);
+    setInvs(f.filter((i) => i.status === "chua_thu"));
     setOcc((a.data as Occupant[]) ?? []);
     const rs = (b.data as MeterReading[]) ?? [];
     setReadings(rs); setCycle((d.data as Cycle[]) ?? []); setBills((e.data as Bill[]) ?? []);
@@ -103,6 +107,15 @@ export default function CustomerInfo() {
           <h2 className="small muted" style={{ margin: "0 0 6px" }}>Công nợ</h2>
           <p style={{ margin: 0 }}>Còn nợ: <b className="num" style={{ color: ov.debt > 0 ? "var(--danger)" : undefined }}>{vnd(ov.debt)}</b>
             {ov.overdue > 0 ? <span className="muted small"> · quá hạn {vnd(ov.overdue)}</span> : null}</p>
+          {invs.map((i) => (
+            <div key={i.id} className="row small" style={{ justifyContent: "space-between", marginTop: 6, flexWrap: "nowrap", gap: 8 }}>
+              <span>Hoá đơn tiền phòng {invMonth(i.period)} · hạn {dmy(i.due_date).slice(0, 5)}{i.due_date < today ? " · quá hạn" : ""}</span>
+              <span className="row" style={{ gap: 8, flexWrap: "nowrap" }}>
+                <span className="num" style={{ whiteSpace: "nowrap" }}>{vnd(i.amount)}</span>
+                {staff ? null : <a className="btn sm" href={payHref(i.pay_code)}>Trả</a>}
+              </span>
+            </div>
+          ))}
           {bills.map((b) => (
             <div key={b.id} className="row small" style={{ justifyContent: "space-between", marginTop: 6 }}>
               <span>{KIND_LABEL[b.kind] ?? b.kind}{b.period ? ` ${b.period.slice(5, 7)}/${b.period.slice(0, 4)}` : ""}{b.due_date ? ` · hạn ${dmy(b.due_date).slice(0, 5)}` : ""}{b.due_date && b.due_date < today ? " · quá hạn" : ""}</span>

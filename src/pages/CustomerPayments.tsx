@@ -6,6 +6,7 @@ import { parseMoney, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import PayQR from "../components/PayQR";
 import type { PaySettings } from "../lib/vietqr";
+import { invMonth, loadCustInvoices, payHref, type CustInvoice } from "../lib/custInvoices";
 import "../feedback.css";
 
 type Kind = "tien_phong" | "dien" | "nuoc" | "phi_dich_vu" | "tien_coc" | "phieu_thu";
@@ -70,11 +71,16 @@ export function MyPayments() {
   const { toast } = useSession();
   const bank = useBank();
   const [rows, setRows] = useState<Bill[] | null>(null);
+  const [invs, setInvs] = useState<CustInvoice[]>([]);
   const [sel, setSel] = useState<Bill | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
-    const { data } = await supabase.from("customer_bills").select("*").neq("status", "huy").order("created_at", { ascending: false });
+    const [{ data }, iv] = await Promise.all([
+      supabase.from("customer_bills").select("*").neq("status", "huy").order("created_at", { ascending: false }),
+      loadCustInvoices(),
+    ]);
+    setInvs(iv);
     setRows((data as Bill[]) ?? []);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -93,7 +99,25 @@ export function MyPayments() {
     <>
       <TopBar title="Thanh toán" back="/thong-tin" />
       <main className="main stack">
-        {rows === null ? <div className="loading">Đang tải…</div> : rows.length === 0 ? <Empty title="Chưa có khoản nào cần thanh toán." /> : (
+        {rows !== null && invs.length ? (
+          <>
+            <h2 className="small muted" style={{ margin: 0 }}>Hoá đơn tiền phòng</h2>
+            {invs.map((i) => (
+              <a key={i.id} className="card list-row" style={{ padding: 12, textDecoration: "none", color: "inherit" }} href={i.status === "chua_thu" ? payHref(i.pay_code) : undefined}>
+                <div className="grow">
+                  <div className="name">Phòng {i.room_code} · tháng {invMonth(i.period)}</div>
+                  <div className="muted small">
+                    {i.status === "da_thu"
+                      ? `Đã thanh toán${i.paid_via === "chuyen_khoan" ? " · chuyển khoản" : ""}${i.txn_ref ? ` · mã GD ${i.txn_ref}` : ""}`
+                      : `Chưa thanh toán · hạn ${dmy(i.due_date)}${i.due_date < todayVN() ? " · quá hạn" : ""} · bấm để xem QR`}
+                  </div>
+                </div>
+                <b className="num">{vnd(i.amount)}</b>
+              </a>
+            ))}
+          </>
+        ) : null}
+        {rows === null ? <div className="loading">Đang tải…</div> : rows.length === 0 ? (invs.length ? null : <Empty title="Chưa có khoản nào cần thanh toán." />) : (
           <>
             {open.length ? <h2 className="small muted" style={{ margin: 0 }}>Cần thanh toán</h2> : null}
             {open.map((b) => <BillRow key={b.id} b={b} onClick={() => setSel(b)} />)}

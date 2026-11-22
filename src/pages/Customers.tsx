@@ -148,55 +148,69 @@ export default function Customers() {
   );
 }
 
+type Candidate = { tenant_id: string; full_name: string; phone: string; id_type: IdType; has_id: boolean; building_code: string; room_code: string; has_account_phone: boolean };
+
+/** Tạo tài khoản khách: chỉ cho khách đứng tên hợp đồng đang hiệu lực (SQL 085 kiểm tra lại khi lưu).
+ *  ID đăng nhập = SĐT trong hồ sơ khách thuê; phòng lấy theo hợp đồng; số giấy tờ phải khớp hồ sơ. */
 function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (cred: string) => void }) {
-  const { toast } = useSession();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [cands, setCands] = useState<Candidate[] | null>(null);
+  const [pick, setPick] = useState("");
   const [cccd, setCccd] = useState("");
   const [idType, setIdType] = useState<IdType>("cccd");
-  const [room, setRoom] = useState("");
   const [pw, setPw] = useState(tempPassword());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (open) { setName(""); setPhone(""); setCccd(""); setRoom(""); setPw(tempPassword()); setErr(null); } }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    setPick(""); setCccd(""); setPw(tempPassword()); setErr(null); setCands(null);
+    supabase.rpc("account_candidates").then(({ data }) => setCands(((data as Candidate[]) ?? []).sort((a, b) =>
+      `${a.building_code} ${a.room_code}`.localeCompare(`${b.building_code} ${b.room_code}`, "vi", { numeric: true }))));
+  }, [open]);
+  const c0 = cands?.find((x) => x.tenant_id === pick) ?? null;
+  useEffect(() => { if (c0) { setIdType(c0.id_type); setCccd(""); } }, [c0]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setErr(null);
-    const p = normPhone(phone);
+    if (!c0) { setErr("Chọn khách đứng tên hợp đồng."); return; }
+    if (c0.has_account_phone) { setErr("Số điện thoại này đã có tài khoản trong app."); return; }
     const c = normId(idType, cccd);
-    if (!/^0\d{9}$/.test(p)) { setErr("Số điện thoại phải có 10 số, bắt đầu bằng 0."); return; }
     const bad = accountIdError(idType, c);
     if (bad) { setErr(bad.charAt(0).toUpperCase() + bad.slice(1) + "."); return; }
     setBusy(true);
     try {
-      const r = await callAccountFn<{ id: string }>({ action: "create_customer", full_name: name.trim(), phone: p, cccd: c, id_type: idType, password: pw });
-      if (room) {
-        const { error } = await supabase.rpc("customer_assign_room", { p_customer: r.id, p_room: room });
-        if (error) toast("Đã tạo tài khoản nhưng chưa gán được phòng: " + error.message);
-      }
-      onDone(credText(name.trim(), p, pw));
-    } catch (ex) { setErr((ex as Error).message); }
+      await callAccountFn<{ id: string }>({ action: "create_customer", full_name: c0.full_name, phone: normPhone(c0.phone), cccd: c, id_type: idType, password: pw });
+      onDone(credText(c0.full_name, c0.phone, pw));
+    } catch (ex) { setErr((ex as Error).message.replace(/^Không thực hiện được: /, "")); }
     setBusy(false);
   }
+  const options = (cands ?? []).map((x) => [x.tenant_id, `${x.building_code} · P.${x.room_code} · ${x.full_name} · ${x.phone}${x.has_account_phone ? " (SĐT đã có tài khoản)" : ""}`] as const);
   return (
     <Sheet open={open} onClose={onClose} title="Tạo tài khoản khách hàng">
       <form className="stack" onSubmit={submit}>
-        <label className="field"><span>Họ tên *</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></label>
-        <label className="field"><span>Số điện thoại (ID đăng nhập) *</span><input className="input" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required /></label>
-        <label className="field"><span>Giấy tờ</span>
-          <Combo value={idType} options={ID_TYPES} onChange={(k) => { setIdType(k); setCccd(""); }} /></label>
-        <label className="field"><span>Số {ID_NAME[idType]} ({idType === "passport" ? "6–20 chữ và số" : "12 số"}, mỗi giấy tờ chỉ đăng ký một lần) *</span>
-          <input className="input" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" maxLength={idType === "passport" ? 24 : 14} value={cccd}
-            onChange={(e) => setCccd(idType === "passport" ? e.target.value.toUpperCase() : e.target.value)} required /></label>
-        <RoomPicker value={room} onChange={setRoom} />
-        <label className="field"><span>Mật khẩu tạm</span>
-          <div className="row" style={{ flexWrap: "nowrap" }}>
-            <input className="input mono" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} />
-            <button type="button" className="btn secondary sm" onClick={() => setPw(tempPassword())}>Tạo mới</button>
-          </div></label>
+        <p className="muted small" style={{ margin: 0 }}>Chỉ tạo cho khách đứng tên hợp đồng đang hiệu lực. ID đăng nhập là số điện thoại trong hồ sơ khách thuê. Mỗi CCCD / hộ chiếu chỉ một tài khoản.</p>
+        <label className="field"><span>Khách đứng tên hợp đồng *</span>
+          {cands === null ? <div className="loading">Đang tải…</div> : options.length ? (
+            <Combo id="cc-pick" value={pick} options={options} onChange={setPick} placeholder="— Chọn khách —" label="Khách đứng tên hợp đồng" />
+          ) : <small className="muted">Không còn khách nào để tạo. Khách cần đứng tên hợp đồng đang hiệu lực và có số điện thoại trong hồ sơ khách thuê.</small>}
+        </label>
+        {c0 ? (
+          <>
+            <label className="field"><span>Giấy tờ</span>
+              <Combo value={idType} options={ID_TYPES} onChange={(k) => { setIdType(k); setCccd(""); }} /></label>
+            <label className="field"><span>Số {ID_NAME[idType]} khách đưa ({idType === "passport" ? "6–20 chữ và số" : "12 số"}) *</span>
+              <input id="cc-id" className="input" inputMode={idType === "passport" ? "text" : "numeric"} autoCapitalize="characters" maxLength={idType === "passport" ? 24 : 14} value={cccd}
+                onChange={(e) => setCccd(idType === "passport" ? e.target.value.toUpperCase() : e.target.value)} required />
+              <small className="muted">{c0.has_id ? "App đối chiếu với số đã lưu trong hồ sơ khách thuê." : "Hồ sơ khách thuê chưa có số giấy tờ. Nên bổ sung trong hồ sơ khách thuê."}</small></label>
+            <label className="field"><span>Mật khẩu tạm</span>
+              <div className="row" style={{ flexWrap: "nowrap" }}>
+                <input className="input mono" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} />
+                <button type="button" className="btn secondary sm" onClick={() => setPw(tempPassword())}>Tạo mới</button>
+              </div></label>
+          </>
+        ) : null}
         {err ? <div className="error-box" role="alert">{err}</div> : null}
-        <button className="btn block" disabled={busy}>{busy ? "Đang tạo…" : "Tạo tài khoản"}</button>
+        <button className="btn block" disabled={busy || !c0}>{busy ? "Đang tạo…" : "Tạo tài khoản"}</button>
       </form>
     </Sheet>
   );
