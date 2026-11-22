@@ -12,6 +12,7 @@ import { CostGrid, LegGrid } from "../components/TripGrids";
 import { TRIP_TYPE, VISA_TYPE, costFilled, costFromRow, costTotal, emptyCost, emptyLeg, legFromRow, loadTrip, saveTrip, type CostDraft, type LegDraft } from "../lib/trip";
 import { LEVEL_SHORT } from "../lib/org";
 import { Icon, TopBar, Combo } from "../components/ui";
+import { expenseOptions } from "../lib/expense";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
 import { addLink } from "../lib/links";
 import { ChainPreview } from "../components/ApprovalChain";
@@ -51,6 +52,7 @@ export default function RequestForm() {
   const [payee, setPayee] = useState("");
   const [bank, setBank] = useState("");
   const [buildingId, setBuildingId] = useState("");
+  const [expCat, setExpCat] = useState("");   // khoản chi của toà (SQL 090), chỉ ĐNTT / tạm ứng gắn toà
   const link = useLinkFrom(!editing);   // lập đề nghị từ công việc / phòng / phản ánh…: gắn liên kết sau khi gửi
   useEffect(() => { if (link.info?.parent && !buildingId && buildings.some((b) => b.id === link.info!.parent)) setBuildingId(link.info.parent); }, [link.info]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false);
@@ -203,7 +205,7 @@ export default function RequestForm() {
       setStart(r.start_date); setEnd(r.end_date ?? r.start_date);
       setT1(r.start_time?.slice(0, 5) ?? ""); setT2(r.end_time?.slice(0, 5) ?? "");
       setLocation(r.location ?? ""); setReason(r.reason); setAmount(r.amount ? String(r.amount) : "");
-      setPayee(r.payee ?? ""); setBank(r.bank_info ?? ""); setBuildingId(r.building_id ?? "");
+      setPayee(r.payee ?? ""); setBank(r.bank_info ?? ""); setBuildingId(r.building_id ?? ""); setExpCat(r.expense_category ?? "");
       if (r.kind === "nghi_phep" && r.sub_type === "phep_nam" && r.status === "cho_duyet") setOrigPending(Number(r.days ?? 0));
       setPayMethod(r.pay_method ?? (r.bank_info ? "chuyen_khoan" : "tien_mat")); setPayType(r.pay_type ?? "khac");
       setLoaId(r.loa_id ?? ""); setOldLoaNo(r.loa_id ? null : r.loa_no); setVendorCode(r.vendor_code ?? ""); setContactName(r.contact_name ?? ""); setContactCode(r.contact_code ?? "");
@@ -308,6 +310,7 @@ export default function RequestForm() {
       payee: isMoney || isBuy ? payee.trim() || null : null,
       bank_info: isMoney ? bank.trim() || null : null,
       building_id: buildingId || null,
+      expense_category: isMoney && buildingId ? expCat || "Khác" : null,
       pay_method: isPay ? payMethod : null,
       pay_type: isPay ? payType : null,
       loa_id: isMoney || isBuy ? loaId || null : null,
@@ -477,11 +480,18 @@ export default function RequestForm() {
   ) : null;
 
   const BuildingSel = kind !== "nghi_phep" && buildings.length ? (
+    <>
     <label className="field"><span>Toà nhà liên quan</span>
       <select id="rq-building" className="input" value={buildingId} onChange={(e) => setBuildingId(e.target.value)}>
         <option value="">Không gắn toà</option>
         {buildings.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
       </select></label>
+      {isMoney && buildingId ? (
+        <label className="field"><span>Khoản chi của toà</span>
+          <Combo id="rq-expcat" value={expCat} options={expenseOptions} onChange={setExpCat} placeholder="— Chọn khoản chi —" label="Khoản chi của toà" />
+          <small className="muted">Khoản này vào sổ thu chi của toà khi được duyệt (VD: Hoa hồng môi giới, Thưởng nóng, Rác).</small></label>
+      ) : null}
+    </>
   ) : null;
 
   const ReadOnly = ({ label, value, num }: { label: string; value: string; num?: boolean }) => (

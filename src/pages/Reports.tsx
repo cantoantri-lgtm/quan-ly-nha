@@ -3,11 +3,13 @@ import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { todayVN } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
-import { Empty, Sheet, TopBar } from "../components/ui";
+import { Combo, Empty, Sheet, TopBar } from "../components/ui";
+import { EXPENSE_CATS, expenseOptions } from "../lib/expense";
+import LedgerTab from "../components/LedgerTab";
 import Pivot, { withSales, type Dim, type SaleMap, type WithSale } from "../components/Pivot";
 import "../reports.css";
 
-type Tab = "thu_chi" | "lap_day" | "phan_anh" | "loi_nhuan" | "chi_phi";
+type Tab = "thu_chi" | "lap_day" | "phan_anh" | "loi_nhuan" | "so_thu_chi" | "chi_phi";
 type Group = "toa" | "nhan_vien" | "lead" | "sale" | "lead_sale";
 type G = { k: Group; t: string };
 // Nhóm theo từng loại báo cáo. Sale = nhân viên KD phụ trách toà; Leader sale = trưởng nhóm của sale đó (Sơ đồ công ty).
@@ -36,7 +38,7 @@ export default function Reports() {
   const setGroup = (g: Group) => setGroups((cur) => ({ ...cur, [tab]: g }));
   const tabs: { k: Tab; t: string }[] = [
     { k: "thu_chi", t: "Thu chi" }, { k: "lap_day", t: "Lấp đầy" }, ...(isLeadUp ? [{ k: "phan_anh" as Tab, t: "Phản ánh" }] : []),
-    ...(fin ? [{ k: "loi_nhuan" as Tab, t: "Lợi nhuận" }, { k: "chi_phi" as Tab, t: "Chi phí & thuê nhà" }] : []),
+    ...(fin ? [{ k: "loi_nhuan" as Tab, t: "Lợi nhuận" }, { k: "so_thu_chi" as Tab, t: "Sổ thu chi toà" }, { k: "chi_phi" as Tab, t: "Chi phí & thuê nhà" }] : []),
   ];
   const range = tab !== "chi_phi";
   return (
@@ -61,6 +63,7 @@ export default function Reports() {
         {tab === "lap_day" ? <OccTab from={from} to={to} group={group} /> : null}
         {tab === "phan_anh" && isLeadUp ? <FbTab from={from} to={to} group={group} /> : null}
         {tab === "loi_nhuan" && fin ? <ProfitTab from={from} to={to} /> : null}
+        {tab === "so_thu_chi" && fin ? <LedgerTab from={from} to={to} /> : null}
         {tab === "chi_phi" && fin ? <CostTab /> : null}
       </main>
     </>
@@ -252,7 +255,6 @@ function ProfitTab({ from, to }: { from: string; to: string }) {
 
 type Exp = { id: string; building_id: string; spent_on: string; category: string; amount: number; note: string | null };
 type Rent = { id: string; building_id: string; effective_from: string; monthly_rent: number; note: string | null };
-const CATS = ["Điện", "Nước", "Internet", "Sửa chữa", "Vệ sinh", "Nhân sự", "Quảng cáo", "Khác"];
 
 function CostTab() {
   const { buildings, toast, isManager } = useSession();
@@ -374,9 +376,8 @@ function ExpSheet({ open, item, onClose, onDone }: { open: boolean; item: Exp | 
           <select className="input" value={f.b} onChange={(e) => setF({ ...f, b: e.target.value })}>{buildings.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}</select></label>
         <div className="row" style={{ flexWrap: "nowrap", gap: 8 }}>
           <label className="field" style={{ flex: 1 }}><span>Ngày chi</span><input className="input" type="date" value={f.d} onChange={(e) => setF({ ...f, d: e.target.value })} /></label>
-          <label className="field" style={{ flex: 1 }}><span>Loại chi</span>
-            <input className="input" list="cat-list" value={f.c} onChange={(e) => setF({ ...f, c: e.target.value })} maxLength={40} />
-            <datalist id="cat-list">{CATS.map((c) => <option key={c} value={c} />)}</datalist></label>
+          <label className="field" style={{ flex: 1 }}><span>Khoản chi</span>
+            <Combo id="exp-cat" value={f.c} options={(EXPENSE_CATS as readonly string[]).includes(f.c) ? expenseOptions : [...expenseOptions, [f.c, f.c] as const]} onChange={(c) => setF({ ...f, c })} label="Khoản chi" /></label>
         </div>
         <label className="field"><span>Số tiền (đ) *</span><input className="input" inputMode="decimal" value={f.amt} onChange={(e) => setF({ ...f, amt: e.target.value })} required /></label>
         <label className="field"><span>Ghi chú</span><input className="input" value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} maxLength={300} /></label>

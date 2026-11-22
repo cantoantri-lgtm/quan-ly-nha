@@ -67,6 +67,7 @@ export type Req = {
   project_id?: string | null;
   project_item_id?: string | null;
   purchase_id?: string | null;   // đề nghị thanh toán tham chiếu đề nghị mua hàng
+  expense_category?: string | null;   // khoản chi của toà (SQL 090) trên ĐNTT / tạm ứng gắn toà
 };
 
 export type ReqLine = {

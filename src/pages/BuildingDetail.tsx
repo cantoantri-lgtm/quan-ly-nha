@@ -182,6 +182,7 @@ export default function BuildingDetail() {
 
         <div className="row">
           <Link className="btn secondary sm" to={`/toa/${building.id}/khach`}>Khách thuê</Link>
+          <Link className="btn secondary sm" to={`/toa/${building.id}/khach-o`}>Khách ở & xe</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hop-dong`}>Hợp đồng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hoa-don`}>Thu tiền phòng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/dien-phong`}>Điện nước phòng</Link>

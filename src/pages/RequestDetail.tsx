@@ -265,7 +265,7 @@ export default function RequestDetail() {
             <dt>Hình thức</dt><dd>{r.pay_method ? PAY_METHOD[r.pay_method] : r.bank_info ? "Chuyển khoản" : "Tiền mặt"}{r.bank_info ? ` — ${r.bank_info}` : ""}</dd>
           </>) : null}
           <dt>{isMoney ? "Nội dung" : isBuy || r.kind === "cong_tac" ? "Mục đích" : r.kind === "ra_ngoai" ? "Công việc" : "Lý do"}</dt><dd className="desc">{r.reason}</dd>
-          {building ? (<><dt>Toà nhà</dt><dd>{building.code} · {building.name}</dd></>) : null}
+          {building ? (<><dt>Toà nhà</dt><dd>{building.code} · {building.name}{r.expense_category ? ` · khoản chi: ${r.expense_category}` : ""}</dd></>) : null}
           {r.handover_to ? (<><dt>Bàn giao cho</dt><dd>{name(r.handover_to)}</dd></>) : null}
           {r.contact_phone ? (<><dt>SĐT liên hệ</dt><dd className="num">{r.contact_phone}</dd></>) : null}
         </dl>

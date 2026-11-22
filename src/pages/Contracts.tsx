@@ -11,6 +11,7 @@ import ContractQR from "../components/ContractQR";
 import { ContractTerm } from "../components/ContractTerm";
 import { uploadFile } from "../lib/files";
 import type { Room } from "./BuildingDetail";
+import { VEHICLE_KIND, type Vehicle, type VehicleKind } from "../lib/vehicles";
 import { ID_NAME, ID_PHOTOS, ID_TYPES, idError, normId, type IdType } from "../lib/idDoc";
 import "../files.css";
 
@@ -203,7 +204,7 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
           <dt>Hiệu lực</dt><dd>{ddmmyyyy(c.start_date)} → {c.end_date ? ddmmyyyy(c.end_date) : <b style={{ color: "var(--late)" }}>chưa có ngày kết thúc</b>}</dd>
           <dt>Giá thuê</dt><dd className="num">{vnd(c.rent_amount)}/tháng · hạn ngày {c.billing_day}</dd>
           <dt>Tiền cọc</dt><dd className="num">{vnd(c.deposit_amount)} · {DEP[c.deposit_status]}</dd>
-          <dt>Số xe gửi</dt><dd className="num">{c.vehicles ?? 0} xe</dd>
+          <dt>Số xe tính phí</dt><dd className="num">{c.vehicles ?? 0} xe</dd>
           <dt>Cách ký</dt><dd>{c.sign_method ? `${SIGN[c.sign_method]}${c.signed_on ? ` ngày ${ddmmyyyy(c.signed_on)}` : ""}` : "Chưa ký"}</dd>
         </dl>
         <div className="row">
@@ -212,6 +213,7 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
         </div>
 
         <OccupantsPanel c={c} canEdit={canEdit} />
+        <VehiclesPanel c={c} canEdit={canEdit} onChanged={onChanged} />
 
         <div className="row">
           {c.deposit_status === "chua_thu" && c.deposit_amount > 0 && c.status === "hieu_luc" ? <button className="btn secondary sm" disabled={busy} onClick={() => patch({ deposit_status: "da_thu" }, "Đã đánh dấu thu cọc.")}>Đánh dấu đã thu cọc</button> : null}
@@ -295,6 +297,69 @@ function EditContract({ c, onClose, onSaved }: { c: Contract; onClose: () => voi
   );
 }
 
+/* ---------- Xe đăng ký: loại xe, dòng xe, biển số. Thêm / thôi gửi thì số xe tính phí tự cập nhật (SQL 090) ---------- */
+function VehiclesPanel({ c, canEdit, onChanged }: { c: Contract; canEdit: boolean; onChanged: () => void }) {
+  const { toast } = useSession();
+  const [list, setList] = useState<Vehicle[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [kind, setKind] = useState<VehicleKind>("xe_may");
+  const [model, setModel] = useState("");
+  const [plate, setPlate] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("contract_vehicles").select("id,kind,model,plate,registered_on").eq("contract_id", c.id).is("removed_on", null).order("created_at");
+    setList((data as Vehicle[]) ?? []);
+  }, [c.id]);
+  useEffect(() => { load(); }, [load]);
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    if (kind !== "xe_dap" && !plate.trim()) { toast("Nhập biển số xe."); return; }
+    setBusy(true);
+    const { error } = await supabase.from("contract_vehicles").insert({ contract_id: c.id, kind, model: model.trim() || null, plate: plate.trim() || null });
+    setBusy(false);
+    if (error) { toast(friendlyError(error)); return; }
+    toast("Đã đăng ký xe."); setAdding(false); setModel(""); setPlate(""); setKind("xe_may"); load(); onChanged();
+  }
+  async function remove(v: Vehicle) {
+    setBusy(true);
+    const { error } = await supabase.from("contract_vehicles").update({ removed_on: todayVN() }).eq("id", v.id);
+    setBusy(false);
+    if (error) { toast(friendlyError(error)); return; }
+    toast(`Đã ghi thôi gửi xe ${v.plate ?? VEHICLE_KIND[v.kind]}.`); load(); onChanged();
+  }
+  return (
+    <section className="stack" style={{ gap: 6 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <b>Xe đăng ký ({list.length})</b>
+        {canEdit && c.status === "hieu_luc" && !adding ? <button type="button" className="btn secondary sm" onClick={() => setAdding(true)}>+ Đăng ký xe</button> : null}
+      </div>
+      {list.length === 0 && !adding ? <small className="muted">Chưa có xe nào. Phí gửi xe trên hoá đơn tính theo số xe đăng ký (trừ xe đạp).</small> : null}
+      {list.map((v) => (
+        <div key={v.id} className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap", borderTop: "1px solid var(--line)", paddingTop: 6 }}>
+          <span style={{ minWidth: 0 }}><b className="num">{v.plate ?? "Không biển"}</b> · {VEHICLE_KIND[v.kind]}{v.model ? ` · ${v.model}` : ""}
+            <br /><small className="muted">đăng ký {ddmmyyyy(v.registered_on)}</small></span>
+          {canEdit ? <button type="button" className="btn ghost sm" style={{ whiteSpace: "nowrap" }} disabled={busy} onClick={() => remove(v)}>Thôi gửi</button> : null}
+        </div>
+      ))}
+      {adding ? (
+        <form className="stack card" style={{ padding: 10, gap: 8 }} onSubmit={add}>
+          <label className="field"><span>Loại xe</span>
+            <Combo id="veh-kind" value={kind} options={VEHICLE_KIND} onChange={setKind} label="Loại xe" /></label>
+          <label className="field"><span>Hãng, dòng xe</span>
+            <input id="veh-model" className="input" maxLength={60} value={model} onChange={(e) => setModel(e.target.value)} placeholder="VD: Honda Vision, Airblade" /></label>
+          <label className="field"><span>Biển số{kind === "xe_dap" ? "" : " *"}</span>
+            <input id="veh-plate" className="input" maxLength={20} autoCapitalize="characters" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder="VD: 59H1-123.45" /></label>
+          <div className="row">
+            <button className="btn sm" disabled={busy}>{busy ? "Đang lưu…" : "Lưu xe"}</button>
+            <button type="button" className="btn ghost sm" onClick={() => setAdding(false)}>Huỷ</button>
+          </div>
+        </form>
+      ) : null}
+    </section>
+  );
+}
+
 /* ---------- Người ở trong phòng: mỗi người phải đủ giấy tờ (CCCD: số + ảnh 2 mặt; hộ chiếu: số + ảnh trang thông tin) ---------- */
 type Occ = { id: string; tenant_id: string; move_in: string; move_out: string | null; tenants: { full_name: string; phone: string | null } | null };
 
@@ -338,6 +403,7 @@ function OccupantsPanel({ c, canEdit }: { c: Contract; canEdit: boolean }) {
           <span style={{ minWidth: 0 }}>
             <Link to={`/khach/${o.tenant_id}`}>{o.tenants?.full_name ?? "—"}</Link>
             {o.tenant_id === c.tenant_id ? <small className="muted"> · đứng tên</small> : null}
+            {o.tenants?.phone ? <small className="muted"> · {o.tenants.phone}</small> : null}
             <br /><small className={ok[o.tenant_id] ? "muted" : ""} style={ok[o.tenant_id] ? undefined : { color: "var(--danger)" }}>
               {ok[o.tenant_id] ? "Đủ giấy tờ" : "Thiếu CCCD / hộ chiếu: mở hồ sơ để bổ sung"} · vào ở {ddmmyyyy(o.move_in)}</small>
           </span>
