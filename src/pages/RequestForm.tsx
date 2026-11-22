@@ -12,7 +12,7 @@ import { CostGrid, LegGrid } from "../components/TripGrids";
 import { TRIP_TYPE, VISA_TYPE, costFilled, costFromRow, costTotal, emptyCost, emptyLeg, legFromRow, loadTrip, saveTrip, type CostDraft, type LegDraft } from "../lib/trip";
 import { LEVEL_SHORT } from "../lib/org";
 import { Icon, TopBar, Combo } from "../components/ui";
-import { expenseOptions } from "../lib/expense";
+import { expenseOptions, linkExpenses, loadMyOpenExpenses, type Expense } from "../lib/expense";
 import { LinkFromNote, useLinkFrom } from "../components/RelatedPanel";
 import { addLink } from "../lib/links";
 import { ChainPreview } from "../components/ApprovalChain";
@@ -53,6 +53,10 @@ export default function RequestForm() {
   const [bank, setBank] = useState("");
   const [buildingId, setBuildingId] = useState("");
   const [expCat, setExpCat] = useState("");   // khoản chi của toà (SQL 090), chỉ ĐNTT / tạm ứng gắn toà
+  // Khoản chi toà mình đã tự ứng tiền (SQL 091), chọn để quyết toán qua đề nghị này
+  const [myExps, setMyExps] = useState<Expense[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [expApplied, setExpApplied] = useState(false);
   const link = useLinkFrom(!editing);   // lập đề nghị từ công việc / phòng / phản ánh…: gắn liên kết sau khi gửi
   useEffect(() => { if (link.info?.parent && !buildingId && buildings.some((b) => b.id === link.info!.parent)) setBuildingId(link.info.parent); }, [link.info]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [busy, setBusy] = useState(false);
@@ -249,6 +253,39 @@ export default function RequestForm() {
     supabase.rpc("loa_pickable").then(({ data }) => setPicks((data ?? []) as LoaPick[]));
   }, [isMoney, kind]);
   const isPay = kind === "thanh_toan";
+  const chiParam = !id && qs.get("chi") === "1";
+  useEffect(() => {
+    if (!isMoney || !profile) return;
+    loadMyOpenExpenses(profile.id, editing ? id : null).then((rows) => {
+      setMyExps(rows);
+      if (editing) setPicked(rows.filter((x) => x.request_id === id).map((x) => x.id));
+      else if (chiParam) setPicked(rows.map((x) => x.id));
+    });
+  }, [isMoney, profile, editing, id, chiParam]);
+  const pickedExps = myExps.filter((x) => picked.includes(x.id));
+  const pickedSum = pickedExps.reduce((t, x) => t + x.amount, 0);
+  /** Đưa các khoản đã chọn vào đề nghị: ĐNTT thành các dòng chi tiết, tạm ứng thành số tiền */
+  function applyExpenses(list: Expense[] = pickedExps) {
+    if (!list.length) return;
+    const code = (bid: string) => buildings.find((b) => b.id === bid)?.code ?? "";
+    const fmt = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
+    const bids = [...new Set(list.map((x) => x.building_id))];
+    if (!reason.trim()) setReason(`Quyết toán chi phí toà ${bids.map(code).join(", ")} nhân viên đã ứng`);
+    if (bids.length === 1 && !buildingId) setBuildingId(bids[0]);
+    if (isPay) {
+      setPayType("hoan_ung");
+      if (!payee.trim()) setPayee(profile?.full_name ?? "");
+      setLines(list.map((x) => ({
+        ...emptyLine(),
+        description: `${x.category} · ${ddmmyyyy(x.spent_on)}${x.note ? " · " + x.note : ""}`,
+        amount: fmt(x.amount), cost_center: code(x.building_id),
+      })));
+    } else setAmount(fmt(list.reduce((t, x) => t + x.amount, 0)));
+    setExpApplied(true);
+  }
+  useEffect(() => {   // mở từ trang Chi phí toà (?chi=1): tự đưa các khoản vào đề nghị
+    if (chiParam && !expApplied && pickedExps.length) applyExpenses();
+  }, [chiParam, expApplied, pickedExps.length]);   // eslint-disable-line react-hooks/exhaustive-deps
   const isBuy = kind === "mua_hang";
   const absence = kind === "nghi_phep" || kind === "ra_ngoai" || kind === "cong_tac";   // vắng mặt: có bàn giao
   // Dòng trống hoàn toàn (vd vừa bấm thêm dòng) thì bỏ qua khi tính và khi lưu
@@ -275,6 +312,9 @@ export default function RequestForm() {
     }
     const amt = isPay ? tot.net : parseMoney(amount);
     if (isMoney && !amt) { setErr(isPay ? "Tiền tạm ứng phải nhỏ hơn tổng thanh toán." : "Nhập số tiền đề nghị."); return; }
+    if (isMoney && pickedSum > 0 && (isPay ? tot.gross : amt ?? 0) < pickedSum) {
+      setErr(`Số tiền đề nghị nhỏ hơn tổng các khoản chi toà đã chọn (${new Intl.NumberFormat("vi-VN").format(pickedSum)} đ). Bấm "Đưa vào đề nghị" hoặc bỏ bớt khoản.`); return;
+    }
     if (!hasLines && !isBuy && amount && !amt) { setErr("Số tiền chưa đúng định dạng."); return; }
     if (isPay) {
       if (payMethod === "chuyen_khoan" && !bank.trim()) { setErr("Nhập số tài khoản và ngân hàng nhận tiền."); return; }
@@ -376,6 +416,9 @@ export default function RequestForm() {
           if (r3.error) problems.push(friendlyError(r3.error));
         }
       }
+    }
+    if (isMoney && (picked.length || myExps.some((x) => x.request_id === rid))) {
+      try { await linkExpenses(rid, picked); } catch (ex) { problems.push(`chưa gắn được khoản chi toà: ${(ex as Error).message}`); }
     }
     if (!editing && link.from) {
       const le = await addLink("request", rid, link.from.type, link.from.id);
@@ -631,6 +674,29 @@ export default function RequestForm() {
                 <textarea id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
                   placeholder={kind === "nghi_phep" ? "VD: Việc gia đình" : ""} /></label>
               <div className="dn-fields">{Handover}</div>
+            </section>
+          ) : null}
+
+          {isMoney && myExps.length ? (
+            <section className="card dn-sec">
+              <h2 className="dn-h">Khoản chi toà bạn đã ứng ({myExps.length})</h2>
+              <p className="muted small" style={{ margin: 0 }}>Chọn các khoản muốn công ty hoàn tiền qua đề nghị này. Kế toán chi xong, các khoản chuyển sang "Đã quyết toán".</p>
+              {myExps.map((x) => (
+                <label key={x.id} className="row small" style={{ flexWrap: "nowrap", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 6 }}>
+                  <input type="checkbox" checked={picked.includes(x.id)}
+                    onChange={(e) => setPicked(e.target.checked ? [...picked, x.id] : picked.filter((k) => k !== x.id))} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <b>{buildings.find((b) => b.id === x.building_id)?.code ?? ""}</b> · {x.category} · {ddmmyyyy(x.spent_on)}{x.note ? ` · ${x.note}` : ""}
+                  </span>
+                  <b className="num">{new Intl.NumberFormat("vi-VN").format(x.amount)} đ</b>
+                </label>
+              ))}
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className="small">Đã chọn {pickedExps.length} khoản · <b className="num">{new Intl.NumberFormat("vi-VN").format(pickedSum)} đ</b></span>
+                <button type="button" className="btn secondary sm" disabled={!pickedExps.length} onClick={() => applyExpenses()}>
+                  Đưa vào đề nghị</button>
+              </div>
+              {expApplied ? <small className="muted">{isPay ? "Đã điền các khoản vào bảng chi tiết thanh toán bên dưới (Cost Center = mã toà)." : "Đã điền số tiền tạm ứng."}</small> : null}
             </section>
           ) : null}
 

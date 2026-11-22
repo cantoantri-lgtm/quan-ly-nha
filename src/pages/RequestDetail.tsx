@@ -17,6 +17,7 @@ import { CostGrid, CostTable, LegGrid, LegTable } from "../components/TripGrids"
 import { TRIP_TYPE, VISA_TYPE, costFilled, costFromRow, costTotal, emptyCost, emptyLeg, legFilled, legFromRow, loadTrip, saveTrip, type CostDraft, type LegDraft, type TripCost, type TripLeg } from "../lib/trip";
 import { PurchaseTable } from "../components/PurchaseGrid";
 import { loadPLines, type PLine } from "../lib/purchase";
+import { SETTLE_LABEL, type SettleStatus } from "../lib/expense";
 import "../office.css";
 
 export default function RequestDetail() {
@@ -271,6 +272,8 @@ export default function RequestDetail() {
         </dl>
         )}
 
+        {isMoney ? <LinkedExpenses requestId={r.id} /> : null}
+
         {isTrip && trip ? (
           <>
             <div className="section-title">Kế hoạch công tác</div>
@@ -518,6 +521,35 @@ export default function RequestDetail() {
             }}>{confirm === "chi" ? "Kết thúc" : confirm === "xoa" ? "Xoá" : "Rút lại"}</button>
         </div>
       </Sheet>
+    </>
+  );
+}
+
+/** Khoản chi toà nhân viên đã ứng, gắn vào đề nghị này để quyết toán (SQL 091 / 092) */
+type LExp = { id: string; building_code: string; spent_on: string; category: string; amount: number; note: string | null;
+  paid_by_name: string | null; settle_status: SettleStatus; settle_note: string | null };
+function LinkedExpenses({ requestId }: { requestId: string }) {
+  const [rows, setRows] = useState<LExp[]>([]);
+  useEffect(() => {
+    supabase.rpc("request_expenses", { p_request: requestId }).then(({ data }) => setRows((data as LExp[]) ?? []));
+  }, [requestId]);
+  if (!rows.length) return null;
+  const total = rows.reduce((t, x) => t + Number(x.amount), 0);
+  return (
+    <>
+      <div className="section-title">Khoản chi toà quyết toán ({rows.length})</div>
+      <div className="card stack" style={{ gap: 6 }}>
+        {rows.map((x) => (
+          <div key={x.id} className="row small" style={{ justifyContent: "space-between", flexWrap: "nowrap", gap: 8 }}>
+            <span style={{ minWidth: 0 }}><b>{x.building_code}</b> · {x.category} · {x.spent_on.split("-").reverse().join("/")}{x.note ? ` · ${x.note}` : ""}
+              <br /><small className="muted">Người ứng: {x.paid_by_name ?? "—"} · {SETTLE_LABEL[x.settle_status]}{x.settle_note ? ` · ${x.settle_note}` : ""}</small></span>
+            <b className="num" style={{ whiteSpace: "nowrap" }}>{vnd(Number(x.amount))}</b>
+          </div>
+        ))}
+        <div className="row small" style={{ justifyContent: "space-between", borderTop: "1px solid var(--line)", paddingTop: 6 }}>
+          <span>Cộng</span><b className="num">{vnd(total)}</b>
+        </div>
+      </div>
     </>
   );
 }

@@ -4,7 +4,7 @@ import { useSession } from "../lib/session";
 import { todayVN } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
 import { Combo, Empty, Sheet, TopBar } from "../components/ui";
-import { EXPENSE_CATS, expenseOptions } from "../lib/expense";
+import { EXPENSE_CATS, expenseOptions, SETTLE_LABEL, type SettleStatus } from "../lib/expense";
 import LedgerTab from "../components/LedgerTab";
 import Pivot, { withSales, type Dim, type SaleMap, type WithSale } from "../components/Pivot";
 import "../reports.css";
@@ -253,7 +253,7 @@ function ProfitTab({ from, to }: { from: string; to: string }) {
   );
 }
 
-type Exp = { id: string; building_id: string; spent_on: string; category: string; amount: number; note: string | null };
+type Exp = { id: string; building_id: string; spent_on: string; category: string; amount: number; note: string | null; settle_status?: SettleStatus; pay_source?: string };
 type Rent = { id: string; building_id: string; effective_from: string; monthly_rent: number; note: string | null };
 
 function CostTab() {
@@ -271,7 +271,7 @@ function CostTab() {
     const next = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 1);
     const end = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`;
     const [e, r] = await Promise.all([
-      supabase.from("building_expenses").select("id,building_id,spent_on,category,amount,note").gte("spent_on", month).lt("spent_on", end).order("spent_on", { ascending: false }),
+      supabase.from("building_expenses").select("id,building_id,spent_on,category,amount,note,settle_status,pay_source").gte("spent_on", month).lt("spent_on", end).order("spent_on", { ascending: false }),
       supabase.from("building_rents").select("id,building_id,effective_from,monthly_rent,note").order("effective_from", { ascending: false }),
     ]);
     setExps((e.data as Exp[]) ?? []); setRents((r.data as Rent[]) ?? []);
@@ -335,7 +335,7 @@ function CostTab() {
         {!exps.length ? <p className="muted small" style={{ margin: 0 }}>Tháng này chưa có khoản chi.</p> : null}
         {exps.map((x) => (
           <div key={x.id} className="row small" style={{ justifyContent: "space-between", flexWrap: "nowrap", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
-            <span style={{ minWidth: 0 }}><b>{bname(x.building_id)}</b> · {x.category} · {dmy(x.spent_on).slice(0, 5)}{x.note ? <span className="muted"> · {x.note}</span> : null}</span>
+            <span style={{ minWidth: 0 }}><b>{bname(x.building_id)}</b> · {x.category} · {dmy(x.spent_on).slice(0, 5)}{x.note ? <span className="muted"> · {x.note}</span> : null}{x.settle_status ? <span className="muted"> · {x.pay_source === "cong_ty" ? "công ty trả" : SETTLE_LABEL[x.settle_status].toLowerCase()}</span> : null}</span>
             <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
               <b className="num">{vnd(x.amount)}</b>
               <button className="btn ghost sm" onClick={() => { setEditE(x); setSheet("exp"); }}>Sửa</button>
@@ -364,7 +364,8 @@ function ExpSheet({ open, item, onClose, onDone }: { open: boolean; item: Exp | 
     if (!f.b) { toast("Chọn toà nhà."); return; }
     if (!a || a <= 0) { toast("Nhập số tiền chi."); return; }
     setBusy(true);
-    const { error } = await supabase.rpc("expense_save", { p_id: item?.id ?? null, p_building: f.b, p_date: f.d, p_category: f.c, p_amount: a, p_note: f.note });
+    // Kế toán / Quản lý nhập ở đây là khoản công ty trả trực tiếp (đã quyết toán). Nhân viên tự ứng thì ghi ở trang toà → Chi phí toà.
+    const { error } = await supabase.rpc("expense_save", { p_id: item?.id ?? null, p_building: f.b, p_date: f.d, p_category: f.c, p_amount: a, p_note: f.note, p_source: "cong_ty" });
     setBusy(false);
     if (error) { toast(friendlyError(error)); return; }
     toast("Đã lưu khoản chi."); onDone();

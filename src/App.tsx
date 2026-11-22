@@ -38,6 +38,7 @@ import Contracts from "./pages/Contracts";
 import Invoices from "./pages/Invoices";
 import PayPage from "./pages/PayPage";
 import Roster from "./pages/Roster";
+import BuildingExpenses from "./pages/BuildingExpenses";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 import VacantRooms from "./pages/VacantRooms";
 import VatDaily from "./pages/VatDaily";
@@ -169,6 +170,7 @@ export default function App() {
         <Route path="toa/:id" element={<BuildingDetail />} />
         <Route path="toa/:id/khach" element={<Tenants />} />
         <Route path="toa/:id/khach-o" element={<Roster />} />
+        <Route path="toa/:id/chi-phi" element={<BuildingExpenses />} />
         <Route path="toa/:id/hop-dong" element={<Contracts />} />
         <Route path="toa/:id/hoa-don" element={<Invoices />} />
         <Route path="toa/:id/dien-nuoc" element={<BuildingMeters />} />
