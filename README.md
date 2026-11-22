@@ -139,6 +139,7 @@ Lưu ý:
 
 Bản thử có địa chỉ cố định https://neo-nestly-thu-nghiem.vercel.app (alias trên Vercel, trỏ vào bản preview mới nhất cần thử).
 Dữ liệu dùng chung CSDL thật; tài khoản/toà thử tạo bằng `supabase/thu_nghiem/seed.sql`, xoá bằng `cleanup.sql`.
+Thử thu tiền: `supabase/thu_nghiem/thu_tien.sql` tạo Nhân viên (thử) 0900000003 (mật khẩu ngẫu nhiên, Quản lý cấp lại trong app), Toà TEST ở trạng thái Ngưng hoạt động, phòng 101 có hợp đồng + hoá đơn 10.000 đ, phòng 102 trống.
 
 ## Thu tiền chuyển khoản (SePay)
 
