@@ -40,7 +40,7 @@ export default function Staff() {
       <main className="main stack">
         <input id="staff-search" className="input" placeholder="Tìm theo tên hoặc số điện thoại" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="chips">
-          {([["", "Tất cả"], ["quan_ly", "Quản lý"], ["giam_sat", "Giám sát"], ["nhan_vien", "Nhân viên"], ["cong_tac_vien", "Cộng tác viên"]] as ["" | Role, string][]).map(([k, l]) => (
+          {([["", "Tất cả"], ["quan_ly", "Quản lý"], ["giam_sat", "Giám sát"], ["nhan_vien", "Nhân viên"]] as ["" | Role, string][]).map(([k, l]) => (
             <button key={k} className="chip" aria-pressed={roleF === k} onClick={() => setRoleF(k)}>
               {l}<span className="n">{k ? people.filter((p) => p.role === k).length : people.length}</span>
             </button>
@@ -144,7 +144,6 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
             <option value="nhan_vien">Nhân viên — làm việc được giao, đánh dấu đã thu tiền</option>
             <option value="giam_sat">Giám sát — giao việc cho nhân viên, quản lý toà được gán</option>
             <option value="quan_ly">Quản lý — toàn quyền, xem tất cả toà</option>
-            <option value="cong_tac_vien">Cộng tác viên — chỉ xem bản đồ và phòng trống</option>
           </select></label>
         {role !== "quan_ly" && role !== "cong_tac_vien" ? (<div className="field"><span>Làm ở toà nào</span><BuildingChecks value={bIds} onChange={setBIds} /></div>) : null}
         <label className="field"><span>Mật khẩu tạm</span>
@@ -240,7 +239,7 @@ function EditSheet({ person, members, onClose, onChanged, onCred }: {
             <option value="nhan_vien">Nhân viên</option>
             <option value="giam_sat">Giám sát</option>
             <option value="quan_ly">Quản lý</option>
-            <option value="cong_tac_vien">Cộng tác viên</option>
+            {role === "cong_tac_vien" ? <option value="cong_tac_vien" disabled>Cộng tác viên (đã bỏ, chọn vai trò khác)</option> : null}
           </select></label>
         <label className="field"><span>Số ngày phép năm {new Date().getFullYear()}</span>
           <div className="row" style={{ flexWrap: "nowrap" }}>

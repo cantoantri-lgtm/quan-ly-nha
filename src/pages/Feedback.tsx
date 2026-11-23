@@ -9,15 +9,18 @@ import { attachFeedbackImage, attachmentUrls, MAX_FEEDBACK_IMAGES, type Feedback
 import "../feedback.css";
 
 export type Thread = {
-  id: string; customer_id: string; subject: string; status: "cho_cong_ty" | "cho_khach" | "dong";
+  id: string; customer_id: string | null; subject: string; status: "cho_cong_ty" | "cho_khach" | "dong";
   closed_reason: "khach_ket_thuc" | "tu_dong" | null; last_company_reply_at: string | null;
-  created_at: string; updated_at: string; kind: "khach" | "ctv";
+  created_at: string; updated_at: string; kind: "khach" | "ctv" | "web";
+  guest_phone?: string | null; guest_name?: string | null;
   building_id: string | null; building_code: string | null; building_name: string | null; room_code: string | null;
   customer?: { full_name: string; phone: string | null } | null;
 };
 type Msg = { id: string; sender: "khach" | "cong_ty" | "he_thong"; body: string; created_at: string; author?: { full_name: string } | null };
 
-export const fbPlace = (t: Thread) => t.kind === "ctv" ? "CTV" : [t.building_code, t.room_code ? "P." + t.room_code : "Khu vực chung"].filter(Boolean).join(" · ");
+export const fbPlace = (t: Thread) => t.kind === "ctv" ? "CTV"
+  : t.kind === "web" ? ["Website", t.building_code, t.room_code ? "P." + t.room_code : null].filter(Boolean).join(" · ")
+  : [t.building_code, t.room_code ? "P." + t.room_code : "Khu vực chung"].filter(Boolean).join(" · ");
 export const FB_STATUS: Record<string, string> = { cho_cong_ty: "Chờ công ty", cho_khach: "Chờ khách", dong: "Đã kết thúc" };
 
 const AUTO_MS = 3 * 24 * 3600 * 1000;
@@ -227,8 +230,11 @@ export function FeedbackThread() {
         <div className="row" style={{ justifyContent: "space-between" }}>
           <span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span>
           {!isRequester && t.customer ? <span className="muted small">{t.customer.full_name} · {t.customer.phone}</span> : null}
+          {!isRequester && t.kind === "web" && t.guest_phone ? <a className="small" href={`tel:${t.guest_phone}`}>Gọi {t.guest_phone}{t.guest_name ? ` · ${t.guest_name}` : ""}</a> : null}
         </div>
-        {t.kind === "ctv" ? <p className="fb-note"><b>Phản ánh của CTV</b><br />Chỉ Lead Sale trở lên đọc và trả lời.</p>
+        {t.kind === "web" ? <p className="fb-note"><b>Tin nhắn từ website · {t.guest_phone}</b>{t.building_name ? ` — ${t.building_name}${t.room_code ? `, phòng ${t.room_code}` : ""}` : ""}<br />
+            Người gửi chưa có tài khoản. Trả lời ở đây thì khách thấy khi mở lại khung chat trên cùng trình duyệt. Nên gọi hoặc nhắn Zalo số {t.guest_phone} để chắc khách nhận được.</p>
+          : t.kind === "ctv" ? <p className="fb-note"><b>Phản ánh của CTV</b><br />Chỉ Lead Sale trở lên đọc và trả lời.</p>
           : <p className="fb-note"><b>{fbPlace(t)}</b>{t.building_name ? ` — ${t.building_name}` : ""}<br />Sale phụ trách: {sales.length ? sales.join(", ") : "chưa có (Quản lý sẽ xử lý)"}</p>}
         {auto && isRequester ? <p className="fb-note">Nếu bạn không phản hồi, phản ánh sẽ tự kết thúc lúc {auto}.</p> : null}
         {auto && !isRequester ? <p className="fb-note">Chờ khách phản hồi. Không có phản hồi thì tự kết thúc lúc {auto}. Công ty không đóng thay khách.</p> : null}
@@ -245,13 +251,13 @@ export function FeedbackThread() {
                   ))}
                 </div>
               ) : null}
-              <small>{m.sender === "khach" ? (isRequester ? "Bạn" : t.kind === "ctv" ? "CTV" : "Khách") : m.sender === "cong_ty" ? "Next Living" : ""} {timeAgo(m.created_at)}</small>
+              <small>{m.sender === "khach" ? (isRequester ? "Bạn" : t.kind === "web" ? `${t.guest_phone}` : t.kind === "ctv" ? "CTV" : "Khách") : m.sender === "cong_ty" ? "Next Living" : ""} {timeAgo(m.created_at)}</small>
             </div>
           ))}
         </div>
         {t.status !== "dong" ? (
           <form className="fb-reply" onSubmit={send}>
-            <textarea className="input" maxLength={2000} placeholder={isRequester ? "Nhập tin nhắn…" : t.kind === "ctv" ? "Trả lời CTV…" : "Trả lời khách…"} value={text} onChange={(e) => setText(e.target.value)} />
+            <textarea className="input" maxLength={2000} placeholder={isRequester ? "Nhập tin nhắn…" : t.kind === "web" ? "Trả lời khách trên website…" : t.kind === "ctv" ? "Trả lời CTV…" : "Trả lời khách…"} value={text} onChange={(e) => setText(e.target.value)} />
             <ImagePicker files={imgs} onChange={setImgs} />
             <div className="row">
               <button className="btn" style={{ flex: 1 }} disabled={busy || !text.trim()}>{busy ? "Đang gửi…" : "Gửi"}</button>
@@ -273,6 +279,7 @@ export function FeedbackInbox() {
   const [items, setItems] = useState<Thread[] | null>(null);
   const [st, setSt] = useState<"" | Thread["status"]>("cho_cong_ty");
   const [bld, setBld] = useState("");
+  const [src, setSrc] = useState<"" | "web" | "khach">("");
   const load = useCallback(async () => {
     const { data } = await supabase.from("feedback_threads").select("*, customer:profiles!customer_id(full_name,phone)").order("updated_at", { ascending: false }).limit(300);
     setItems((data as Thread[]) ?? []);
@@ -284,17 +291,23 @@ export function FeedbackInbox() {
     return () => window.removeEventListener("neo:notification", h);
   }, [load]);
   const blds = Array.from(new Set((items ?? []).map((t) => t.building_code).filter(Boolean))) as string[];
-  const shown = (items ?? []).filter((t) => (!st || t.status === st) && (!bld || t.building_code === bld));
+  const shown = (items ?? []).filter((t) => (!st || t.status === st) && (!bld || t.building_code === bld) && (!src || (src === "web" ? t.kind === "web" : t.kind !== "web")));
+  const webN = (items ?? []).filter((t) => t.kind === "web" && t.status === "cho_cong_ty").length;
   const cnt = (s: Thread["status"]) => (items ?? []).filter((t) => t.status === s).length;
   return (
     <>
-      <TopBar title="Phản ánh khách hàng" />
+      <TopBar title="Phản ánh & tin nhắn" />
       <main className="main stack">
         <div className="chips">
           {(["cho_cong_ty", "cho_khach", "dong"] as const).map((k) => (
             <button key={k} className="chip" aria-pressed={st === k} onClick={() => setSt(k)}>{FB_STATUS[k]}<span className="n">{cnt(k)}</span></button>
           ))}
           <button className="chip" aria-pressed={st === ""} onClick={() => setSt("")}>Tất cả</button>
+        </div>
+        <div className="chips" role="group" aria-label="Nguồn">
+          <button className="chip" aria-pressed={src === ""} onClick={() => setSrc("")}>Mọi nguồn</button>
+          <button className="chip" aria-pressed={src === "web"} onClick={() => setSrc("web")}>Tin nhắn website{webN ? <span className="n">{webN}</span> : null}</button>
+          <button className="chip" aria-pressed={src === "khach"} onClick={() => setSrc("khach")}>Khách thuê</button>
         </div>
         {blds.length > 1 ? (
           <select className="input" value={bld} onChange={(e) => setBld(e.target.value)}>
@@ -308,7 +321,7 @@ export function FeedbackInbox() {
               <div key={t.id} className="list-row fb-row" onClick={() => nav(`/phan-anh/${t.id}`)}>
                 <div className="grow">
                   <div className="name">{t.subject}</div>
-                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> {fbPlace(t)} · {t.customer?.full_name} · {timeAgo(t.updated_at)}</div>
+                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> {fbPlace(t)} · {t.kind === "web" ? (t.guest_name ?? "Khách website") : t.customer?.full_name} · {timeAgo(t.updated_at)}</div>
                 </div>›
               </div>
             ))}

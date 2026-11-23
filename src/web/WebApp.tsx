@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { useWebConfig, webText } from "./webApi";
 import "./web.css";
 
-/** Website phòng trống công khai: không cần đăng nhập. CTV / nhân sự đã đăng nhập thấy thêm link giới thiệu. */
+/** Website phòng trống công khai: không cần đăng nhập. Nhân sự đã đăng nhập thấy thêm link giới thiệu. Nút Liên hệ + nhắn tin: public/lien-he.js (dùng chung với website công ty). */
 export default function WebApp() {
   const cfg = useWebConfig();
   // Tiêu đề tab và mô tả khi chia sẻ link (Quản lý sửa trong Cài đặt website)
@@ -17,6 +17,12 @@ export default function WebApp() {
     if (!m) { m = document.createElement("meta"); m.name = "description"; document.head.appendChild(m); }
     m.content = webText("seo_desc");
   }, [cfg]);
+  useEffect(() => {
+    if (document.querySelector('script[data-nl-lien-he]')) return;
+    const s = document.createElement("script");
+    s.src = "/lien-he.js"; s.charset = "utf-8"; s.defer = true; s.dataset.nlLienHe = "1";
+    document.body.appendChild(s);
+  }, []);
   return (
     <>
       <Routes>

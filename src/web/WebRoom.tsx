@@ -251,7 +251,7 @@ function BookForm({ room, title }: { room: WebRoomDetail; title: string }) {
   );
 }
 
-/** CTV / nhân sự đã đăng nhập: link giới thiệu riêng và tin đăng copy sẵn. Khách và người chưa đăng nhập không thấy. */
+/** Nhân sự đã đăng nhập: link giới thiệu riêng và tin đăng copy sẵn. Khách và người chưa đăng nhập không thấy. */
 function CtvBox({ room, title }: { room: WebRoomDetail; title: string }) {
   const { session, isCustomer, toast } = useSession();
   const [code, setCode] = useState<string | null>(null);

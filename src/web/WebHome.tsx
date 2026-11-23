@@ -215,7 +215,6 @@ export default function WebHome() {
       ) : null}
 
       <WebFooter />
-      {zalo ? <a className="web-fab" href={zalo} target="_blank" rel="noopener" aria-label="Chat Zalo với Next Living">{WebIcon.chat}</a> : null}
     </div>
   );
 }

@@ -25,6 +25,9 @@ export type WebConfig = {
   hero_media?: { path: string; kind: "image" | "video" }[]; hero_interval?: number;   // trình chiếu đầu trang
   notice_on?: boolean; notice?: string;
   hotline?: string; zalo?: string; email?: string; address?: string; hours?: string; footer_note?: string;
+  // Nút Liên hệ và khung nhắn tin (public/lien-he.js, migration 096)
+  contact_on?: boolean; chat_on?: boolean; contact_title?: string; contact_hours?: string; chat_greeting?: string;
+  messenger?: string; hotline_label?: string; hotline2?: string; hotline2_label?: string;
   show_features?: boolean; show_buildings?: boolean; show_app?: boolean; show_brands?: boolean;
   seo_title?: string; seo_desc?: string;
   hidden_buildings?: string[]; hidden_rooms?: string[];   // chỉ có ở trang cài đặt, web công khai không nhận

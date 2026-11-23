@@ -16,7 +16,6 @@ export type Policy = {
 };
 
 export const hasData = (p: Policy) => p.fees.length > 0 || p.amenities.length > 0 || p.furniture.length > 0 || p.deposit_lines.length > 0 || p.commission_terms.length > 0 || p.forfeit_pct != null;
-const pctText = (n: number) => String(n).replace(".", ",");
 
 
 export function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManager: boolean; guest: boolean; onEdit: () => void }) {
@@ -61,39 +60,14 @@ export function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManag
 
       {guest ? null : p.deposit_lines.length ? (
         <section className="card pl-sec">
-          <h3>Ký hợp đồng <span className="pl-tag">Chỉ Sale và CTV</span></h3>
+          <h3>Ký hợp đồng <span className="pl-tag">Chỉ nhân viên</span></h3>
           <ul className="pl-lines">{p.deposit_lines.map((a, i) => <li key={i}>{a}</li>)}</ul>
         </section>
       ) : null}
 
-      {guest ? null : p.commission_terms.length || p.forfeit_pct != null ? (
-        <section className="card pl-sec pl-comm">
-          <h3>Hoa hồng Cộng tác viên <span className="pl-tag">Chỉ Sale và CTV</span></h3>
-          {p.commission_terms.length ? (
-            <>
-              <p className="muted small" style={{ margin: 0 }}>Hợp đồng thành công, tính trên tiền thuê tháng đầu:</p>
-              <div className="pl-terms">
-                {p.commission_terms.slice().sort((a, b) => a.months - b.months).map((t, i) => (
-                  <div key={i} className="pl-term"><span className="muted small">Hợp đồng {t.months} tháng</span><b className="num">{pctText(t.pct)}%</b></div>
-                ))}
-              </div>
-            </>
-          ) : null}
-          {p.forfeit_pct != null ? (
-            <div className="pl-forfeit">
-              <b>Khách bỏ cọc</b>
-              <p className="small" style={{ margin: 0 }}>
-                {p.forfeit_min != null && p.forfeit_min > 0
-                  ? <>Tiền cọc công ty giữ lại dưới <b className="num">{vnd(p.forfeit_min)}</b>: <b>không chi</b> hoa hồng. Từ <b className="num">{vnd(p.forfeit_min)}</b> trở lên: hoa hồng <b className="num">{pctText(p.forfeit_pct)}%</b> số tiền cọc đó.</>
-                  : <>Hoa hồng <b className="num">{pctText(p.forfeit_pct)}%</b> số tiền cọc công ty giữ lại.</>}
-              </p>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
 
       {!guest && p.note ? <section className="card pl-sec"><h3>Ghi chú</h3><p className="small" style={{ margin: 0, whiteSpace: "pre-line" }}>{p.note}</p></section> : null}
-      {p.updated_at ? <p className="muted small" style={{ margin: 0 }}>Cập nhật {ddmmyyyy(p.updated_at)}.{guest ? "" : " Mức hoa hồng cuối cùng do Quản lý xác nhận."}</p> : null}
+      {p.updated_at ? <p className="muted small" style={{ margin: 0 }}>Cập nhật {ddmmyyyy(p.updated_at)}.</p> : null}
     </div>
   );
 }

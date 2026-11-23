@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { Icon } from "../components/ui";
+import { copyText, Icon } from "../components/ui";
 import { WEB_DEFAULTS, type WebConfig } from "../web/webApi";
 import { heroMediaUrl, removeHeroMedia, uploadHeroMedia, type HeroMedia } from "../lib/files";
 import "../table.css";
@@ -19,11 +19,20 @@ const HERO: TextField[] = [
 ];
 const CONTACT: TextField[] = [
   { k: "hotline", label: "Hotline", max: 16, ph: "0909 123 456", hint: "Hiện nút “Gọi” ở đầu trang và cuối trang." },
-  { k: "zalo", label: "Số Zalo", max: 13, ph: "0909123456", hint: "Hiện nút chat Zalo nổi ở góc màn hình." },
+  { k: "zalo", label: "Số Zalo", max: 13, ph: "0909123456", hint: "Hiện nút “Liên hệ Zalo” trong khung Liên hệ." },
   { k: "email", label: "Email", max: 120, ph: "lienhe@…" },
   { k: "address", label: "Địa chỉ văn phòng", max: 200 },
   { k: "hours", label: "Giờ làm việc", max: 100, ph: "8:00 – 18:00, thứ Hai đến thứ Bảy" },
   { k: "footer_note", label: "Câu giới thiệu cuối trang", max: 200, ph: WEB_DEFAULTS.footer_note },
+];
+const CHAT: TextField[] = [
+  { k: "contact_title", label: "Tiêu đề khung", max: 60, ph: "Liên hệ để được tư vấn" },
+  { k: "contact_hours", label: "Giờ tư vấn (hiện sau mỗi nút)", max: 40, ph: "8h - 21h30" },
+  { k: "messenger", label: "Facebook Messenger", max: 120, ph: "Link fanpage hoặc m.me/ten-trang", hint: "Dán link Fanpage, app tự lấy tên trang." },
+  { k: "hotline_label", label: "Tên nút gọi Hotline", max: 40, ph: "Gọi thuê phòng" },
+  { k: "hotline2", label: "Số gọi thứ hai", max: 16, ph: "0909 765 432" },
+  { k: "hotline2_label", label: "Tên nút gọi số thứ hai", max: 40, ph: "Gọi hỗ trợ khách thuê" },
+  { k: "chat_greeting", label: "Lời chào trong khung nhắn tin", max: 160, area: true, ph: "Chào bạn! Để lại số điện thoại và tin nhắn, Next Living sẽ trả lời ở đây và gọi lại cho bạn." },
 ];
 const SEO: TextField[] = [
   { k: "seo_title", label: "Tiêu đề tab trình duyệt", max: 70, ph: WEB_DEFAULTS.seo_title },
@@ -143,7 +152,7 @@ export default function WebSettings() {
         <span>{f.label} <small className="muted num">{v.length}/{f.max}</small></span>
         {f.area
           ? <textarea className="input" rows={2} maxLength={f.max} value={v} placeholder={f.ph} onChange={(e) => set(f.k, e.target.value as never)} />
-          : <input className="input" maxLength={f.max} value={v} placeholder={f.ph} inputMode={f.k === "hotline" || f.k === "zalo" ? "tel" : f.k === "email" ? "email" : undefined}
+          : <input className="input" maxLength={f.max} value={v} placeholder={f.ph} inputMode={f.k === "hotline" || f.k === "hotline2" || f.k === "zalo" ? "tel" : f.k === "email" ? "email" : undefined}
               onChange={(e) => set(f.k, e.target.value as never)} />}
         {f.hint ? <small className="muted">{f.hint}</small> : null}
       </label>
@@ -236,6 +245,26 @@ export default function WebSettings() {
           <section className="card ws-sec">
             <h3>Liên hệ</h3>
             {CONTACT.map(textInput)}
+          </section>
+
+          <section className="card ws-sec">
+            <h3>Nút Liên hệ và nhắn tin</h3>
+            <p className="muted small" style={{ margin: 0 }}>Nút “Liên hệ” nổi ở góc phải website. Khung gồm: nhắn tin (khách phải nhập số điện thoại trước khi gửi, tin vào mục Phản ánh & tin nhắn dạng “SĐT: tin nhắn”), Messenger, Zalo, Hotline, số gọi thứ hai. Mục nào để trống thì không hiện.</p>
+            <label className="loa-switch ws-switch">
+              <span>Hiện nút Liên hệ<small className="muted">Tắt thì website không có nút Liên hệ</small></span>
+              <input type="checkbox" role="switch" checked={cfg.contact_on !== false} onChange={(e) => set("contact_on", e.target.checked)} />
+            </label>
+            <label className="loa-switch ws-switch">
+              <span>Cho khách nhắn tin trong khung<small className="muted">Tắt thì chỉ còn các nút Messenger, Zalo, gọi điện</small></span>
+              <input type="checkbox" role="switch" checked={cfg.chat_on !== false} onChange={(e) => set("chat_on", e.target.checked)} />
+            </label>
+            {CHAT.map(textInput)}
+            <div className="field">
+              <span>Gắn vào website công ty</span>
+              <code className="ws-code">{`<script src="${window.location.origin}/lien-he.js" charset="utf-8" defer></script>`}</code>
+              <small className="muted">Dán dòng này trước thẻ đóng &lt;/body&gt; của website công ty (WordPress: Giao diện → Theme File Editor hoặc plugin chèn mã cuối trang). Nút Liên hệ và nội dung giống hệt trang phòng trống; đổi ở đây là website công ty đổi theo.</small>
+              <button type="button" className="btn secondary sm" style={{ alignSelf: "flex-start" }} onClick={() => copyText(`<script src="${window.location.origin}/lien-he.js" charset="utf-8" defer></script>`).then(() => toast("Đã chép mã nhúng."))}>Chép mã</button>
+            </div>
           </section>
 
           <section className="card ws-sec">
