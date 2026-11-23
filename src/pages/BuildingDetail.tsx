@@ -21,6 +21,7 @@ import RoomTypesSheet from "../components/RoomTypesSheet";
 import { groupColorKey, type RoomType } from "../lib/roomTypes";
 import "../rooms.css";
 import { ContractTerm } from "../components/ContractTerm";
+import RoomUtilities from "./RoomUtilities";
 
 export type RoomStatus = "trong" | "dang_o" | "dang_sua" | "giu_cho";
 export type Room = {
@@ -49,6 +50,7 @@ export default function BuildingDetail() {
   const [types, setTypes] = useState<RoomType[]>([]);
   const [typesOpen, setTypesOpen] = useState(false);
   const [polOpen, setPolOpen] = useState(false);
+  const [meterOpen, setMeterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"" | RoomStatus>("");
   const [groupFilter, setGroupFilter] = useState<string>("");   // mã nhóm phòng đang lọc ("" = tất cả)
@@ -98,6 +100,8 @@ export default function BuildingDetail() {
   useEffect(() => { load(); }, [load]);
   // Mở thẳng một phòng khi đi từ liên kết (?phong=<id>)
   const [params, setParams] = useSearchParams();
+  // Mở từ thẻ Chốt tháng (?ghi-dien=1): mở sẵn phần ghi số điện
+  useEffect(() => { if (params.has("ghi-dien")) setMeterOpen(true); }, [params]);
   const openRoom = params.get("phong");
   useEffect(() => {
     if (!openRoom || !rooms.length) return;
@@ -181,15 +185,21 @@ export default function BuildingDetail() {
         ) : null}
 
         <div className="row">
+          <button type="button" className={`btn sm${meterOpen ? " secondary" : ""}`} aria-expanded={meterOpen} onClick={() => setMeterOpen(!meterOpen)}>{meterOpen ? "Đóng ghi số điện" : "Ghi số điện phòng"}</button>
           <Link className="btn secondary sm" to={`/toa/${building.id}/khach`}>Khách thuê</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/khach-o`}>Khách ở & xe</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hop-dong`}>Hợp đồng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/hoa-don`}>Thu tiền phòng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/chi-phi`}>Chi phí toà</Link>
-          <Link className="btn secondary sm" to={`/toa/${building.id}/dien-phong`}>Điện nước phòng</Link>
           <Link className="btn secondary sm" to={`/toa/${building.id}/dien-nuoc`}>Điện nước toà</Link>
           <button type="button" className="btn secondary sm" aria-expanded={polOpen} onClick={() => setPolOpen(!polOpen)}>{polOpen ? "Ẩn dịch vụ & chính sách" : "Dịch vụ & chính sách"}</button>
         </div>
+        {meterOpen ? (
+          <section className="card stack" style={{ padding: 14 }} aria-label="Ghi số điện phòng">
+            <h3 style={{ margin: 0 }}>Ghi số điện phòng</h3>
+            <RoomUtilities key={`dien-${building.id}`} buildingId={building.id} embedded />
+          </section>
+        ) : null}
         {polOpen ? (
           <section className="card stack">
             <PolicyPanel buildingId={building.id} canEdit={canEdit} />

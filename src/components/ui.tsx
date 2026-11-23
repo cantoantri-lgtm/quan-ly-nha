@@ -205,7 +205,6 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
       { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
       { to: "/lich-xem-phong", label: "Lịch hẹn xem phòng", icon: Icon.tasks },
       { to: "/phong", label: "Website phòng trống", icon: Icon.map },
-      { to: "/thu-chi-toa?tab=dien", label: "Ghi số điện phòng", icon: Icon.edit },
       { to: "/thu-chi-toa", label: "Thu & chi toà nhà", icon: Icon.money },
       { to: "/thu-tien-khach", label: "Thu tiền khách", icon: Icon.money },
       ...(isManager ? [{ to: "/quan-tri/thu-tien", label: "Tài khoản nhận tiền", icon: Icon.money }] : []),

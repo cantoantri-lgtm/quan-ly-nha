@@ -9,7 +9,7 @@ const HOME_KEYS: MCKey[] = ["chua_dien", "chua_chot", "chua_thu", "chua_hd", "th
 
 /** Đường dẫn để xử lý từng loại việc của một toà */
 export function mcLink(buildingId: string, k: MCKey, r?: MCRow): string {
-  if (k === "chua_dien") return `/thu-chi-toa?toa=${buildingId}&tab=dien`;
+  if (k === "chua_dien") return `/toa/${buildingId}?ghi-dien=1`;
   if (k === "chua_hd") return `/toa/${buildingId}/hop-dong`;
   if (k === "thieu_cccd") return r?.contract_id ? `/toa/${buildingId}/hop-dong?mo=${r.contract_id}` : `/toa/${buildingId}/hop-dong`;
   return `/toa/${buildingId}/hoa-don`;
