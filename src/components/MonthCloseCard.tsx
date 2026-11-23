@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { friendlyError } from "../lib/supabase";
 import { mmyyyy, todayVN } from "../lib/dates";
-import { groupByBuilding, loadMonthClose, mcIs, MC_LABEL, notClosedWhy, type MCKey, type MCRow } from "../lib/monthClose";
+import { groupByBuilding, loadMonthCloseShared, mcIs, MC_LABEL, notClosedWhy, type MCKey, type MCRow } from "../lib/monthClose";
 import { Icon } from "./ui";
 
 const HOME_KEYS: MCKey[] = ["chua_dien", "chua_chot", "chua_thu", "chua_hd", "thieu_cccd"];
@@ -23,7 +23,7 @@ export default function MonthCloseCard() {
   const [f, setF] = useState<MCKey | null>(null);
 
   useEffect(() => {
-    loadMonthClose().then(({ rows, error }) => {
+    loadMonthCloseShared().then(({ rows, error }) => {
       if (error) setErr(friendlyError(error));
       setRows(rows);
     });

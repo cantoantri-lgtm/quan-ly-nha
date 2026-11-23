@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
@@ -10,6 +10,9 @@ import DecideSheet, { type DecideMode } from "../components/DecideSheet";
 import { Pager, usePaging } from "../components/Pager";
 import { KIND_ICON } from "./Office";
 import MonthCloseCard from "../components/MonthCloseCard";
+import { CashWidget, ContractWidget, FeedbackWidget, OccupancyWidget, RentWidget } from "../components/HomeWidgets";
+import HomeCustomize from "../components/HomeCustomize";
+import { cleanLayout, defaultLayout, loadLayout, type WidgetKey } from "../lib/homeLayout";
 import "../office.css";
 import "../table.css";
 
@@ -18,7 +21,12 @@ type TaskLite = { id: string; title: string; due_date: string | null; assignee_i
 
 /** Trang chủ: danh sách phiếu chờ tôi duyệt (bảng) + Bàn làm việc + lịch */
 export default function Home() {
-  const { profile, people, unread, isManager } = useSession();
+  const { profile, people, unread, isManager, isLeadUp, isAccountant } = useSession();
+  const who = useMemo(() => ({ isManager, isLeadUp, isAccountant }), [isManager, isLeadUp, isAccountant]);
+  const [saved, setSaved] = useState<string[] | null | undefined>(undefined);   // undefined = đang tải, null = chưa tuỳ chỉnh
+  const [custom, setCustom] = useState(false);
+  useEffect(() => { if (profile) loadLayout().then(setSaved); }, [profile]);
+  const keys: WidgetKey[] | null = saved === undefined ? null : saved === null ? defaultLayout(who) : cleanLayout(saved, who);
   const [rows, setRows] = useState<Req[]>([]);
   const [phases, setPhases] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -88,12 +96,7 @@ export default function Home() {
   const overdue = tasks.filter((t) => t.due_date && t.due_date < todayVN()).length;
   const nearDue = tasks.filter((t) => { const l = dueLevel(t.due_date, false); return l === "today" || l === "soon"; }).length;
 
-  return (
-    <>
-      <main className="main main-full">
-        <div className="home-grid">
-          <div className="stack home-main">
-          {!isManager ? <MonthCloseCard /> : null}
+  const approvals = (
           <section className="pg-card" aria-label="Chờ bạn duyệt">
             <div className="pg-head">
               <span className="pg-ico">{Icon.bell}</span>
@@ -148,8 +151,17 @@ export default function Home() {
             )}
             {shown.length ? <Pager p={paging} /> : null}
           </section>
-          {isManager ? <MonthCloseCard /> : null}
-          <TodoCard mine={tasks} given={given} name={name} />
+  );
+
+  return (
+    <>
+      <main className="main main-full">
+        <div className="home-grid">
+          <div className="stack home-main">
+          <div className="home-tools"><button type="button" className="btn ghost sm" onClick={() => setCustom(true)}>{Icon.edit} Tuỳ chỉnh màn hình chính</button></div>
+          {keys === null ? null : keys.length === 0 ? (
+            <section className="pg-card"><div className="dt-empty"><b>Màn hình chính đang trống</b><br />Bấm “Tuỳ chỉnh màn hình chính” để thêm báo cáo.</div></section>
+          ) : keys.map((k) => <Fragment key={k}>{k === "duyet" ? approvals : k === "viec" ? <TodoCard mine={tasks} given={given} name={name} /> : renderWidget(k)}</Fragment>)}
           </div>
 
           <aside className="bench" aria-label="Bàn làm việc">
@@ -173,6 +185,7 @@ export default function Home() {
           </aside>
         </div>
       </main>
+      {keys && profile ? <HomeCustomize open={custom} onClose={() => setCustom(false)} userId={profile.id} keys={keys} who={who} onChange={setSaved} /> : null}
       <DecideSheet req={decide?.req ?? null} mode={decide?.mode ?? null} onClose={() => setDecide(null)} onDone={() => { setDecide(null); load(); }} />
     </>
   );
@@ -313,4 +326,16 @@ function TodoCard({ mine, given, name }: { mine: TaskLite[]; given: TaskLite[]; 
       {rows.length ? <Pager p={paging} /> : null}
     </section>
   );
+}
+
+function renderWidget(k: WidgetKey) {
+  switch (k) {
+    case "chot_thang": return <MonthCloseCard />;
+    case "tien_nha": return <RentWidget />;
+    case "hop_dong": return <ContractWidget />;
+    case "lap_day": return <OccupancyWidget />;
+    case "thu_chi": return <CashWidget />;
+    case "phan_anh": return <FeedbackWidget />;
+    default: return null;
+  }
 }

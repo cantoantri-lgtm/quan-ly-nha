@@ -60,3 +60,10 @@ export async function loadMonthClose(rent?: string, meter?: string) {
   const { data, error } = await supabase.rpc("month_close", args);
   return { rows: (data ?? []) as MCRow[], error };
 }
+
+// Dùng chung giữa các ô màn hình chính (Chốt tháng, Tiền nhà, Hợp đồng & CCCD): gọi một lần trong 30 giây
+let cache: { at: number; p: ReturnType<typeof loadMonthClose> } | null = null;
+export function loadMonthCloseShared() {
+  if (!cache || Date.now() - cache.at > 30000) cache = { at: Date.now(), p: loadMonthClose() };
+  return cache.p;
+}

@@ -205,3 +205,16 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 .meter-total { padding: 10px 14px; border-top: 1px solid var(--line); justify-content: space-between; font-weight: 600; font-size: 13.5px; gap: 8px; }
 .meter-save { position: sticky; bottom: 10px; z-index: 2; box-shadow: 0 4px 14px rgb(0 0 0 / .12); }
 @media (max-width: 720px) { table.dt.cards.meter-cards tbody td { align-items: center; } }
+
+/* Màn hình chính tuỳ chỉnh */
+.home-tools { display: flex; justify-content: flex-end; }
+.home-tools .btn svg { width: 16px; height: 16px; }
+.hw-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.hw-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--surface); }
+.hw-item:first-child { border-top: 0; }
+.hw-no { width: 24px; height: 24px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-size: 12.5px; font-weight: 700; flex: none; }
+.hw-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hw-name small { color: var(--muted); font-size: 12.5px; }
+.hw-acts { display: flex; gap: 4px; align-items: center; flex: none; }
+.hw-acts .ico-btn:disabled { opacity: .35; }
+.tile.tile-late[aria-pressed="true"] b, .tile.tile-near[aria-pressed="true"] b { color: var(--brand-ink); }
