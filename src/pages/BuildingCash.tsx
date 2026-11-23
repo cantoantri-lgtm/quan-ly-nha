@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { todayVN } from "../lib/dates";
+import { exportCashbook } from "../lib/cashbook";
 import { useSession } from "../lib/session";
 import { Combo, Empty, TopBar } from "../components/ui";
 import Invoices from "./Invoices";
@@ -9,7 +12,9 @@ import BuildingExpenses from "./BuildingExpenses";
 type Tab = "thu" | "chi";
 
 export default function BuildingCash() {
-  const { buildings, isManager, isAccountant } = useSession();
+  const { buildings, people, isManager, isAccountant, toast } = useSession();
+  const [month, setMonth] = useState(() => todayVN().slice(0, 7));
+  const [busy, setBusy] = useState(false);
   const [qs, setQs] = useSearchParams();
   const bid = qs.get("toa") && buildings.some((b: { id: string }) => b.id === qs.get("toa")) ? qs.get("toa")! : buildings[0]?.id ?? "";
   const tab: Tab = qs.get("tab") === "chi" ? "chi" : "thu";
@@ -17,6 +22,16 @@ export default function BuildingCash() {
   const fin = isManager || isAccountant;
 
   if (!buildings.length) return (<><TopBar title="Thu & chi toà nhà" /><main className="main"><Empty title="Bạn chưa được gán toà nào." /></main></>);
+  async function exportXlsx() {
+    const b = buildings.find((x: { id: string }) => x.id === bid);
+    if (!b || !month) return;
+    setBusy(true);
+    try {
+      await exportCashbook(b, month, (u) => (u ? people.find((p: { id: string }) => p.id === u)?.full_name ?? "" : ""));
+      toast("Đã tải file Excel sổ thu chi.");
+    } catch (e) { toast(`Chưa xuất được: ${(e as Error).message}`); }
+    setBusy(false);
+  }
   const opts = buildings.map((b: { id: string; code: string; name: string }) => [b.id, `${b.code} · ${b.name}`] as const);
   return (
     <>
@@ -24,6 +39,11 @@ export default function BuildingCash() {
       <main className="main stack">
         <label className="field"><span>Toà nhà</span>
           <Combo id="tc-toa" value={bid} options={opts} onChange={(v) => set("toa", v)} label="Toà nhà" /></label>
+        <div className="card row" style={{ padding: 10, gap: 8, flexWrap: "nowrap", alignItems: "flex-end" }}>
+          <label className="field" style={{ flex: 1, margin: 0 }}><span>Xuất sổ thu chi tháng</span>
+            <input id="tc-month" className="input" type="month" value={month} max={todayVN().slice(0, 7)} onChange={(e) => setMonth(e.target.value)} /></label>
+          <button className="btn secondary" disabled={busy || !month} onClick={exportXlsx}>{busy ? "Đang tạo…" : "Tải Excel"}</button>
+        </div>
         <div className="chips" role="tablist" aria-label="Thu hoặc chi">
           <button role="tab" className="chip" aria-selected={tab === "thu"} aria-pressed={tab === "thu"} onClick={() => set("tab", "thu")}>Thu tiền phòng</button>
           <button role="tab" className="chip" aria-selected={tab === "chi"} aria-pressed={tab === "chi"} onClick={() => set("tab", "chi")}>Chi phí toà</button>
