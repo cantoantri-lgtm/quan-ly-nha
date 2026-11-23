@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { addDaysISO, rangeLabel, type DateRange } from "./dates";
 import { saveWorkbook } from "./xlsx";
 import { EXP_COLS, EXPENSE_ROWS, INCOME_CATS, SETTLE_LABEL, type Expense } from "./expense";
+import { INC_COLS, type OtherIncome } from "./income";
 
 /** Xuất Excel sổ thu chi của một toà trong một khoảng ngày (trang "Thu & chi toà nhà", mặc định trọn tháng).
  *  Thu: hoá đơn của các tháng trong khoảng + hoá đơn tháng khác nhưng thu trong khoảng; khoản thu khách và khoản chi theo ngày.
@@ -24,18 +25,20 @@ const billCat = (label: string) => label.startsWith("Tiền phòng") ? "Tiền p
 export async function exportCashbook(b: { id: string; code: string; name: string }, r: DateRange, nameOf: (id: string | null) => string) {
   const start = r.from, next = addDaysISO(r.to, 1);
   const pFrom = r.from.slice(0, 8) + "01", pTo = r.to.slice(0, 8) + "01";
-  const [iv, bl, ex] = await Promise.all([
+  const [iv, bl, ex, oi] = await Promise.all([
     supabase.from("invoices").select("period,amount,due_date,status,collected_at,paid_via,txn_ref,transfer_note,lines, contracts(rooms(code), tenants(full_name))")
       .eq("building_id", b.id).neq("status", "huy")
       .or(`and(period.gte.${pFrom},period.lte.${pTo}),and(collected_at.gte.${r.from},collected_at.lte.${r.to})`),
     supabase.from("customer_bills").select("kind,amount,status,confirmed_at,pay_code,txn_ref,note,lines")
       .eq("building_id", b.id).eq("status", "da_thanh_toan").gte("confirmed_at", `${start}T00:00:00+07:00`).lt("confirmed_at", `${next}T00:00:00+07:00`),
     supabase.from("building_expenses").select(EXP_COLS).eq("building_id", b.id).gte("spent_on", start).lt("spent_on", next).order("spent_on"),
+    supabase.from("building_incomes").select(INC_COLS).eq("building_id", b.id).gte("received_on", start).lt("received_on", next).order("received_on"),
   ]);
   if (iv.error) throw new Error(iv.error.message);
   const invs = ((iv.data as unknown as Inv[]) ?? []).sort((a, c) => (a.contracts?.rooms?.code ?? "").localeCompare(c.contracts?.rooms?.code ?? "", "vi", { numeric: true }));
   const bills = (bl.data as Bill[]) ?? [];
   const exps = ((ex.data as Expense[]) ?? []).map((e) => ({ ...e, amount: Number(e.amount) }));
+  const others = ((oi.data as OtherIncome[]) ?? []).map((x) => ({ ...x, amount: Number(x.amount) }));
 
   // Cộng thu theo khoản (chỉ hoá đơn đã thu và khoản thu khách đã thanh toán), chi theo khoản
   const thu = new Map<string, number>(), chi = new Map<string, number>();
@@ -49,6 +52,7 @@ export async function exportCashbook(b: { id: string; code: string; name: string
     if (c.lines?.length) c.lines.forEach((l) => add(thu, billCat(l.label), Number(l.amount)));
     else add(thu, BILL_CAT[c.kind] ?? "Khác", Number(c.amount));
   }
+  others.forEach((x) => add(thu, x.category, x.amount));   // thu khác (SQL 099): mỗi khoản một dòng theo tên khoản
   exps.forEach((e) => add(chi, e.category, e.amount));
 
   const { Workbook } = await import("exceljs");
@@ -102,13 +106,20 @@ export async function exportCashbook(b: { id: string; code: string; name: string
   tr.font = { bold: true };
   t.views = [{ state: "frozen", ySplit: 1 }];
 
-  // THU KHÁC: khoản thu khách đã thanh toán trong tháng (cọc, phí…)
-  if (bills.length) {
+  // THU KHÁC: khoản thu khách đã thanh toán (cọc, phí…) và thu khác của toà (gửi xe vãng lai, phế liệu…)
+  if (bills.length || others.length) {
     const o = wb.addWorksheet("THU KHÁC");
-    o.columns = [{ header: "Ngày", width: 11 }, { header: "Khoản", width: 16 }, { header: "Nội dung", width: 36 },
-      { header: "Số tiền", width: 14, style: { numFmt: money } }, { header: "Mã GD / mã khoản", width: 22, style: { numFmt: "@" } }];
+    o.columns = [{ header: "Ngày", width: 11 }, { header: "Nguồn", width: 16 }, { header: "Khoản", width: 18 }, { header: "Nội dung", width: 36 },
+      { header: "Số tiền", width: 14, style: { numFmt: money } }, { header: "Hình thức", width: 14 }, { header: "Người thu / mã", width: 22, style: { numFmt: "@" } },
+      { header: "Nộp Kế toán", width: 14 }];
     o.getRow(1).font = { bold: true };
-    bills.forEach((c) => o.addRow([dmy(c.confirmed_at), BILL_CAT[c.kind] ?? c.kind, c.note ?? "", Number(c.amount), c.txn_ref ?? c.pay_code]));
+    bills.forEach((c) => o.addRow([dmy(c.confirmed_at), "Thu tiền khách", BILL_CAT[c.kind] ?? c.kind, c.note ?? "", Number(c.amount), "Chuyển khoản", c.txn_ref ?? c.pay_code, ""]));
+    others.forEach((x) => o.addRow([dmy(x.received_on), "Thu khác toà", x.category, [x.note, x.payer_name ? `người nộp: ${x.payer_name}` : ""].filter(Boolean).join(" · "),
+      x.amount, x.method === "chuyen_khoan" ? "Chuyển khoản" : "Tiền mặt", nameOf(x.received_by),
+      x.method === "chuyen_khoan" ? "Vào TK công ty" : x.handover_status === "da_nop" ? "Đã nộp" : "Chưa nộp"]));
+    const n = bills.length + others.length;
+    const orow = o.addRow(["", "", "Cộng", "", { formula: `SUM(E2:E${n + 1})` }]);
+    orow.font = { bold: true };
   }
 
   // CHI

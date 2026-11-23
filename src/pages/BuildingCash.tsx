@@ -6,10 +6,11 @@ import { useSession } from "../lib/session";
 import { Combo, Empty, TopBar } from "../components/ui";
 import Invoices from "./Invoices";
 import BuildingExpenses from "./BuildingExpenses";
+import BuildingIncomes from "./BuildingIncomes";
 
 /** Thu & chi toà nhà: chọn toà, tab Thu (hoá đơn tiền phòng theo tháng) và tab Chi (chi phí toà, nhân viên ứng / công ty trả).
  *  Khoản thu khác (cọc, phí phát sinh trên tài khoản khách) ở trang Thu tiền khách; sổ thu chi tổng hợp ở Báo cáo. */
-type Tab = "thu" | "chi";
+type Tab = "thu" | "thu_khac" | "chi";
 
 export default function BuildingCash() {
   const { buildings, people, isManager, isAccountant, toast } = useSession();
@@ -21,7 +22,8 @@ export default function BuildingCash() {
   const [busy, setBusy] = useState(false);
   const [qs, setQs] = useSearchParams();
   const bid = qs.get("toa") && buildings.some((b: { id: string }) => b.id === qs.get("toa")) ? qs.get("toa")! : buildings[0]?.id ?? "";
-  const tab: Tab = qs.get("tab") === "chi" ? "chi" : "thu";
+  const q = qs.get("tab");
+  const tab: Tab = q === "chi" || q === "thu_khac" ? q : "thu";
   const set = (k: "toa" | "tab", v: string) => { const n = new URLSearchParams(qs); n.set(k, v); setQs(n, { replace: true }); };
   const fin = isManager || isAccountant;
 
@@ -63,6 +65,7 @@ export default function BuildingCash() {
         </div>
         <div className="chips" role="tablist" aria-label="Thu hoặc chi">
           <button role="tab" className="chip" aria-selected={tab === "thu"} aria-pressed={tab === "thu"} onClick={() => set("tab", "thu")}>Thu tiền phòng</button>
+          <button role="tab" className="chip" aria-selected={tab === "thu_khac"} aria-pressed={tab === "thu_khac"} onClick={() => set("tab", "thu_khac")}>Thu khác</button>
           <button role="tab" className="chip" aria-selected={tab === "chi"} aria-pressed={tab === "chi"} onClick={() => set("tab", "chi")}>Chi phí toà</button>
         </div>
         {tab === "thu" ? (
@@ -73,6 +76,8 @@ export default function BuildingCash() {
               Tiền cọc và các khoản thu khác trên tài khoản khách: <Link to="/thu-tien-khach">Thu tiền khách</Link>.
             </p>
           </>
+        ) : tab === "thu_khac" ? (
+          <BuildingIncomes key={`thukhac-${bid}`} buildingId={bid} embedded range={range} />
         ) : (
           <BuildingExpenses key={`chi-${bid}`} buildingId={bid} embedded range={range} />
         )}

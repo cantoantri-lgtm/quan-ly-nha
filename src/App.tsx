@@ -39,6 +39,7 @@ import Invoices from "./pages/Invoices";
 import PayPage from "./pages/PayPage";
 import Roster from "./pages/Roster";
 import BuildingExpenses from "./pages/BuildingExpenses";
+import BuildingIncomes from "./pages/BuildingIncomes";
 import BuildingCash from "./pages/BuildingCash";
 import PaymentSettingsPage from "./pages/PaymentSettingsPage";
 import VacantRooms from "./pages/VacantRooms";
@@ -172,6 +173,7 @@ export default function App() {
         <Route path="toa/:id/khach" element={<Tenants />} />
         <Route path="toa/:id/khach-o" element={<Roster />} />
         <Route path="toa/:id/chi-phi" element={<BuildingExpenses />} />
+        <Route path="toa/:id/thu-khac" element={<BuildingIncomes />} />
         <Route path="toa/:id/hop-dong" element={<Contracts />} />
         <Route path="toa/:id/hoa-don" element={<Invoices />} />
         <Route path="toa/:id/dien-nuoc" element={<BuildingMeters />} />

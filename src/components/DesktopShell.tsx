@@ -41,6 +41,7 @@ const PATTERNS: [RegExp, string, boolean][] = [
   [/^\/toa\/[^/]+\/hop-dong$/, "Hợp đồng", false],
   [/^\/toa\/[^/]+\/hoa-don$/, "Thu tiền phòng", false],
   [/^\/toa\/[^/]+\/chi-phi$/, "Chi phí toà", false],
+  [/^\/toa\/[^/]+\/thu-khac$/, "Thu khác toà", false],
   [/^\/toa\/[^/]+\/khach-o$/, "Khách ở & xe", false],
   [/^\/toa\/[^/]+\/dien-nuoc$/, "Điện nước toà", false],
   [/^\/toa\/[^/]+\/dien-phong$/, "Điện nước phòng", false],
