@@ -1,5 +1,6 @@
 /* Next Living · Nút "Liên hệ" và khung nhắn tin cho website.
  * Dán vào website:  <script src="https://neo-nestly.vercel.app/lien-he.js" charset="utf-8" defer></script>
+ * Website tiếng Anh: thêm data-lang="en" vào thẻ script (hoặc trang có <html lang="en">).
  * Nội dung (Messenger, Zalo, số gọi, giờ tư vấn, bật / tắt) chỉnh trong app: Quản trị → Cài đặt website → Nút Liên hệ.
  * Tin nhắn khách gửi vào app, mục Phản ánh & tin nhắn, dạng "SĐT: tin nhắn". Khách phải nhập số điện thoại trước khi gửi.
  * Chạy trong Shadow DOM để không đụng giao diện của website chủ. Không dùng cookie; chỉ lưu mã cuộc trò chuyện trên trình duyệt. */
@@ -9,7 +10,29 @@
   var KEY = "sb_publishable_hETTG4G-xty-xj1rm2B3NQ_fILjnDux";
   var me = document.currentScript;
   var APP = (function () { try { return new URL(me && me.src ? me.src : location.href).origin; } catch (e) { return "https://neo-nestly.vercel.app"; } })();
-  var onApp = location.origin === APP && /^\/phong(\/|$)/.test(location.pathname);
+  var onApp = location.origin === APP && /^\/(en\/)?phong(\/|$)/.test(location.pathname);
+  // Ngôn ngữ: trang /en/... của app, data-lang="en" trên thẻ script, hoặc <html lang="en"> của website chủ
+  var EN = /^\/en\//.test(location.pathname) || (me && me.getAttribute("data-lang") === "en") ||
+    (!(me && me.getAttribute("data-lang")) && /^en/i.test(document.documentElement.lang || ""));
+  var L = EN ? {
+    btn: "CONTACT", title: "Contact us", chat: "Message Next Living", chatSub: "We reply during working hours", ms: "Messenger", zl: "Zalo",
+    call1: "Call to rent", call2: "Tenant support", rooms: "Available rooms", roomsSub: "Photos, prices and viewing bookings",
+    back: "Back", close: "Close", greet: "Hi! Leave your phone number and message. Next Living will reply here and call you back.",
+    ended: "This conversation has ended. Send a new message to start again.", phone: "Mobile phone number *", phonePh: "e.g. 0909 123 456",
+    name: "Your name", namePh: "Optional", msg: "Message *", msgPh: "Where would you like to live, what budget, when do you move in?",
+    send: "Send", fresh: "New chat", privacy: "We only use your phone number to contact you about renting a room.",
+    errPhone: "Please enter a 10-digit Vietnamese mobile number before sending.", errMsg: "Please enter a message.", errSend: "Could not send. Please try again in a few minutes.",
+    nl: "Next Living · ", locale: "en-GB", roomsPath: "/en/phong",
+  } : {
+    btn: "LIÊN HỆ", title: "Liên hệ để được tư vấn", chat: "Nhắn tin cho Next Living", chatSub: "Trả lời trong giờ làm việc", ms: "Liên hệ Messenger", zl: "Liên hệ Zalo",
+    call1: "Gọi thuê phòng", call2: "Gọi hỗ trợ khách thuê", rooms: "Xem phòng trống", roomsSub: "Ảnh, giá và đặt lịch xem phòng",
+    back: "Quay lại", close: "Đóng", greet: "Chào bạn! Để lại số điện thoại và tin nhắn, Next Living sẽ trả lời ở đây và gọi lại cho bạn.",
+    ended: "Cuộc trò chuyện đã kết thúc. Gửi tin mới để bắt đầu lại.", phone: "Số điện thoại di động *", phonePh: "Ví dụ 0909 123 456",
+    name: "Tên của bạn", namePh: "Không bắt buộc", msg: "Tin nhắn *", msgPh: "Bạn cần thuê phòng ở đâu, giá bao nhiêu, khi nào vào ở?",
+    send: "Gửi", fresh: "Cuộc mới", privacy: "Số điện thoại chỉ dùng để Next Living liên hệ lại về việc thuê phòng.",
+    errPhone: "Vui lòng nhập số điện thoại di động 10 số trước khi gửi.", errMsg: "Bạn chưa nhập tin nhắn.", errSend: "",
+    nl: "Next Living · ", locale: "vi-VN", roomsPath: "/phong",
+  };
   var TK = "nl_chat_token";
   var store = {
     get: function () { try { return localStorage.getItem(TK) || ""; } catch (e) { return ""; } },
@@ -100,12 +123,14 @@
     var hours = c.contact_hours ? " (" + c.contact_hours + ")" : "";
     var chatOn = c.chat_on !== false;
     var items = [];
-    if (chatOn) items.push({ kind: "chat", icon: IC.chat, title: "Nhắn tin cho Next Living", sub: "Trả lời trong giờ làm việc" + hours });
-    if (c.messenger) items.push({ href: "https://m.me/" + encodeURIComponent(c.messenger), icon: IC.msg, cls: "ms", title: "Liên hệ Messenger", sub: hours.trim() });
-    if (c.zalo) items.push({ href: "https://zalo.me/" + String(c.zalo).replace(/\D/g, ""), icon: IC.zalo, cls: "zl", title: "Liên hệ Zalo", sub: hours.trim() });
-    if (c.hotline) items.push({ href: "tel:" + String(c.hotline).replace(/[\s.]/g, ""), icon: IC.phone, title: (c.hotline_label || "Gọi thuê phòng") + hours, sub: c.hotline });
-    if (c.hotline2) items.push({ href: "tel:" + String(c.hotline2).replace(/[\s.]/g, ""), icon: IC.help, title: (c.hotline2_label || "Gọi hỗ trợ khách thuê") + hours, sub: c.hotline2 });
-    if (!onApp) items.push({ href: APP + "/phong", icon: IC.home, title: "Xem phòng trống", sub: "Ảnh, giá và đặt lịch xem phòng", blank: true });
+    // Nhãn tự đặt trong cài đặt là tiếng Việt: bản tiếng Anh dùng nhãn mặc định
+    var lab = function (v, d) { return EN ? d : v || d; };
+    if (chatOn) items.push({ kind: "chat", icon: IC.chat, title: L.chat, sub: L.chatSub + hours });
+    if (c.messenger) items.push({ href: "https://m.me/" + encodeURIComponent(c.messenger), icon: IC.msg, cls: "ms", title: L.ms, sub: hours.trim() });
+    if (c.zalo) items.push({ href: "https://zalo.me/" + String(c.zalo).replace(/\D/g, ""), icon: IC.zalo, cls: "zl", title: L.zl, sub: hours.trim() });
+    if (c.hotline) items.push({ href: "tel:" + String(c.hotline).replace(/[\s.]/g, ""), icon: IC.phone, title: lab(c.hotline_label, L.call1) + hours, sub: c.hotline });
+    if (c.hotline2) items.push({ href: "tel:" + String(c.hotline2).replace(/[\s.]/g, ""), icon: IC.help, title: lab(c.hotline2_label, L.call2) + hours, sub: c.hotline2 });
+    if (!onApp) items.push({ href: APP + L.roomsPath, icon: IC.home, title: L.rooms, sub: L.roomsSub, blank: true });
     if (!items.length) return;
     build(c, items, chatOn);
   }).catch(function () { /* không tải được cài đặt thì không hiện nút */ });
@@ -118,8 +143,8 @@
     var w = el("div", { class: "w" });
     root.appendChild(w);
 
-    var title = c.contact_title || "Liên hệ để được tư vấn";
-    var fab = el("button", { class: "fab", type: "button", "aria-expanded": "false", "aria-controls": "nl-pn" }, [svg(IC.chat), "LIÊN HỆ"]);
+    var title = EN ? L.title : c.contact_title || L.title;
+    var fab = el("button", { class: "fab", type: "button", "aria-expanded": "false", "aria-controls": "nl-pn" }, [svg(IC.chat), L.btn]);
     var pn = el("div", { class: "pn", id: "nl-pn", role: "dialog", "aria-label": title, hidden: "" });
     w.appendChild(pn); w.appendChild(fab);
 
@@ -132,9 +157,9 @@
 
     function head(text, back) {
       return el("div", { class: "hd" }, [
-        back ? el("button", { type: "button", "aria-label": "Quay lại", on: { click: function () { render("menu"); } } }, [svg(IC.back)]) : svg(IC.chat),
+        back ? el("button", { type: "button", "aria-label": L.back, on: { click: function () { render("menu"); } } }, [svg(IC.back)]) : svg(IC.chat),
         el("b", { text: text }),
-        el("button", { type: "button", "aria-label": "Đóng", on: { click: close } }, [svg(IC.x)]),
+        el("button", { type: "button", "aria-label": L.close, on: { click: close } }, [svg(IC.x)]),
       ]);
     }
 
@@ -164,7 +189,7 @@
     }
 
     function chatView() {
-      pn.appendChild(head("Nhắn tin cho Next Living", true));
+      pn.appendChild(head(L.chat, true));
       var bd = el("div", { class: "bd" });
       var list = el("div", { class: "chat", "aria-live": "polite" });
       bd.appendChild(list);
@@ -173,23 +198,23 @@
       var phone = "";
       var err = el("p", { class: "err", role: "alert" });
       var f = el("form", { novalidate: "" });
-      var inPhone = el("input", { type: "tel", inputmode: "tel", autocomplete: "tel", maxlength: "15", placeholder: "Ví dụ 0909 123 456", required: "" });
-      var inName = el("input", { type: "text", autocomplete: "name", maxlength: "60", placeholder: "Không bắt buộc" });
-      var inText = el("textarea", { maxlength: "1000", placeholder: "Bạn cần thuê phòng ở đâu, giá bao nhiêu, khi nào vào ở?", required: "" });
-      var btn = el("button", { class: "go", type: "submit" }, [svg(IC.send), "Gửi"]);
-      var phoneRow = el("label", null, ["Số điện thoại di động *", inPhone]);
-      var nameRow = el("label", null, ["Tên của bạn", inName]);
+      var inPhone = el("input", { type: "tel", inputmode: "tel", autocomplete: "tel", maxlength: "15", placeholder: L.phonePh, required: "" });
+      var inName = el("input", { type: "text", autocomplete: "name", maxlength: "60", placeholder: L.namePh });
+      var inText = el("textarea", { maxlength: "1000", placeholder: L.msgPh, required: "" });
+      var btn = el("button", { class: "go", type: "submit" }, [svg(IC.send), L.send]);
+      var phoneRow = el("label", null, [L.phone, inPhone]);
+      var nameRow = el("label", null, [L.name, inName]);
 
       function paint(data) {
         list.textContent = "";
-        var greet = c.chat_greeting || "Chào bạn! Để lại số điện thoại và tin nhắn, Next Living sẽ trả lời ở đây và gọi lại cho bạn.";
+        var greet = EN ? L.greet : c.chat_greeting || L.greet;
         list.appendChild(el("div", { class: "msg cong_ty", text: greet }));
         if (data && data.messages) data.messages.forEach(function (m) {
           var t = new Date(m.at);
-          var when = t.toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
-          list.appendChild(el("div", { class: "msg " + m.sender }, [m.body, el("small", { text: (m.sender === "cong_ty" ? "Next Living · " : "") + when })]));
+          var when = t.toLocaleString(L.locale, { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+          list.appendChild(el("div", { class: "msg " + m.sender }, [m.body, el("small", { text: (m.sender === "cong_ty" ? L.nl : "") + when })]));
         });
-        if (data && data.status === "dong") list.appendChild(el("div", { class: "msg he_thong", text: "Cuộc trò chuyện đã kết thúc. Gửi tin mới để bắt đầu lại." }));
+        if (data && data.status === "dong") list.appendChild(el("div", { class: "msg he_thong", text: L.ended }));
         bd.scrollTop = bd.scrollHeight;
       }
       function load() {
@@ -204,23 +229,23 @@
         phoneRow.hidden = !!token; nameRow.hidden = !!token;
         newBtn.hidden = !token;
       }
-      var newBtn = el("button", { type: "button", class: "lnk", text: "Cuộc mới", on: { click: function () { token = ""; phone = ""; store.set(""); paint(null); layout(); inPhone.focus(); } } });
+      var newBtn = el("button", { type: "button", class: "lnk", text: L.fresh, on: { click: function () { token = ""; phone = ""; store.set(""); paint(null); layout(); inPhone.focus(); } } });
 
       f.appendChild(phoneRow); f.appendChild(nameRow);
-      f.appendChild(el("label", null, ["Tin nhắn *", inText]));
+      f.appendChild(el("label", null, [L.msg, inText]));
       f.appendChild(err);
       f.appendChild(el("div", { class: "row" }, [btn, newBtn]));
-      f.appendChild(el("p", { class: "note", text: "Số điện thoại chỉ dùng để Next Living liên hệ lại về việc thuê phòng." }));
+      f.appendChild(el("p", { class: "note", text: L.privacy }));
       f.addEventListener("submit", function (e) {
         e.preventDefault(); err.textContent = "";
         var ph = token ? phone : inPhone.value.replace(/\D/g, "").replace(/^84(?=\d{9}$)/, "0");
         var tx = inText.value.trim();
-        if (!/^0[35789]\d{8}$/.test(ph)) { err.textContent = "Vui lòng nhập số điện thoại di động 10 số trước khi gửi."; inPhone.focus(); return; }
-        if (!tx) { err.textContent = "Bạn chưa nhập tin nhắn."; inText.focus(); return; }
+        if (!/^0[35789]\d{8}$/.test(ph)) { err.textContent = L.errPhone; inPhone.focus(); return; }
+        if (!tx) { err.textContent = L.errMsg; inText.focus(); return; }
         btn.disabled = true;
         rpc("web_chat_send", { p_token: token || null, p_phone: ph, p_text: tx, p_name: inName.value.trim() || null, p_room: roomId() })
           .then(function (r) { token = r.token; store.set(token); phone = ph; inText.value = ""; return load(); })
-          .catch(function (x) { err.textContent = x.message; })
+          .catch(function (x) { err.textContent = L.errSend || x.message; })   // lỗi máy chủ viết tiếng Việt
           .then(function () { btn.disabled = false; });
       });
       pn.appendChild(f);

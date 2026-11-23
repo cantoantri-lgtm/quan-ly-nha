@@ -1,22 +1,24 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { vnd } from "../lib/money";
-import { floorText, perText, shortAddr, typeGroup, usePhotoUrls, useWebRooms, webCfg, webShow, webText, type WebRoomRow } from "./webApi";
+import { floorText, groupLabel, perText, shortAddr, typeGroup, usePhotoUrls, useWebRooms, webCfg, webNotice, webShow, webText, type WebRoomRow } from "./webApi";
+import { dataText, millions, money, useLang, useT, webPath } from "./i18n";
 import { WebFooter, WebHeader, WebIcon, zaloHref } from "./WebShell";
 import { HeroSlides } from "./HeroSlides";
 
 type Filter = { building: string; group: string; price: string; mode: string };
-const PRICES: [string, string, (n: number) => boolean][] = [
-  ["", "Mọi mức giá", () => true],
-  ["duoi7", "Dưới 7 triệu", (n) => n < 7_000_000],
-  ["7-10", "7 – 10 triệu", (n) => n >= 7_000_000 && n <= 10_000_000],
-  ["tren10", "Trên 10 triệu", (n) => n > 10_000_000],
+const PRICES: [string, "price_any" | "price_lt7" | "price_7_10" | "price_gt10", (n: number) => boolean][] = [
+  ["", "price_any", () => true],
+  ["duoi7", "price_lt7", (n) => n < 7_000_000],
+  ["7-10", "price_7_10", (n) => n >= 7_000_000 && n <= 10_000_000],
+  ["tren10", "price_gt10", (n) => n > 10_000_000],
 ];
-const trieu = (n: number) => (n / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + " triệu";
 
 /** Trang chủ website phòng trống: ảnh lớn, ô tìm phòng nổi, toà nổi bật, danh sách phòng trống (phong cách 6) */
 export default function WebHome() {
   const { rooms, err } = useWebRooms();
+  const lang = useLang(), t = useT();
+  const trieu = (n: number) => millions(lang, n);
+  const dt = (x: string) => dataText(lang, x);
   const [draft, setDraft] = useState<Filter>({ building: "", group: "", price: "", mode: "" });
   const [f, setF] = useState<Filter>(draft);
   const [sort, setSort] = useState<"gia" | "toa">("gia");
@@ -46,12 +48,12 @@ export default function WebHome() {
     const most = buildings[0];
     const view = rooms.find((r) => /ban công|cửa sổ/i.test(r.type_name) && r.room_id !== cheapest.room_id);
     const out: { tag: string; t: string; s: string; photo: WebRoomRow["photo"]; go: () => void }[] = [
-      { tag: "Giá tốt", t: `${cheapest.type_name} từ ${trieu(cheapest.list_price)}`, s: shortAddr(cheapest.address) || cheapest.building_name, photo: cheapest.photo, go: () => apply({ ...EMPTY, group: typeGroup(cheapest.type_name) }) },
+      { tag: t("feat_cheap"), t: `${dt(cheapest.type_name)} ${t("from")} ${trieu(cheapest.list_price)}`, s: shortAddr(cheapest.address) || cheapest.building_name, photo: cheapest.photo, go: () => apply({ ...EMPTY, group: typeGroup(cheapest.type_name) }) },
     ];
-    if (most) out.push({ tag: "Nhiều lựa chọn", t: most.name, s: `${most.n} phòng đang trống`, photo: most.photo, go: () => apply({ ...EMPTY, building: most.id }) });
-    if (view) out.push({ tag: /ban công/i.test(view.type_name) ? "Có ban công" : "Có cửa sổ", t: `${view.type_name} · ${view.building_name}`, s: `từ ${trieu(view.list_price)}`, photo: view.photo, go: () => apply({ ...EMPTY, building: view.building_id }) });
+    if (most) out.push({ tag: t("feat_many"), t: most.name, s: t("rooms_vacant", { n: most.n }), photo: most.photo, go: () => apply({ ...EMPTY, building: most.id }) });
+    if (view) out.push({ tag: /ban công/i.test(view.type_name) ? t("feat_balcony") : t("feat_window"), t: `${dt(view.type_name)} · ${view.building_name}`, s: `${t("from")} ${trieu(view.list_price)}`, photo: view.photo, go: () => apply({ ...EMPTY, building: view.building_id }) });
     return out;
-  }, [rooms, buildings]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rooms, buildings, lang]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cfg = webCfg();
   const heroPhoto = (cfg.hero_building ? buildings.find((b) => b.id === cfg.hero_building && b.photo)?.photo : null)
@@ -71,7 +73,7 @@ export default function WebHome() {
 
   return (
     <div className="web">
-      {cfg.notice_on && cfg.notice ? <div className="web-notice" role="note">{cfg.notice}</div> : null}
+      {webNotice(lang) ? <div className="web-notice" role="note">{webNotice(lang)}</div> : null}
       <section className="web-hero">
         {cfg.hero_media?.length ? <HeroSlides items={cfg.hero_media} seconds={cfg.hero_interval ?? 5} />
           : heroUrl ? <img className="web-hero-img" src={heroUrl} alt="" /> : (
@@ -83,47 +85,47 @@ export default function WebHome() {
         <div className="web-hero-shade" aria-hidden="true" />
         <div style={{ position: "relative" }}><WebHeader /></div>
         <div className="web-wrap web-hero-text">
-          <span className="web-eyebrow">{webText("eyebrow")}</span>
-          <h1>{webText("title1")}<br /><em>{webText("title2")}</em></h1>
-          <p>{webText("subtitle")}</p>
+          <span className="web-eyebrow">{webText("eyebrow", lang)}</span>
+          <h1>{webText("title1", lang)}<br /><em>{webText("title2", lang)}</em></h1>
+          <p>{webText("subtitle", lang)}</p>
         </div>
       </section>
 
-      <section className="web-wrap web-search" aria-label="Tìm phòng">
+      <section className="web-wrap web-search" aria-label={t("search_aria")}>
         <form onSubmit={submit}>
-          <label>Bạn muốn ở đâu?
+          <label>{t("where")}
             <select value={draft.building} onChange={set("building")}>
-              <option value="">Tất cả toà nhà</option>
+              <option value="">{t("all_buildings")}</option>
               {buildings.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </label>
-          <label>Loại phòng
+          <label>{t("room_type")}
             <select value={draft.group} onChange={set("group")}>
-              <option value="">Tất cả</option>
-              {groups.map((g) => <option key={g}>{g}</option>)}
+              <option value="">{t("all")}</option>
+              {groups.map((g) => <option key={g} value={g}>{groupLabel(g, lang)}</option>)}
             </select>
           </label>
-          <label>Ngân sách / tháng
+          <label>{t("budget")}
             <select value={draft.price} onChange={set("price")}>
-              {PRICES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              {PRICES.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}
             </select>
           </label>
           {hasNight ? (
-            <label>Thuê theo
+            <label>{t("rent_by")}
               <select value={draft.mode} onChange={set("mode")}>
-                <option value="">Tháng hoặc đêm</option><option value="thang">Theo tháng</option><option value="dem">Theo đêm</option>
+                <option value="">{t("month_or_night")}</option><option value="thang">{t("by_month")}</option><option value="dem">{t("by_night")}</option>
               </select>
             </label>
           ) : null}
-          <button type="submit">Tìm phòng</button>
+          <button type="submit">{t("find")}</button>
         </form>
       </section>
 
-      {err ? <div className="web-wrap web-sec"><div className="web-err" role="alert">{err}</div></div> : null}
+      {err ? <div className="web-wrap web-sec"><div className="web-err" role="alert">{t("load_err")}</div></div> : null}
 
       {webShow("show_features") && features.length ? (
         <section className="web-wrap web-sec" aria-labelledby="kham-pha">
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><span className="web-eyebrow">Gợi ý từ phòng đang trống</span><h2 id="kham-pha">Khám phá mới</h2></div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><span className="web-eyebrow">{t("feat_eyebrow")}</span><h2 id="kham-pha">{t("feat_title")}</h2></div>
           <div className="web-grid">
             {features.map((x, i) => (
               <button key={x.tag} type="button" className="web-feature" style={{ background: `var(--web-card-${i + 1})` }} onClick={x.go}>
@@ -140,8 +142,8 @@ export default function WebHome() {
       {webShow("show_buildings") ? (
       <section id="toa" className="web-wrap web-sec" aria-labelledby="toa-h">
         <div className="web-sec-head">
-          <div><span className="web-eyebrow">Toà nhà</span><h2 id="toa-h">Chọn nơi bạn muốn ở</h2></div>
-          {f.building ? <button type="button" className="web-pill" onClick={() => apply({ ...f, building: "" })}>Xem tất cả toà</button> : null}
+          <div><span className="web-eyebrow">{t("bld_eyebrow")}</span><h2 id="toa-h">{t("bld_title")}</h2></div>
+          {f.building ? <button type="button" className="web-pill" onClick={() => apply({ ...f, building: "" })}>{t("bld_all")}</button> : null}
         </div>
         <div className="web-grid sm">
           {buildings.map((b, i) => (
@@ -149,7 +151,7 @@ export default function WebHome() {
               <div className="web-ph">{buildingUrls[i] ? <img src={buildingUrls[i]!} alt="" /> : WebIcon.photo(36)}</div>
               <h3>{b.name}</h3>
               <span className="web-muted" style={{ fontSize: 14 }}>{shortAddr(b.address)}</span>
-              <span style={{ fontSize: 15 }}><span style={{ color: "var(--web-green)", fontWeight: 500 }}>từ {trieu(b.min)}</span> · {b.n} phòng trống</span>
+              <span style={{ fontSize: 15 }}><span style={{ color: "var(--web-green)", fontWeight: 500 }}>{t("from")} {trieu(b.min)}</span> · {t("rooms_vacant", { n: b.n })}</span>
             </button>
           ))}
         </div>
@@ -159,27 +161,27 @@ export default function WebHome() {
       <section id="phong" className="web-wrap web-sec" aria-labelledby="phong-h" style={{ scrollMarginTop: 12 }}>
         <div className="web-sec-head">
           <div>
-            <span className="web-eyebrow">Trống ngay</span>
-            <h2 id="phong-h">Phòng đang trống</h2>
-            <p className="web-muted" style={{ margin: "4px 0 0" }}>{rooms ? `${list.length} phòng${list.length !== rooms.length ? ` (trong ${rooms.length})` : ""}` : "Đang tải…"} · sale đổi trạng thái trong app là trang này đổi theo.</p>
+            <span className="web-eyebrow">{t("vac_eyebrow")}</span>
+            <h2 id="phong-h">{t("vac_title")}</h2>
+            <p className="web-muted" style={{ margin: "4px 0 0" }}>{rooms ? `${t("vac_count", { n: list.length })}${list.length !== rooms.length ? t("vac_of", { t: rooms.length }) : ""}` : t("loading")}{t("vac_live")}</p>
           </div>
-          <label className="web-muted" style={{ fontSize: 14, display: "flex", gap: 8, alignItems: "center" }}>Sắp xếp
-            <select className="web-chip" value={sort} onChange={(e) => setSort(e.target.value as "gia" | "toa")}><option value="gia">Giá thấp đến cao</option><option value="toa">Theo toà</option></select>
+          <label className="web-muted" style={{ fontSize: 14, display: "flex", gap: 8, alignItems: "center" }}>{t("sort")}
+            <select className="web-chip" value={sort} onChange={(e) => setSort(e.target.value as "gia" | "toa")}><option value="gia">{t("sort_price")}</option><option value="toa">{t("sort_building")}</option></select>
           </label>
         </div>
-        <div className="web-chips" role="group" aria-label="Lọc loại phòng">
-          <button type="button" className="web-chip" aria-pressed={!f.group} onClick={() => apply({ ...f, group: "" })}>Tất cả</button>
-          {groups.map((g) => <button key={g} type="button" className="web-chip" aria-pressed={f.group === g} onClick={() => apply({ ...f, group: g })}>{g}</button>)}
+        <div className="web-chips" role="group" aria-label={t("filter_type")}>
+          <button type="button" className="web-chip" aria-pressed={!f.group} onClick={() => apply({ ...f, group: "" })}>{t("all")}</button>
+          {groups.map((g) => <button key={g} type="button" className="web-chip" aria-pressed={f.group === g} onClick={() => apply({ ...f, group: g })}>{groupLabel(g, lang)}</button>)}
         </div>
-        {rooms && !list.length ? <div className="web-empty">Chưa có phòng hợp bộ lọc này. Thử bỏ bớt điều kiện{zalo ? ", hoặc nhắn Zalo để sale tìm giúp" : ""}.</div> : null}
+        {rooms && !list.length ? <div className="web-empty">{t("empty_filter")}{zalo ? t("empty_zalo") : ""}.</div> : null}
         <div className="web-grid">
           {list.map((r, i) => (
-            <Link key={r.room_id} className="web-room" to={`/phong/${r.room_id}${window.location.search}`}>
-              <div className="web-ph">{roomUrls[i] ? <img src={roomUrls[i]!} alt="" loading="lazy" /> : WebIcon.photo(40)}<span className="badge">Trống ngay</span></div>
+            <Link key={r.room_id} className="web-room" to={`${webPath(lang, `/phong/${r.room_id}`)}${window.location.search}`}>
+              <div className="web-ph">{roomUrls[i] ? <img src={roomUrls[i]!} alt="" loading="lazy" /> : WebIcon.photo(40)}<span className="badge">{t("vacant_now")}</span></div>
               <div className="body">
-                <h3>{r.type_name}</h3>
-                <span className="web-muted" style={{ fontSize: 15 }}>{r.building_name}{r.floor != null ? ` · ${floorText(r.floor)}` : ""}</span>
-                <span className="web-price" style={{ marginTop: 6 }}>{vnd(r.list_price)}<small>{perText(r.rent_mode)}</small></span>
+                <h3>{dt(r.type_name)}</h3>
+                <span className="web-muted" style={{ fontSize: 15 }}>{r.building_name}{r.floor != null ? ` · ${floorText(r.floor, lang)}` : ""}</span>
+                <span className="web-price" style={{ marginTop: 6 }}>{money(lang, r.list_price)}<small>{perText(r.rent_mode, lang)}</small></span>
               </div>
             </Link>
           ))}
@@ -190,14 +192,14 @@ export default function WebHome() {
       <section id="app" className="web-wrap web-sec">
         <div className="web-app">
           <div style={{ flex: "1 1 420px", display: "flex", flexDirection: "column", gap: 12 }}>
-            <span className="web-eyebrow">App người thuê Next Living</span>
-            <h2>Thuê xong là có tài khoản app.</h2>
+            <span className="web-eyebrow">{t("app_eyebrow")}</span>
+            <h2>{t("app_title")}</h2>
             <ul>
-              <li>Xem hoá đơn, số điện, tiền nước từng tháng</li>
-              <li>Đăng ký người ở cùng</li>
-              <li>Gửi phản ánh, sự cố cho quản lý toà</li>
+              <li>{t("app_1")}</li>
+              <li>{t("app_2")}</li>
+              <li>{t("app_3")}</li>
             </ul>
-            <a className="web-pill solid" href="/" style={{ alignSelf: "flex-start" }}>Đăng nhập app</a>
+            <a className="web-pill solid" href="/" style={{ alignSelf: "flex-start" }}>{t("app_login")}</a>
           </div>
         </div>
       </section>
@@ -205,11 +207,11 @@ export default function WebHome() {
 
       {webShow("show_brands") ? (
       <section id="thuong-hieu" className="web-wrap web-sec" aria-labelledby="th-h">
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><span className="web-eyebrow">Next Vision</span><h2 id="th-h">Hệ thương hiệu</h2></div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}><span className="web-eyebrow">Next Vision</span><h2 id="th-h">{t("brand_title")}</h2></div>
         <div className="web-grid">
-          <div className="web-brand"><b style={{ color: "var(--web-green)" }}>Next Living</b><span className="web-muted">Phòng ở, căn hộ dịch vụ thuê theo tháng.</span></div>
-          <div className="web-brand"><b style={{ color: "var(--web-title)" }}>Next Hub</b><span className="web-muted">Văn phòng cho thuê, phòng livestream.</span></div>
-          <div className="web-brand"><b style={{ color: "var(--web-title)" }}>Next Stay</b><span className="web-muted">Khách sạn, lưu trú ngắn ngày.</span></div>
+          <div className="web-brand"><b style={{ color: "var(--web-green)" }}>Next Living</b><span className="web-muted">{t("brand_living")}</span></div>
+          <div className="web-brand"><b style={{ color: "var(--web-title)" }}>Next Hub</b><span className="web-muted">{t("brand_hub")}</span></div>
+          <div className="web-brand"><b style={{ color: "var(--web-title)" }}>Next Stay</b><span className="web-muted">{t("brand_stay")}</span></div>
         </div>
       </section>
       ) : null}

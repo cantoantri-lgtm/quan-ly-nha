@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { heroMediaUrl, type HeroMedia } from "../lib/files";
+import { useT } from "./i18n";
 
 /**
  * Trình chiếu đầu trang: nhiều ảnh / clip chồng lên nhau, mờ dần sang cái tiếp theo sau mỗi `seconds` giây.
  * Clip tự phát, tắt tiếng, lặp. Có nút tạm dừng và chấm chọn ảnh (WCAG 2.2.2). Người bật "giảm chuyển động" thì không tự chuyển.
  */
 export function HeroSlides({ items, seconds = 5 }: { items: HeroMedia[]; seconds?: number }) {
+  const t = useT();
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const vids = useRef<(HTMLVideoElement | null)[]>([]);
@@ -42,13 +44,13 @@ export function HeroSlides({ items, seconds = 5 }: { items: HeroMedia[]; seconds
       </div>
       {n > 1 ? (
         <div className="web-slide-ctl">
-          <button type="button" className="web-slide-pause" onClick={() => setPaused((p) => !p)} aria-label={paused ? "Tiếp tục trình chiếu" : "Tạm dừng trình chiếu"}>
+          <button type="button" className="web-slide-pause" onClick={() => setPaused((p) => !p)} aria-label={paused ? t("slide_play") : t("slide_pause")}>
             {paused
               ? <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z" fill="currentColor" /></svg>
               : <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h4v16H7zM13 4h4v16h-4z" fill="currentColor" /></svg>}
           </button>
           {items.map((m, k) => (
-            <button key={m.path} type="button" className={`web-dot${k === i ? " on" : ""}`} aria-label={`Ảnh ${k + 1} / ${n}`} aria-current={k === i} onClick={() => setI(k)}><span /></button>
+            <button key={m.path} type="button" className={`web-dot${k === i ? " on" : ""}`} aria-label={t("slide_n", { n: k + 1, t: n })} aria-current={k === i} onClick={() => setI(k)}><span /></button>
           ))}
         </div>
       ) : null}

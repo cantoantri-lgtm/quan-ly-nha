@@ -145,7 +145,7 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount, l
           <input id="b-name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Toà 89 Cách Mạng Tháng 8" required /></label>
         <label className="field"><span>Địa chỉ</span>
           <input id="b-addr" className="input" value={address} onChange={(e) => setAddress(e.target.value)} /></label>
-        <label className="field"><span>Ghi chú toà (hiện ở danh sách phòng trống cho CTV và khách)</span>
+        <label className="field"><span>Ghi chú toà (hiện ở danh sách phòng trống và website cho khách)</span>
           <input id="b-pubnote" className="input" maxLength={200} placeholder="VD: Gần chợ, có thang máy, ưu đãi tháng 11" value={pubNote} onChange={(e) => setPubNote(e.target.value)} /></label>
         <div className="field">
           <span>Vị trí trên bản đồ</span>

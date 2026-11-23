@@ -97,7 +97,7 @@ export default function App() {
   const loc = useLocation();
 
   // Website phòng trống: ai cũng xem được, kể cả chưa đăng nhập
-  if (loc.pathname === "/phong" || loc.pathname.startsWith("/phong/")) return <Suspense fallback={<div className="loading">Đang tải…</div>}><WebApp /></Suspense>;
+  if (/^\/(en\/)?phong(\/|$)/.test(loc.pathname)) return <Suspense fallback={<div className="loading">Đang tải…</div>}><WebApp /></Suspense>;
 
   // Trang thanh toán cho khách thuê: công khai, không cần đăng nhập
   if (window.location.pathname.startsWith("/thanh-toan/")) return <Routes><Route path="/thanh-toan/:code" element={<PayPage />} /></Routes>;

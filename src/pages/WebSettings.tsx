@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { copyText, Icon } from "../components/ui";
-import { WEB_DEFAULTS, type WebConfig } from "../web/webApi";
+import { WEB_DEFAULTS, WEB_DEFAULTS_EN, type WebConfig } from "../web/webApi";
 import { heroMediaUrl, removeHeroMedia, uploadHeroMedia, type HeroMedia } from "../lib/files";
 import "../table.css";
 import "../office.css";
@@ -34,6 +34,16 @@ const CHAT: TextField[] = [
   { k: "hotline2_label", label: "Tên nút gọi số thứ hai", max: 40, ph: "Gọi hỗ trợ khách thuê" },
   { k: "chat_greeting", label: "Lời chào trong khung nhắn tin", max: 160, area: true, ph: "Chào bạn! Để lại số điện thoại và tin nhắn, Next Living sẽ trả lời ở đây và gọi lại cho bạn." },
 ];
+const EN: TextField[] = [
+  { k: "eyebrow_en", label: "Dòng chữ nhỏ trên tiêu đề", max: 60, ph: WEB_DEFAULTS_EN.eyebrow },
+  { k: "title1_en", label: "Tiêu đề, dòng 1", max: 60, ph: WEB_DEFAULTS_EN.title1 },
+  { k: "title2_en", label: "Tiêu đề, dòng 2 (chữ nghiêng)", max: 60, ph: WEB_DEFAULTS_EN.title2 },
+  { k: "subtitle_en", label: "Câu giới thiệu", max: 200, area: true, ph: WEB_DEFAULTS_EN.subtitle },
+  { k: "notice_en", label: "Thông báo đầu trang (hiện khi bật thông báo)", max: 160, area: true, hint: "Để trống thì bản tiếng Anh không hiện thông báo." },
+  { k: "footer_note_en", label: "Câu giới thiệu cuối trang", max: 200, ph: WEB_DEFAULTS_EN.footer_note },
+  { k: "seo_title_en", label: "Tiêu đề tab trình duyệt", max: 70, ph: WEB_DEFAULTS_EN.seo_title },
+  { k: "seo_desc_en", label: "Mô tả khi tìm Google / chia sẻ link", max: 160, area: true, ph: WEB_DEFAULTS_EN.seo_desc },
+];
 const SEO: TextField[] = [
   { k: "seo_title", label: "Tiêu đề tab trình duyệt", max: 70, ph: WEB_DEFAULTS.seo_title },
   { k: "seo_desc", label: "Mô tả khi tìm Google / chia sẻ link", max: 160, area: true, ph: WEB_DEFAULTS.seo_desc },
@@ -58,6 +68,7 @@ export default function WebSettings() {
   const [openB, setOpenB] = useState<string | null>(null);
   const [device, setDevice] = useState<"pc" | "dt">("pc");
   const [frameKey, setFrameKey] = useState(0);
+  const [pvLang, setPvLang] = useState<"vi" | "en">("vi");
   const frame = useRef<HTMLIFrameElement>(null);
   const [upl, setUpl] = useState<{ done: number; total: number } | null>(null);
   const [uplErr, setUplErr] = useState<string[]>([]);
@@ -316,6 +327,19 @@ export default function WebSettings() {
             <h3>Google và chia sẻ link</h3>
             {SEO.map(textInput)}
           </section>
+
+          <section className="card ws-sec">
+            <h3>Bản tiếng Anh (English)</h3>
+            <p className="muted small" style={{ margin: 0 }}>
+              Website tiếng Anh ở địa chỉ <b>{window.location.origin}/en/phong</b>, có nút VI / EN ở đầu trang. Chữ giao diện đã dịch sẵn.
+              Loại phòng, nội thất, tiện ích, tên phí tự dịch các cụm thường gặp; nội dung đặt cọc và địa chỉ giữ nguyên tiếng Việt.
+              Ô nào để trống thì dùng câu mặc định bằng tiếng Anh (chữ mờ trong ô).
+            </p>
+            {EN.map(textInput)}
+            <button type="button" className="btn secondary sm" style={{ alignSelf: "flex-start" }} onClick={() => setPvLang(pvLang === "en" ? "vi" : "en")}>
+              {pvLang === "en" ? "Xem trước bản tiếng Việt" : "Xem trước bản tiếng Anh"}
+            </button>
+          </section>
         </div>
 
         <aside className="ws-preview" aria-label="Xem trước website">
@@ -327,7 +351,7 @@ export default function WebSettings() {
             </div>
           </div>
           <div className={`ws-frame ${device}`}>
-            <iframe key={frameKey} ref={frame} title="Xem trước website" src="/phong?xem=thu" onLoad={push} />
+            <iframe key={`${frameKey}-${pvLang}`} ref={frame} title="Xem trước website" src={pvLang === "en" ? "/en/phong?xem=thu" : "/phong?xem=thu"} onLoad={push} />
           </div>
           <small className="muted">Chữ, liên hệ và các khối đổi ngay khi gõ. Toà / phòng bị ẩn chỉ đổi sau khi Lưu.</small>
         </aside>

@@ -169,7 +169,7 @@ export default function BuildingDetail() {
         <LeasePanel buildingId={building.id} />
 
         <FileGallery owner={{ kind: "anh_toa", buildingId: building.id }} title="Ảnh toà nhà" pdf={false} cover
-          hint={'Ảnh có nhãn "Đại diện" hiện trên bản đồ cho cả nhân viên và cộng tác viên.'} canUpload={canEdit} canDelete={canEdit} />
+          hint={'Ảnh có nhãn "Đại diện" hiện trên bản đồ và website phòng trống.'} canUpload={canEdit} canDelete={canEdit} />
 
         <section className="room-stats">
           <div className="stat"><b className="num">{rooms.length}</b><span>phòng</span></div>
