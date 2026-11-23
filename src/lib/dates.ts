@@ -89,3 +89,16 @@ export function workDays(fromISO: string, toISO: string): number {
   }
   return n;
 }
+
+/** Kỳ ghi điện đang cần làm: từ ngày 28 là tháng này, trước ngày 28 là tháng trước (dạng YYYY-MM-01). Giống meter_period() trong SQL. */
+export function meterPeriodVN(today: string = todayVN()): string {
+  const [y, m, d] = today.split("-").map(Number);
+  if (d >= 28) return `${y}-${String(m).padStart(2, "0")}-01`;
+  const p = new Date(Date.UTC(y, m - 2, 1));
+  return p.toISOString().slice(0, 10);
+}
+
+/** "11/2026" từ ngày dạng YYYY-MM-.. */
+export function mmyyyy(iso: string): string {
+  return `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+}

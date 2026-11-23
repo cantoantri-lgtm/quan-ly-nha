@@ -7,10 +7,11 @@ import { parseMoney, vnd } from "../lib/money";
 import { Combo, Empty, Sheet, TopBar } from "../components/ui";
 import { EXPENSE_CATS, expenseOptions, SETTLE_LABEL, type SettleStatus } from "../lib/expense";
 import LedgerTab from "../components/LedgerTab";
+import MonthCloseTab from "../components/MonthCloseTab";
 import Pivot, { withSales, type Dim, type SaleMap, type WithSale } from "../components/Pivot";
 import "../reports.css";
 
-type Tab = "thu_chi" | "lap_day" | "phan_anh" | "loi_nhuan" | "so_thu_chi" | "chi_phi";
+type Tab = "chot_thang" | "thu_chi" | "lap_day" | "phan_anh" | "loi_nhuan" | "so_thu_chi" | "chi_phi";
 type Group = "toa" | "nhan_vien" | "lead" | "sale" | "lead_sale";
 type G = { k: Group; t: string };
 // Nhóm theo từng loại báo cáo. Sale = nhân viên KD phụ trách toà; Leader sale = trưởng nhóm của sale đó (Sơ đồ công ty).
@@ -31,7 +32,7 @@ export default function Reports() {
   const { isManager, isAccountant, isLeadUp } = useSession();
   const fin = isManager || isAccountant;   // Quản lý, Kế toán: chi phí, lợi nhuận, mọi toà
   const [qs] = useSearchParams();
-  const [tab, setTab] = useState<Tab>(() => (qs.get("tab") === "so_thu_chi" ? "so_thu_chi" : "thu_chi"));
+  const [tab, setTab] = useState<Tab>(() => { const t = qs.get("tab"); return t === "so_thu_chi" || t === "chot_thang" ? t : "thu_chi"; });
   const [from, setFrom] = useState(() => monthStart(todayVN()));
   const [to, setTo] = useState(() => todayVN());
   const [groups, setGroups] = useState<Partial<Record<Tab, Group>>>({});
@@ -39,10 +40,10 @@ export default function Reports() {
   const group: Group = groups[tab] ?? "toa";
   const setGroup = (g: Group) => setGroups((cur) => ({ ...cur, [tab]: g }));
   const tabs: { k: Tab; t: string }[] = [
-    { k: "thu_chi", t: "Thu chi" }, { k: "lap_day", t: "Lấp đầy" }, ...(isLeadUp ? [{ k: "phan_anh" as Tab, t: "Phản ánh" }] : []),
+    { k: "thu_chi", t: "Thu chi" }, { k: "chot_thang", t: "Chốt tháng" }, { k: "lap_day", t: "Lấp đầy" }, ...(isLeadUp ? [{ k: "phan_anh" as Tab, t: "Phản ánh" }] : []),
     ...(fin ? [{ k: "loi_nhuan" as Tab, t: "Lợi nhuận" }, { k: "so_thu_chi" as Tab, t: "Sổ thu chi toà" }, { k: "chi_phi" as Tab, t: "Chi phí & thuê nhà" }] : []),
   ];
-  const range = tab !== "chi_phi";
+  const range = tab !== "chi_phi" && tab !== "chot_thang";
   return (
     <>
       <TopBar title="Báo cáo" />
@@ -62,6 +63,7 @@ export default function Reports() {
           </div>
         ) : null}
         {tab === "thu_chi" ? <CashTab from={from} to={to} group={group} isManager={fin} /> : null}
+        {tab === "chot_thang" ? <MonthCloseTab /> : null}
         {tab === "lap_day" ? <OccTab from={from} to={to} group={group} /> : null}
         {tab === "phan_anh" && isLeadUp ? <FbTab from={from} to={to} group={group} /> : null}
         {tab === "loi_nhuan" && fin ? <ProfitTab from={from} to={to} /> : null}

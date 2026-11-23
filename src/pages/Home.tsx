@@ -9,6 +9,7 @@ import { Icon } from "../components/ui";
 import DecideSheet, { type DecideMode } from "../components/DecideSheet";
 import { Pager, usePaging } from "../components/Pager";
 import { KIND_ICON } from "./Office";
+import MonthCloseCard from "../components/MonthCloseCard";
 import "../office.css";
 import "../table.css";
 
@@ -17,7 +18,7 @@ type TaskLite = { id: string; title: string; due_date: string | null; assignee_i
 
 /** Trang chủ: danh sách phiếu chờ tôi duyệt (bảng) + Bàn làm việc + lịch */
 export default function Home() {
-  const { profile, people, unread } = useSession();
+  const { profile, people, unread, isManager } = useSession();
   const [rows, setRows] = useState<Req[]>([]);
   const [phases, setPhases] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -92,6 +93,7 @@ export default function Home() {
       <main className="main main-full">
         <div className="home-grid">
           <div className="stack home-main">
+          {!isManager ? <MonthCloseCard /> : null}
           <section className="pg-card" aria-label="Chờ bạn duyệt">
             <div className="pg-head">
               <span className="pg-ico">{Icon.bell}</span>
@@ -146,6 +148,7 @@ export default function Home() {
             )}
             {shown.length ? <Pager p={paging} /> : null}
           </section>
+          {isManager ? <MonthCloseCard /> : null}
           <TodoCard mine={tasks} given={given} name={name} />
           </div>
 

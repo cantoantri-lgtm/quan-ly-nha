@@ -193,3 +193,8 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
   table.dt .ico-btn svg { width: 16px; height: 16px; }
   .tile { border-radius: 8px; }
 }
+
+/* Chốt tháng: danh sách mã phòng */
+.mc-rooms { display: flex; flex-wrap: wrap; gap: 6px; }
+.mc-room { display: inline-flex; align-items: baseline; gap: 2px; padding: 3px 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); font-size: 13.5px; }
+.mc-room small { color: var(--muted); font-size: 12px; }

@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { useCanEditBuilding } from "../lib/useCanEdit";
-import { todayVN } from "../lib/dates";
+import { meterPeriodVN, todayVN } from "../lib/dates";
 import { vnd } from "../lib/money";
 import { Empty, TopBar } from "../components/ui";
 import "../reports.css";
@@ -22,11 +22,12 @@ const monthStart = (iso: string) => iso.slice(0, 7) + "-01";
 /** Điện nước từng phòng: mỗi tháng ghi số điện cuối kỳ từng phòng; nước khoán theo số người ở (không ghi số nước). */
 export default function RoomUtilities() {
   const { id } = useParams();
-  const { buildings, toast } = useSession();
+  const { buildings, toast, isManager, isSupervisor } = useSession();
   const building = buildings.find((b) => b.id === id);
   const canEdit = useCanEditBuilding(id);
   const thisMonth = monthStart(todayVN());
-  const [month, setMonth] = useState(thisMonth);
+  const [month, setMonth] = useState(() => meterPeriodVN());
+  const canFixStart = isManager || isSupervisor;   // sale chỉ nhập số cuối kỳ khi đã có số tháng trước
   const [rows, setRows] = useState<Row[] | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [onlyRented, setOnlyRented] = useState(true);
@@ -72,7 +73,7 @@ export default function RoomUtilities() {
     for (const r of changed) {
       const d = drafts[r.room_id]; const s = num(d.start)!, e = num(d.end)!;
       if (Number.isNaN(s) || Number.isNaN(e) || s < 0) { setErr(`Phòng ${r.room_code}: số chưa đúng.`); return; }
-      if (e < s) { setErr(`Phòng ${r.room_code}: số mới (${fmt(e)}) nhỏ hơn số cũ (${fmt(s)}).`); return; }
+      if (e < s) { setErr(`Phòng ${r.room_code}: số cuối kỳ (${fmt(e)}) nhỏ hơn số đầu kỳ (${fmt(s)}).`); return; }
     }
     setBusy(true);
     for (const r of changed) {
@@ -113,7 +114,7 @@ export default function RoomUtilities() {
           <Empty title="Không có phòng nào">{onlyRented ? "Toà chưa có phòng nào đang có hợp đồng. Bỏ tích “Chỉ phòng đang cho thuê” để xem tất cả." : "Toà chưa có phòng thuê tháng."}</Empty>
         ) : (
           <div className="rpt-wrap"><table className="rpt">
-            <thead><tr><th>Phòng</th><th>Số người</th><th>Số cũ</th><th>Số mới</th><th>kWh</th><th>Tiền điện</th><th>Tiền nước</th></tr></thead>
+            <thead><tr><th>Phòng</th><th>Số người</th><th>Số đầu kỳ</th><th>Số cuối kỳ</th><th>kWh</th><th>Tiền điện</th><th>Tiền nước</th></tr></thead>
             <tbody>{shown.map((r) => {
               const d = drafts[r.room_id] ?? { start: "", end: "" }; const p = preview(r);
               const set = (k: keyof Draft, v: string) => setDrafts((cur) => ({ ...cur, [r.room_id]: { ...d, [k]: v } }));
@@ -121,8 +122,9 @@ export default function RoomUtilities() {
                 <tr key={r.room_id}>
                   <td><b>{r.room_code}</b><br /><small className="muted">{r.tenant_name ?? (r.room_status === "trong" ? "Trống" : "Chưa có hợp đồng")}</small></td>
                   <td className="num">{r.contract_id ? <Link to={`/toa/${id}/hop-dong?mo=${r.contract_id}`}>{r.occupants}{r.max_occupants ? `/${r.max_occupants}` : ""}</Link> : "—"}</td>
-                  <td>{canEdit ? <input className="input num" style={{ minWidth: 80 }} inputMode="decimal" aria-label={`Số cũ phòng ${r.room_code}`} value={d.start} onChange={(e) => set("start", e.target.value)} placeholder="Số đầu" />
-                    : <span className="num">{fmt(r.start_reading)}</span>}</td>
+                  <td>{canEdit && (r.prev_end == null || canFixStart) ? <input className="input num" style={{ minWidth: 80 }} inputMode="decimal" aria-label={`Số đầu kỳ phòng ${r.room_code}`} value={d.start} onChange={(e) => set("start", e.target.value)} placeholder="Số đầu" />
+                    : <span className="num">{canEdit ? d.start : fmt(r.start_reading)}</span>}
+                    {canEdit && r.prev_end == null ? <><br /><small className="muted">Chưa có số tháng trước</small></> : null}</td>
                   <td>{canEdit ? <input className="input num" style={{ minWidth: 80 }} inputMode="decimal" aria-label={`Số mới phòng ${r.room_code}`} value={d.end} onChange={(e) => set("end", e.target.value)} placeholder="Số cuối" />
                     : <span className="num">{fmt(r.end_reading)}</span>}</td>
                   <td className="num">{p ? fmt(p.kwh) : ""}</td>
@@ -138,7 +140,7 @@ export default function RoomUtilities() {
           <button className="btn block" disabled={busy || !changed.length} onClick={saveAll}>{busy ? "Đang lưu…" : changed.length ? `Lưu số điện ${changed.length} phòng` : "Chưa có số nào thay đổi"}</button>
         ) : null}
         <p className="muted small" style={{ margin: 0 }}>
-          Số cũ tự lấy từ số mới của tháng trước; tháng đầu tiên thì nhập số đồng hồ lúc khách vào ở. Tiền điện = (số mới − số cũ) × giá điện.
+          Ghi đồng hồ từ ngày 28 đến cuối tháng; số này tính vào hoá đơn ngày 1 tháng sau. Số đầu kỳ tự lấy từ số cuối kỳ tháng trước. Phòng chưa có số tháng trước (phòng mới, khách mới vào) thì nhập cả số đầu kỳ (số lúc khách vào ở) và số cuối kỳ. Thay đồng hồ thì báo Giám sát hoặc Quản lý sửa số đầu kỳ. Hoá đơn tháng sau đã lập mà chưa thu sẽ tự tính lại tiền điện. Tiền điện = (số mới − số cũ) × giá điện.
           Tiền nước = số người đang ở × giá nước/người (không ghi số nước). Số người lấy theo mục “Người ở” trong hợp đồng.
           {canEdit ? "" : " Bạn chỉ xem: sale phòng Kinh doanh phụ trách toà, Giám sát hoặc Quản lý mới ghi số."}
         </p>
