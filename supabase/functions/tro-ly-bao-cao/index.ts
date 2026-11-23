@@ -19,7 +19,7 @@ const MODELS = (Deno.env.get("GEMINI_MODEL_BAO_CAO") ?? "gemini-3.6-flash:low,ge
   .split(",").map((s) => s.trim()).filter(Boolean)
   .map((s) => { const [model, level] = s.split(":"); return { model, level }; });
 
-const SOURCES = ["Phòng & lấp đầy", "Doanh thu & công nợ", "Chi phí & ngân sách", "Công việc & dự án"];
+const SOURCES = ["Phòng & lấp đầy", "Hợp đồng & CCCD", "Doanh thu & công nợ", "Chi phí & ngân sách", "Công việc & dự án"];
 const PRIORITIES = ["thap", "binh_thuong", "cao", "gap"];
 const HOURLY_LIMIT = 40;
 
@@ -104,7 +104,8 @@ const RULES = `Quy tắc:
 7. sources: chỉ các nhóm dữ liệu thực sự dùng.
 8. Câu ngắn, tiếng Việt có dấu, giọng báo cáo cho chủ doanh nghiệp. Không dùng gạch ngang dài.
 9. Công ty nghỉ Chủ nhật. Toà khách sạn cho thuê theo đêm nên không có hợp đồng tháng.
-10. Câu hỏi ngoài phạm vi số liệu kinh doanh (VD chuyện riêng, lương, thông tin cá nhân khách) thì từ chối lịch sự trong summary, các mảng để rỗng.`;
+10. Câu hỏi ngoài phạm vi số liệu kinh doanh (VD chuyện riêng, lương, thông tin cá nhân khách) thì từ chối lịch sự trong summary, các mảng để rỗng.
+11. "Hợp đồng & CCCD" chỉ có trạng thái theo phòng (đã có hợp đồng chưa, đủ giấy tờ chưa, thiếu số / đồng ý lưu / ảnh), không có tên hay số giấy tờ. Trả lời được câu hỏi phòng nào đã / chưa có hợp đồng, phòng nào thiếu CCCD; liệt kê mã phòng theo toà. Không đoán tên khách.`;
 
 // Model bận (503, 500, 502, 504), hết lượt riêng của model (429) hoặc chờ quá lâu: chuyển sang model kế tiếp
 const BUSY = [429, 500, 502, 503, 504];
@@ -191,11 +192,12 @@ async function loadData(db: SupabaseClient) {
     db.rpc("ai_revenue", { p_from: from, p_to: null, p_building: null }),
     db.rpc("ai_costs", { p_from: from, p_to: null, p_building: null }),
     db.rpc("ai_work"),
+    db.rpc("ai_contracts", { p_building: null }),
   ]);
   const err = calls.find((c) => c.error)?.error;
   if (err) throw new Error("db:" + err.message);
-  const [b, occ, rev, cost, work] = calls.map((c) => c.data);
-  return { "Danh sách toà": b, "Phòng & lấp đầy": occ, "Doanh thu & công nợ": rev, "Chi phí & ngân sách": cost, "Công việc & dự án": work };
+  const [b, occ, rev, cost, work, ctr] = calls.map((c) => c.data);
+  return { "Danh sách toà": b, "Phòng & lấp đầy": occ, "Hợp đồng & CCCD": ctr, "Doanh thu & công nợ": rev, "Chi phí & ngân sách": cost, "Công việc & dự án": work };
 }
 
 Deno.serve(async (req) => {

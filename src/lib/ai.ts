@@ -94,6 +94,7 @@ export function openAiPanel(question?: string) {
 export const AI_SUGGEST = [
   "Vì sao tỉ lệ lấp đầy tháng này thay đổi?",
   "Phòng nào trống lâu nhất và nên làm gì?",
+  "Phòng nào đang ở mà chưa có hợp đồng hoặc thiếu CCCD?",
   "Công nợ quá hạn đang dồn ở toà nào?",
   "Chi phí tháng này so với tháng trước thế nào?",
   "Dự án nào đang chậm tiến độ?",
