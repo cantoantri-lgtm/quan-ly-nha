@@ -7,6 +7,8 @@ import { naturalCompare, vnd } from "../lib/money";
 import { Empty, TopBar } from "../components/ui";
 import { vehicleText, type VehicleKind } from "../lib/vehicles";
 import { saveWorkbook } from "../lib/xlsx";
+import { useCanEditBuilding } from "../lib/useCanEdit";
+import VehiclesPanel from "../components/VehiclesPanel";
 
 /** Danh sách khách ở theo toà: mỗi phòng một dòng (người đứng tên, người ở cùng, SĐT, xe, hợp đồng). SQL 090: building_roster */
 type Person = { name: string; phone: string | null };
@@ -26,6 +28,9 @@ export default function Roster() {
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  const canEdit = useCanEditBuilding(id);
+  const [openVeh, setOpenVeh] = useState<string | null>(null);   // hợp đồng đang mở phần nhập xe
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     Promise.all([
@@ -35,7 +40,7 @@ export default function Roster() {
       if (r.error) setErr(friendlyError(r.error)); else setRows((r.data as Row[]) ?? []);
       setRooms((m.data as RoomLite[]) ?? []);
     });
-  }, [id]);
+  }, [id, tick]);
 
   // Phòng đang thuê + phòng trống, xếp theo tầng rồi mã phòng
   const list = useMemo(() => {
@@ -91,7 +96,7 @@ export default function Roster() {
         {rows ? (
           <>
             <p className="muted small" style={{ margin: 0 }}>
-              {stat.rooms} phòng đang thuê · {stat.people} người ở · {stat.veh} xe đăng ký. Thêm người ở và xe trong từng hợp đồng.
+              {stat.rooms} phòng đang thuê · {stat.people} người ở · {stat.veh} xe đăng ký. {canEdit ? "Bấm “Nhập xe” ở từng phòng để thêm loại xe, biển số." : ""}
             </p>
             <div className="row" style={{ flexWrap: "nowrap", gap: 8 }}>
               <input className="input" style={{ flex: 1 }} placeholder="Tìm phòng, tên, SĐT, biển số" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -110,7 +115,16 @@ export default function Roster() {
                 </div>
                 <div className="small"><b>{r.holder_name}</b>{r.holder_phone ? <> · <a href={`tel:${r.holder_phone}`}>{r.holder_phone}</a></> : <span style={{ color: "var(--danger)" }}> · chưa có SĐT</span>}</div>
                 {r.occupants.length ? <div className="small muted">Ở cùng: {r.occupants.map((o) => o.phone ? `${o.name} (${o.phone})` : o.name).join(", ")}</div> : null}
-                <div className="small">{r.vehicles.length ? `Xe: ${r.vehicles.map(vehicleText).join("; ")}` : <span className="muted">Chưa đăng ký xe</span>}</div>
+                <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap", gap: 8 }}>
+                  <div className="small" style={{ minWidth: 0 }}>{r.vehicles.length ? `Xe (${r.vehicles.length}): ${r.vehicles.map(vehicleText).join("; ")}` : <span className="muted">Chưa đăng ký xe</span>}</div>
+                  {canEdit ? <button type="button" className="btn secondary sm" style={{ whiteSpace: "nowrap" }} aria-expanded={openVeh === r.contract_id}
+                    onClick={() => setOpenVeh(openVeh === r.contract_id ? null : r.contract_id)}>{openVeh === r.contract_id ? "Xong" : r.vehicles.length ? "Sửa xe" : "Nhập xe"}</button> : null}
+                </div>
+                {openVeh === r.contract_id ? (
+                  <div className="card" style={{ padding: 10, background: "var(--surface-2)" }}>
+                    <VehiclesPanel contractId={r.contract_id} active canEdit={canEdit} title={false} startAdding={r.vehicles.length === 0} onChanged={() => setTick((n) => n + 1)} />
+                  </div>
+                ) : null}
                 <div className="small muted">HĐ {r.contract_code ?? ""} · {ddmmyyyy(r.start_date)} → {r.end_date ? ddmmyyyy(r.end_date) : "chưa có ngày kết thúc"} · cọc {vnd(r.deposit)}</div>
               </div>
             ))}
