@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { Link, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { ddmmyyyy, todayVN } from "../lib/dates";
+import { ddmmyyyy, todayVN, type DateRange, rangeLabel } from "../lib/dates";
 import { parseMoney, vnd } from "../lib/money";
 import { Combo, Empty, Sheet, TopBar } from "../components/ui";
 import { EXP_COLS, EXPENSE_CATS, expenseOptions, PAY_SOURCE, saveExpense, SETTLE_LABEL,
@@ -17,7 +17,7 @@ const shiftMonth = (m: string, n: number) => { const d = new Date(Number(m.slice
 const COLOR: Record<SettleStatus, string> = { chua_quyet_toan: "var(--danger)", cho_quyet_toan: "var(--today)", da_quyet_toan: "var(--s-done)" };
 
 /** Dùng làm trang riêng (/toa/:id/chi-phi) hoặc nhúng trong "Thu & chi toà nhà" (embedded) */
-export default function BuildingExpenses({ buildingId, embedded }: { buildingId?: string; embedded?: boolean } = {}) {
+export default function BuildingExpenses({ buildingId, embedded, range }: { buildingId?: string; embedded?: boolean; range?: DateRange } = {}) {
   const params = useParams();
   const id = buildingId ?? params.id ?? "";
   const { buildings, profile, people, isManager, isAccountant, toast } = useSession();
@@ -30,12 +30,13 @@ export default function BuildingExpenses({ buildingId, embedded }: { buildingId?
   const name = (u: string | null) => (u ? people.find((p: { id: string }) => p.id === u)?.full_name ?? "—" : "Công ty");
 
   const load = useCallback(async () => {
-    const start = `${month}-01`, end = `${shiftMonth(month, 1)}-01`;
-    const { data, error } = await supabase.from("building_expenses").select(EXP_COLS).eq("building_id", id)
-      .gte("spent_on", start).lt("spent_on", end).order("spent_on", { ascending: false }).order("created_at", { ascending: false });
+    const start = range?.from ?? `${month}-01`;
+    let q = supabase.from("building_expenses").select(EXP_COLS).eq("building_id", id).gte("spent_on", start);
+    q = range ? q.lte("spent_on", range.to) : q.lt("spent_on", `${shiftMonth(month, 1)}-01`);
+    const { data, error } = await q.order("spent_on", { ascending: false }).order("created_at", { ascending: false });
     if (error) toast(friendlyError(error));
     setRows(((data as Expense[]) ?? []).map((e) => ({ ...e, amount: Number(e.amount) })));
-  }, [id, month, toast]);
+  }, [id, month, toast, range?.from, range?.to]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [load]);
 
   const shown = useMemo(() => (rows ?? []).filter((r) => f === "all" || r.settle_status === f), [rows, f]);
@@ -58,13 +59,15 @@ export default function BuildingExpenses({ buildingId, embedded }: { buildingId?
           Ghi các khoản bạn tự ứng tiền chi cho toà (rác, sửa chữa, mua đồ…). Khi lập đề nghị thanh toán hoặc tạm ứng, chọn các khoản này để công ty hoàn tiền.
           Kế toán chi xong thì khoản chuyển sang "Đã quyết toán".
         </p>
-        <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
-          <button className="btn ghost sm" onClick={() => setMonth(shiftMonth(month, -1))}>‹ Tháng trước</button>
-          <b>Tháng {month.slice(5, 7)}/{month.slice(0, 4)}</b>
-          <button className="btn ghost sm" onClick={() => setMonth(shiftMonth(month, 1))}>Tháng sau ›</button>
-        </div>
+        {range ? null : (
+          <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
+            <button className="btn ghost sm" onClick={() => setMonth(shiftMonth(month, -1))}>‹ Tháng trước</button>
+            <b>Tháng {month.slice(5, 7)}/{month.slice(0, 4)}</b>
+            <button className="btn ghost sm" onClick={() => setMonth(shiftMonth(month, 1))}>Tháng sau ›</button>
+          </div>
+        )}
         <div className="rpt-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-          <div className="card" style={{ padding: 10 }}><b className="num">{vnd(sum())}</b><br /><small className="muted">Tổng chi tháng</small></div>
+          <div className="card" style={{ padding: 10 }}><b className="num">{vnd(sum())}</b><br /><small className="muted">{range ? `Tổng chi ${rangeLabel(range)}` : "Tổng chi tháng"}</small></div>
           <div className="card" style={{ padding: 10 }}><b className="num" style={{ color: sum("chua_quyet_toan") ? "var(--danger)" : undefined }}>{vnd(sum("chua_quyet_toan") + sum("cho_quyet_toan"))}</b><br /><small className="muted">Nhân viên đang ứng, chưa hoàn</small></div>
         </div>
         {mineOpen.length ? (

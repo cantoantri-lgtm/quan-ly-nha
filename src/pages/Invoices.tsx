@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { ddmm, todayVN } from "../lib/dates";
+import { ddmm, todayVN, type DateRange } from "../lib/dates";
 import { naturalCompare, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar, copyText } from "../components/ui";
 import PayQR from "../components/PayQR";
@@ -34,12 +34,14 @@ const fmtTime = (iso: string) => {
 };
 
 /** Thu tiền phòng của một toà. Dùng làm trang riêng (/toa/:id/hoa-don) hoặc nhúng trong "Thu & chi toà nhà" (embedded) */
-export default function Invoices({ buildingId, embedded }: { buildingId?: string; embedded?: boolean } = {}) {
+/** range (khi nhúng trong Thu & chi toà nhà): hoá đơn của các tháng nằm trong khoảng ngày, cộng hoá đơn tháng khác nhưng thu trong khoảng ngày. */
+export default function Invoices({ buildingId, embedded, range }: { buildingId?: string; embedded?: boolean; range?: DateRange } = {}) {
   const params = useParams();
   const id = buildingId ?? params.id;
   const { buildings, isManager, toast } = useSession();
   const building = buildings.find((b) => b.id === id);
-  const [period, setPeriod] = useState(() => monthKey(new Date(todayVN() + "T00:00:00")));
+  const [period0, setPeriod] = useState(() => monthKey(new Date(todayVN() + "T00:00:00")));
+  const period = range ? range.to.slice(0, 8) + "01" : period0;   // tháng dùng cho nút tạo hoá đơn
   const [list, setList] = useState<Invoice[]>([]);
   const [bank, setBank] = useState<PaySettings | null>(null);
   const [filter, setFilter] = useState<"" | "chua_thu" | "da_thu">("");
@@ -48,12 +50,16 @@ export default function Invoices({ buildingId, embedded }: { buildingId?: string
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("invoices")
+    let q = supabase.from("invoices")
       .select("id,contract_id,period,amount,due_date,status,collected_at,paid_via,pay_code,note,lines,vat_amount,txn_ref,txn_at,transfer_note, contracts(rooms(code), tenants(full_name,phone))")
-      .eq("building_id", id!).eq("period", period).neq("status", "huy");
+      .eq("building_id", id!).neq("status", "huy");
+    q = range
+      ? q.or(`and(period.gte.${range.from.slice(0, 8)}01,period.lte.${range.to.slice(0, 8)}01),and(collected_at.gte.${range.from},collected_at.lte.${range.to})`)
+      : q.eq("period", period);
+    const { data } = await q;
     setList(((data as unknown as Invoice[]) ?? []).sort((a, b) => naturalCompare(room(a), room(b))));
     setLoading(false);
-  }, [id, period]);
+  }, [id, period, range?.from, range?.to]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setLoading(true); load(); }, [load]);
   useEffect(() => {
     supabase.from("payment_settings").select("bank_bin,bank_name,account_no,account_name").maybeSingle().then(({ data }) => setBank((data as PaySettings) ?? null));
@@ -84,11 +90,13 @@ export default function Invoices({ buildingId, embedded }: { buildingId?: string
     <>
       {embedded ? null : <TopBar title={`Thu tiền phòng · ${building.code}`} back={`/toa/${building.id}`} />}
       <Wrap className={embedded ? "stack" : "main stack"}>
-        <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
-          <button className="btn ghost sm" onClick={() => setPeriod(shiftMonth(period, -1))} aria-label="Tháng trước">‹ Trước</button>
-          <b>{monthLabel(period)}</b>
-          <button className="btn ghost sm" onClick={() => setPeriod(shiftMonth(period, 1))} aria-label="Tháng sau">Sau ›</button>
-        </div>
+        {range ? null : (
+          <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap" }}>
+            <button className="btn ghost sm" onClick={() => setPeriod(shiftMonth(period, -1))} aria-label="Tháng trước">‹ Trước</button>
+            <b>{monthLabel(period)}</b>
+            <button className="btn ghost sm" onClick={() => setPeriod(shiftMonth(period, 1))} aria-label="Tháng sau">Sau ›</button>
+          </div>
+        )}
         <section className="room-stats" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
           <div className="stat"><b className="num">{sums.nPaid}/{sums.n}</b><span>phòng đã thu</span></div>
           <div className="stat st-trong"><b className="num">{vnd(sums.paid)}</b><span>đã thu</span></div>

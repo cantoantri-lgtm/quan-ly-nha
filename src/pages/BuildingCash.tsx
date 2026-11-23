@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { todayVN } from "../lib/dates";
+import { monthRange, rangeLabel, type DateRange } from "../lib/dates";
 import { exportCashbook } from "../lib/cashbook";
 import { useSession } from "../lib/session";
 import { Combo, Empty, TopBar } from "../components/ui";
@@ -13,7 +13,11 @@ type Tab = "thu" | "chi";
 
 export default function BuildingCash() {
   const { buildings, people, isManager, isAccountant, toast } = useSession();
-  const [month, setMonth] = useState(() => todayVN().slice(0, 7));
+  const [range, setRange] = useState<DateRange>(() => monthRange());   // mặc định trọn tháng này
+  const [draft, setDraft] = useState<DateRange>(range);
+  const bad = !draft.from || !draft.to || draft.to < draft.from;
+  const apply = (r: DateRange) => { setDraft(r); if (r.from && r.to && r.to >= r.from) setRange(r); };
+  const shiftMonth = (n: number) => { const [y, m] = range.from.split("-").map(Number); const d = new Date(Date.UTC(y, m - 1 + n, 1)); apply(monthRange(d.toISOString().slice(0, 10))); };
   const [busy, setBusy] = useState(false);
   const [qs, setQs] = useSearchParams();
   const bid = qs.get("toa") && buildings.some((b: { id: string }) => b.id === qs.get("toa")) ? qs.get("toa")! : buildings[0]?.id ?? "";
@@ -24,10 +28,10 @@ export default function BuildingCash() {
   if (!buildings.length) return (<><TopBar title="Thu & chi toà nhà" /><main className="main"><Empty title="Bạn chưa được gán toà nào." /></main></>);
   async function exportXlsx() {
     const b = buildings.find((x: { id: string }) => x.id === bid);
-    if (!b || !month) return;
+    if (!b) return;
     setBusy(true);
     try {
-      await exportCashbook(b, month, (u) => (u ? people.find((p: { id: string }) => p.id === u)?.full_name ?? "" : ""));
+      await exportCashbook(b, range, (u) => (u ? people.find((p: { id: string }) => p.id === u)?.full_name ?? "" : ""));
       toast("Đã tải file Excel sổ thu chi.");
     } catch (e) { toast(`Chưa xuất được: ${(e as Error).message}`); }
     setBusy(false);
@@ -39,10 +43,23 @@ export default function BuildingCash() {
       <main className="main stack">
         <label className="field"><span>Toà nhà</span>
           <Combo id="tc-toa" value={bid} options={opts} onChange={(v) => set("toa", v)} label="Toà nhà" /></label>
-        <div className="card row" style={{ padding: 10, gap: 8, flexWrap: "nowrap", alignItems: "flex-end" }}>
-          <label className="field" style={{ flex: 1, margin: 0 }}><span>Xuất sổ thu chi tháng</span>
-            <input id="tc-month" className="input" type="month" value={month} max={todayVN().slice(0, 7)} onChange={(e) => setMonth(e.target.value)} /></label>
-          <button className="btn secondary" disabled={busy || !month} onClick={exportXlsx}>{busy ? "Đang tạo…" : "Tải Excel"}</button>
+        <div className="card stack" style={{ padding: 10, gap: 8 }}>
+          <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
+            <label className="field" style={{ flex: "1 1 140px", margin: 0 }}><span>Từ ngày</span>
+              <input id="tc-from" className="input" type="date" value={draft.from} onChange={(e) => apply({ ...draft, from: e.target.value })} /></label>
+            <label className="field" style={{ flex: "1 1 140px", margin: 0 }}><span>Đến ngày</span>
+              <input id="tc-to" className="input" type="date" value={draft.to} min={draft.from || undefined} onChange={(e) => apply({ ...draft, to: e.target.value })} /></label>
+            <button className="btn secondary" disabled={busy || bad} onClick={exportXlsx}>{busy ? "Đang tạo…" : "Tải Excel"}</button>
+          </div>
+          {bad ? <small style={{ color: "var(--danger)" }}>Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.</small> : null}
+          <div className="row" style={{ justifyContent: "space-between", flexWrap: "nowrap", gap: 6 }}>
+            <button type="button" className="btn ghost sm" onClick={() => shiftMonth(-1)}>‹ Tháng trước</button>
+            <b className="small" style={{ textAlign: "center" }}>Đang xem {rangeLabel(range)}</b>
+            <button type="button" className="btn ghost sm" onClick={() => shiftMonth(1)}>Tháng sau ›</button>
+          </div>
+          {range.from !== monthRange().from || range.to !== monthRange().to ? (
+            <button type="button" className="btn ghost sm" style={{ alignSelf: "center" }} onClick={() => apply(monthRange())}>Về tháng này</button>
+          ) : null}
         </div>
         <div className="chips" role="tablist" aria-label="Thu hoặc chi">
           <button role="tab" className="chip" aria-selected={tab === "thu"} aria-pressed={tab === "thu"} onClick={() => set("tab", "thu")}>Thu tiền phòng</button>
@@ -50,13 +67,14 @@ export default function BuildingCash() {
         </div>
         {tab === "thu" ? (
           <>
-            <Invoices key={`thu-${bid}`} buildingId={bid} embedded />
+            <Invoices key={`thu-${bid}`} buildingId={bid} embedded range={range} />
+            <p className="muted small" style={{ margin: 0 }}>Danh sách gồm hoá đơn của các tháng trong khoảng ngày, cộng hoá đơn tháng khác nhưng thu trong khoảng ngày.</p>
             <p className="muted small" style={{ margin: 0 }}>
               Tiền cọc và các khoản thu khác trên tài khoản khách: <Link to="/thu-tien-khach">Thu tiền khách</Link>.
             </p>
           </>
         ) : (
-          <BuildingExpenses key={`chi-${bid}`} buildingId={bid} embedded />
+          <BuildingExpenses key={`chi-${bid}`} buildingId={bid} embedded range={range} />
         )}
         {fin ? <p className="muted small" style={{ margin: 0 }}>Tổng hợp thu, chi, lợi nhuận theo tháng: <Link to="/bao-cao?tab=so_thu_chi">Báo cáo → Sổ thu chi toà</Link>.</p> : null}
       </main>

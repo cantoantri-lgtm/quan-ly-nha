@@ -102,3 +102,20 @@ export function meterPeriodVN(today: string = todayVN()): string {
 export function mmyyyy(iso: string): string {
   return `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 }
+
+/** Khoảng ngày (YYYY-MM-DD, tính cả hai đầu) dùng cho bộ lọc từ ngày đến ngày */
+export type DateRange = { from: string; to: string };
+/** Ngày đầu và ngày cuối của tháng chứa `day` (mặc định hôm nay, giờ Việt Nam) */
+export function monthRange(day: string = todayVN()): DateRange {
+  const [y, m] = day.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const mm = String(m).padStart(2, "0");
+  return { from: `${y}-${mm}-01`, to: `${y}-${mm}-${String(last).padStart(2, "0")}` };
+}
+/** "01/11/2026 – 30/11/2026", hoặc "tháng 11/2026" khi đúng trọn một tháng */
+export function rangeLabel(r: DateRange): string {
+  const m = monthRange(r.from);
+  if (m.from === r.from && m.to === r.to) return `tháng ${r.from.slice(5, 7)}/${r.from.slice(0, 4)}`;
+  const d = (s: string) => s.split("-").reverse().join("/");
+  return `${d(r.from)} – ${d(r.to)}`;
+}
