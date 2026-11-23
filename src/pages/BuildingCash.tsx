@@ -6,10 +6,11 @@ import { useSession } from "../lib/session";
 import { Combo, Empty, TopBar } from "../components/ui";
 import Invoices from "./Invoices";
 import BuildingExpenses from "./BuildingExpenses";
+import RoomUtilities from "./RoomUtilities";
 
-/** Thu & chi toà nhà: chọn toà, tab Thu (hoá đơn tiền phòng theo tháng) và tab Chi (chi phí toà, nhân viên ứng / công ty trả).
+/** Thu & chi toà nhà: chọn toà, tab Ghi số điện từng phòng, tab Thu (hoá đơn tiền phòng theo tháng) và tab Chi (chi phí toà, nhân viên ứng / công ty trả).
  *  Khoản thu khác (cọc, phí phát sinh trên tài khoản khách) ở trang Thu tiền khách; sổ thu chi tổng hợp ở Báo cáo. */
-type Tab = "thu" | "chi";
+type Tab = "dien" | "thu" | "chi";
 
 export default function BuildingCash() {
   const { buildings, people, isManager, isAccountant, toast } = useSession();
@@ -17,7 +18,9 @@ export default function BuildingCash() {
   const [busy, setBusy] = useState(false);
   const [qs, setQs] = useSearchParams();
   const bid = qs.get("toa") && buildings.some((b: { id: string }) => b.id === qs.get("toa")) ? qs.get("toa")! : buildings[0]?.id ?? "";
-  const tab: Tab = qs.get("tab") === "chi" ? "chi" : "thu";
+  const q = qs.get("tab");
+  // Từ ngày 28 đến cuối tháng là kỳ ghi điện: mở sẵn tab Ghi số điện
+  const tab: Tab = q === "chi" || q === "dien" || q === "thu" ? q : Number(todayVN().slice(8, 10)) >= 28 ? "dien" : "thu";
   const set = (k: "toa" | "tab", v: string) => { const n = new URLSearchParams(qs); n.set(k, v); setQs(n, { replace: true }); };
   const fin = isManager || isAccountant;
 
@@ -45,10 +48,11 @@ export default function BuildingCash() {
           <button className="btn secondary" disabled={busy || !month} onClick={exportXlsx}>{busy ? "Đang tạo…" : "Tải Excel"}</button>
         </div>
         <div className="chips" role="tablist" aria-label="Thu hoặc chi">
+          <button role="tab" className="chip" aria-selected={tab === "dien"} aria-pressed={tab === "dien"} onClick={() => set("tab", "dien")}>Ghi số điện</button>
           <button role="tab" className="chip" aria-selected={tab === "thu"} aria-pressed={tab === "thu"} onClick={() => set("tab", "thu")}>Thu tiền phòng</button>
           <button role="tab" className="chip" aria-selected={tab === "chi"} aria-pressed={tab === "chi"} onClick={() => set("tab", "chi")}>Chi phí toà</button>
         </div>
-        {tab === "thu" ? (
+        {tab === "dien" ? <RoomUtilities key={`dien-${bid}`} buildingId={bid} embedded /> : tab === "thu" ? (
           <>
             <Invoices key={`thu-${bid}`} buildingId={bid} embedded />
             <p className="muted small" style={{ margin: 0 }}>

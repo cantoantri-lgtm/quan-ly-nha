@@ -198,3 +198,10 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 .mc-rooms { display: flex; flex-wrap: wrap; gap: 6px; }
 .mc-room { display: inline-flex; align-items: baseline; gap: 2px; padding: 3px 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); font-size: 13.5px; }
 .mc-room small { color: var(--muted); font-size: 12px; }
+
+/* Ghi số điện từng phòng */
+.meter-in { width: 132px; text-align: right; font-size: 16px; min-height: 40px; }
+.meter-flag { color: var(--late); font-size: 12px; font-weight: 600; }
+.meter-total { padding: 10px 14px; border-top: 1px solid var(--line); justify-content: space-between; font-weight: 600; font-size: 13.5px; gap: 8px; }
+.meter-save { position: sticky; bottom: 10px; z-index: 2; box-shadow: 0 4px 14px rgb(0 0 0 / .12); }
+@media (max-width: 720px) { table.dt.cards.meter-cards tbody td { align-items: center; } }
