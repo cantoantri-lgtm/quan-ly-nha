@@ -5,6 +5,7 @@ import { ddmmyyyy } from "../lib/dates";
 import { vnd } from "../lib/money";
 import { Empty } from "./ui";
 import PolicyEditSheet from "./PolicyEditSheet";
+import CommissionSheet from "./CommissionSheet";
 import "../policy.css";
 
 export type Fee = { label: string; amount: number; unit: string };
@@ -15,14 +16,17 @@ export type Policy = {
   forfeit_min: number | null; forfeit_pct: number | null; note: string | null; updated_at: string | null;
 };
 
+const pctText = (n: number) => String(n).replace(".", ",");
+
 export const hasData = (p: Policy) => p.fees.length > 0 || p.amenities.length > 0 || p.furniture.length > 0 || p.deposit_lines.length > 0 || p.commission_terms.length > 0 || p.forfeit_pct != null;
 
 
-export function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManager: boolean; guest: boolean; onEdit: () => void }) {
+export function PolicyView({ p, isManager, guest, onEdit, canCommission = false, onEditCommission }: { p: Policy; isManager: boolean; guest: boolean; onEdit: () => void; canCommission?: boolean; onEditCommission?: () => void }) {
   if (!hasData(p)) {
     return (
       <Empty title={`${p.code} chưa có chính sách`}>
         {isManager ? <button className="btn" onClick={onEdit}>Nhập chính sách cho toà này</button> : "Quản lý sẽ cập nhật dịch vụ và chính sách cho toà này."}
+        {canCommission && onEditCommission && !guest ? <><br /><button className="btn secondary sm" style={{ marginTop: 8 }} onClick={onEditCommission}>Nhập hoa hồng CTV</button></> : null}
       </Empty>
     );
   }
@@ -66,6 +70,36 @@ export function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManag
       ) : null}
 
 
+      {guest ? null : p.commission_terms.length || p.forfeit_pct != null || canCommission ? (
+        <section className="card pl-sec pl-comm">
+          <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <h3 style={{ margin: 0 }}>Hoa hồng CTV <span className="pl-tag">Chỉ nhân viên</span></h3>
+            {canCommission && onEditCommission ? <button type="button" className="btn secondary sm" onClick={onEditCommission}>Sửa hoa hồng</button> : null}
+          </div>
+          {p.commission_terms.length ? (
+            <>
+              <p className="muted small" style={{ margin: 0 }}>Hợp đồng thành công, tính trên tiền thuê tháng đầu:</p>
+              <div className="pl-terms">
+                {p.commission_terms.slice().sort((a, b) => a.months - b.months).map((t, i) => (
+                  <div key={i} className="pl-term"><span className="muted small">Hợp đồng {t.months} tháng</span><b className="num">{pctText(t.pct)}%</b></div>
+                ))}
+              </div>
+            </>
+          ) : <p className="muted small" style={{ margin: 0 }}>Chưa có mức hoa hồng cho toà này.</p>}
+          {p.forfeit_pct != null ? (
+            <div className="pl-forfeit">
+              <b>Khách bỏ cọc</b>
+              <p className="small" style={{ margin: 0 }}>
+                {p.forfeit_min != null && p.forfeit_min > 0
+                  ? <>Tiền cọc công ty giữ lại dưới <b className="num">{vnd(p.forfeit_min)}</b>: <b>không chi</b> hoa hồng. Từ <b className="num">{vnd(p.forfeit_min)}</b> trở lên: hoa hồng <b className="num">{pctText(p.forfeit_pct)}%</b> số tiền cọc đó.</>
+                  : <>Hoa hồng <b className="num">{pctText(p.forfeit_pct)}%</b> số tiền cọc công ty giữ lại.</>}
+              </p>
+            </div>
+          ) : null}
+          <p className="muted small" style={{ margin: 0 }}>Lead Sale trở lên cập nhật mức hoa hồng.</p>
+        </section>
+      ) : null}
+
       {!guest && p.note ? <section className="card pl-sec"><h3>Ghi chú</h3><p className="small" style={{ margin: 0, whiteSpace: "pre-line" }}>{p.note}</p></section> : null}
       {p.updated_at ? <p className="muted small" style={{ margin: 0 }}>Cập nhật {ddmmyyyy(p.updated_at)}.</p> : null}
     </div>
@@ -76,7 +110,8 @@ export function PolicyView({ p, isManager, guest, onEdit }: { p: Policy; isManag
 /** Chính sách một toà, tự tải; dùng trong trang toà và cửa sổ nhỏ ở Phòng trống. Có công tắc Khách xem. canEdit (Quản lý): nút Sửa ngay tại đây. */
 export function PolicyPanel({ buildingId, canEdit = false }: { buildingId: string; canEdit?: boolean }) {
   const [p, setP] = useState<Policy | null | undefined>(undefined);
-  const { isCustomer, isManager } = useSession();
+  const { isCustomer, isLeadUp } = useSession();
+  const [commOpen, setCommOpen] = useState(false);
   const [guestToggle, setGuest] = useState(false);
   const guest = isCustomer || guestToggle; // khách hàng luôn ở chế độ khách (máy chủ cũng đã bỏ hoa hồng)
   const [editing, setEditing] = useState(false);
@@ -102,8 +137,9 @@ export function PolicyPanel({ buildingId, canEdit = false }: { buildingId: strin
           {canEdit ? <button type="button" className="btn secondary sm" onClick={() => setEditing(true)}>Sửa chính sách</button> : null}
         </div>
       ) : null}
-      <PolicyView p={p} isManager={canEdit} guest={guest} onEdit={() => setEditing(true)} />
-      {editing ? <PolicyEditSheet p={p} canCommission={isManager} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setTick((n) => n + 1); }} /> : null}
+      <PolicyView p={p} isManager={canEdit} guest={guest} onEdit={() => setEditing(true)} canCommission={isLeadUp} onEditCommission={() => setCommOpen(true)} />
+      {commOpen ? <CommissionSheet p={p} onClose={() => setCommOpen(false)} onSaved={() => { setCommOpen(false); setTick((n) => n + 1); }} /> : null}
+      {editing ? <PolicyEditSheet p={p} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); setTick((n) => n + 1); }} /> : null}
     </div>
   );
 }

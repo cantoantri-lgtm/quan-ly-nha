@@ -9,7 +9,7 @@ type FeeRow = { label: string; amount: string; unit: string };
 type TermRow = { months: string; pct: string };
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
-export default function PolicyEditSheet({ p, onClose, onSaved }: { p: Policy; onClose: () => void; onSaved: () => void; canCommission?: boolean }) {
+export default function PolicyEditSheet({ p, onClose, onSaved }: { p: Policy; onClose: () => void; onSaved: () => void }) {
   const [fees, setFees] = useState<FeeRow[]>(p.fees.map((f) => ({ label: f.label, amount: new Intl.NumberFormat("vi-VN").format(f.amount), unit: f.unit })));
   const [amenities, setAmenities] = useState(p.amenities.join("\n"));
   const [furn, setFurn] = useState(p.furniture.join("\n"));
@@ -76,7 +76,7 @@ export default function PolicyEditSheet({ p, onClose, onSaved }: { p: Policy; on
         <label className="field"><span>Ký hợp đồng: đặt cọc, kỳ hợp đồng (mỗi dòng một ý)</span>
           <textarea className="input" style={{ minHeight: 110 }} value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
 
-        {/* Hoa hồng: sale trao đổi trực tiếp (23/11/2026), không nhập trong app. Số cũ giữ nguyên khi lưu. */}
+        {/* Hoa hồng CTV sửa riêng ở nút "Sửa hoa hồng" (Lead Sale trở lên, CommissionSheet). Số cũ giữ nguyên khi lưu ở đây. */}
 
         <label className="field"><span>Ghi chú</span>
           <textarea className="input" style={{ minHeight: 60 }} value={note} onChange={(e) => setNote(e.target.value)} /></label>
