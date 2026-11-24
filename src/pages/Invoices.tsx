@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { ddmm, todayVN, type DateRange } from "../lib/dates";
-import { naturalCompare, vnd } from "../lib/money";
+import { naturalCompare, parseMoney, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar, copyText } from "../components/ui";
 import PayQR from "../components/PayQR";
 import type { PaySettings } from "../lib/vietqr";
@@ -19,7 +19,7 @@ type Invoice = {
   contracts: { rooms: { code: string } | null; tenants: { full_name: string; phone: string | null } | null } | null;
 };
 /** Một dòng hoá đơn: amount = giá đã gồm thuế; pre = tiền trước thuế; vat = tiền thuế; rate = % GTGT */
-export type InvLine = { k: string; label: string; detail: string | null; amount: number; rate: number; pre: number; vat: number };
+export type InvLine = { k: string; label: string; detail: string | null; amount: number; rate: number; pre: number; vat: number; by?: string; at?: string };
 const room = (i: Invoice) => i.contracts?.rooms?.code ?? "?";
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 const monthLabel = (k: string) => `Tháng ${Number(k.slice(5, 7))}/${k.slice(0, 4)}`;
@@ -137,10 +137,52 @@ export default function Invoices({ buildingId, embedded, range }: { buildingId?:
   );
 }
 
+const fmtAmt = (n: number) => new Intl.NumberFormat("vi-VN").format(Math.round(n));
+
 function InvoiceSheet({ inv, bank, canUndo, onClose, onChanged }: { inv: Invoice; bank: PaySettings | null; canUndo: boolean; onClose: () => void; onChanged: () => void }) {
   const { toast } = useSession();
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  // Form thu tiền: sửa số tiền phải thu khi app tính sai (SQL 100 invoice_adjust)
+  const [collect, setCollect] = useState(false);
+  const [amtStr, setAmtStr] = useState(() => fmtAmt(inv.amount));
+  const [reason, setReason] = useState("");
+  const autoTotal = (inv.lines ?? []).filter((l) => l.k !== "dieu_chinh").reduce((t, l) => t + Number(l.amount), 0);
+  const hasAdj = (inv.lines ?? []).some((l) => l.k === "dieu_chinh");
+  const amt = parseMoney(amtStr);
+  const changed = amt != null && Math.round(amt) !== Math.round(inv.amount);
+  useEffect(() => { setAmtStr(fmtAmt(inv.amount)); setReason(""); }, [inv.amount]);
+
+  async function adjust(total: number, why: string): Promise<boolean> {
+    const { error } = await supabase.rpc("invoice_adjust", { p_invoice: inv.id, p_total: total, p_reason: why });
+    if (error) { toast(friendlyError(error)); return false; }
+    return true;
+  }
+  async function updateQR() {
+    if (amt == null || amt < 0) { toast("Nhập số tiền thu."); return; }
+    if (changed && reason.trim().length < 5) { toast("Ghi lý do điều chỉnh (ít nhất 5 ký tự)."); return; }
+    setBusy(true);
+    const ok = await adjust(amt, reason.trim());
+    setBusy(false);
+    if (ok) { toast("Đã cập nhật số tiền, mã QR và nội dung chuyển khoản."); setCollect(false); onChanged(); }
+  }
+  async function resetAuto() {
+    setBusy(true);
+    const ok = await adjust(autoTotal, "");
+    setBusy(false);
+    if (ok) { toast("Đã trả về số app tính."); onChanged(); }
+  }
+  async function collectCash() {
+    if (amt == null || amt <= 0) { toast("Nhập số tiền thu."); return; }
+    if (changed && reason.trim().length < 5) { toast("Ghi lý do điều chỉnh (ít nhất 5 ký tự)."); return; }
+    if (!window.confirm(`Xác nhận đã nhận ${vnd(amt)} tiền mặt phòng ${room(inv)}?`)) return;
+    setBusy(true);
+    if (changed && !(await adjust(amt, reason.trim()))) { setBusy(false); return; }
+    const { error } = await supabase.from("invoices").update({ status: "da_thu" }).eq("id", inv.id);
+    setBusy(false);
+    if (error) { toast(friendlyError(error)); return; }
+    toast(`Đã ghi nhận thu ${vnd(amt)} tiền mặt.`); setCollect(false); onChanged();
+  }
 
   // Khách đang chuyển khoản: tự làm mới mỗi 10 giây để thấy "Đã thu" ngay khi tiền về
   useEffect(() => {
@@ -187,8 +229,33 @@ function InvoiceSheet({ inv, bank, canUndo, onClose, onChanged }: { inv: Invoice
           ) : <div className="error-box">Chưa cài tài khoản nhận tiền. Quản lý vào Quản trị → Thu tiền chuyển khoản để cài.</div>
         ) : null}
 
+        {inv.status === "chua_thu" && hasAdj ? (
+          <div className="row small" style={{ justifyContent: "space-between", gap: 6 }}>
+            <span className="muted">App tính {vnd(autoTotal)}, đã điều chỉnh thành {vnd(inv.amount)}.</span>
+            <button type="button" className="btn ghost sm" disabled={busy} onClick={resetAuto}>Về số app tính</button>
+          </div>
+        ) : null}
         {inv.status === "chua_thu" ? (
-          <button className="btn block" disabled={busy} onClick={() => mark("da_thu")}>{busy ? "Đang lưu…" : "Đã nhận tiền mặt / tự đối chiếu → Đánh dấu đã thu"}</button>
+          collect ? (
+            <div className="card stack" style={{ padding: 12, gap: 8, background: "var(--surface-2)" }}>
+              <b>Thu tiền phòng {room(inv)}</b>
+              <label className="field"><span>Số tiền thu (đ)</span>
+                <input className="input num" inputMode="decimal" value={amtStr} onChange={(e) => setAmtStr(e.target.value)} autoFocus />
+                <small className="muted">{inv.lines?.length ? `App tính ${vnd(autoTotal)}${hasAdj ? `, hoá đơn đang là ${vnd(inv.amount)}` : ""}. ` : ""}Sửa nếu app tính sai.</small></label>
+              {changed ? (
+                <label className="field"><span>Lý do điều chỉnh *</span>
+                  <input className="input" maxLength={110} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="VD: Đồng hồ điện chạy sai, giảm theo thoả thuận" />
+                  <small className="muted">{amt != null ? `${amt > inv.amount ? "Tăng" : "Giảm"} ${vnd(Math.abs(amt - inv.amount))}. Kế toán và Quản lý nhận thông báo.` : ""}</small></label>
+              ) : null}
+              {changed && bank ? (
+                <button className="btn secondary block" disabled={busy} onClick={updateQR}>Cập nhật mã QR chuyển khoản theo {amt != null ? vnd(amt) : ""}</button>
+              ) : null}
+              <button className="btn block" disabled={busy || amt == null || amt <= 0} onClick={collectCash}>{busy ? "Đang lưu…" : `Xác nhận đã thu tiền mặt${amt != null ? ` ${vnd(amt)}` : ""}`}</button>
+              <button type="button" className="btn ghost sm" onClick={() => { setCollect(false); setAmtStr(fmtAmt(inv.amount)); setReason(""); }}>Huỷ</button>
+            </div>
+          ) : (
+            <button className="btn block" disabled={busy} onClick={() => setCollect(true)}>Thu tiền mặt / điều chỉnh số tiền</button>
+          )
         ) : canUndo ? (
           confirm ? (
             <div className="row">
@@ -213,9 +280,9 @@ export function InvoiceLines({ lines }: { lines: InvLine[] }) {
         <tbody>
           {lines.map((l, i) => (
             <tr key={i}>
-              <td>{l.label}{l.detail ? <div className="t2">{l.detail}</div> : null}</td>
+              <td>{l.label}{l.detail ? <div className="t2">{l.detail}</div> : null}{l.k === "dieu_chinh" && (l.by || l.at) ? <div className="t2">{[l.by, l.at].filter(Boolean).join(" · ")}</div> : null}</td>
               <td className="r num">{vnd(l.pre)}</td>
-              <td className="r num">{vnd(l.vat)}<div className="t2">{l.rate}%</div></td>
+              <td className="r num">{l.k === "dieu_chinh" ? "—" : <>{vnd(l.vat)}<div className="t2">{l.rate}%</div></>}</td>
               <td className="r num"><b>{vnd(l.amount)}</b></td>
             </tr>
           ))}
