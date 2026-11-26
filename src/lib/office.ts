@@ -6,6 +6,10 @@ import { listFiles, removeFile } from "./files";
 import { useCallback, useEffect, useState } from "react";
 
 export type ReqKind = "nghi_phep" | "ra_ngoai" | "cong_tac" | "loa" | "mua_hang" | "thanh_toan" | "tam_ung";
+/** Khoá luồng duyệt (không phải loại phiếu): mua_hang_gia = bước Duyệt NCC & giá của đề nghị mua hàng (SQL 108) */
+export type FlowKind = ReqKind | "mua_hang_gia";
+/** Giai đoạn đề nghị mua hàng (SQL 108). null = phiếu cũ trước khi có bước báo giá */
+export type BuyStage = "nhu_cau" | "bao_gia" | "duyet_gia" | "da_chot";
 export type ReqStatus = "nhap" | "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy" | "hoan_tat" | "tra_lai";
 
 export type Req = {
@@ -68,6 +72,12 @@ export type Req = {
   project_item_id?: string | null;
   purchase_id?: string | null;   // đề nghị thanh toán tham chiếu đề nghị mua hàng
   expense_category?: string | null;   // khoản chi của toà (SQL 090) trên ĐNTT / tạm ứng gắn toà
+  buy_stage?: BuyStage | null;
+  buy_estimate?: number | null;       // tổng dự kiến lúc duyệt nhu cầu (amount đổi thành giá NCC khi trình duyệt giá)
+  buy_vendor_id?: string | null;
+  buy_quote_id?: string | null;
+  buy_reason?: string | null;         // lý do chọn NCC / thiếu báo giá
+  buy_round?: number;
 };
 
 export type ReqLine = {
@@ -89,7 +99,7 @@ export type ReqStep = {
   decided_by: string | null; decided_at: string | null; note: string | null;
 };
 export const DUTY_LABEL: Record<string, string> = {
-  leader: "Leader", truong_phong: "Trưởng phòng", nhan_su: "Nhân sự", ke_toan: "Kế toán", giam_doc: "Giám đốc", khac: "Người duyệt",
+  leader: "Leader", truong_phong: "Trưởng phòng", nhan_su: "Nhân sự", ke_toan: "Kế toán", giam_doc: "Giám đốc", mua_hang: "Mua hàng", khac: "Người duyệt",
 };
 /** Luồng duyệt theo loại đề nghị (mô tả cho người dùng) */
 export const FLOW_TEXT: Record<ReqKind, string> = {
@@ -99,7 +109,7 @@ export const FLOW_TEXT: Record<ReqKind, string> = {
   loa: "Người lập → Leader → Trưởng phòng → Kế toán → Giám đốc",
   thanh_toan: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
   tam_ung: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
-  mua_hang: "Người đề nghị → Leader → Trưởng phòng → Kế toán → Giám đốc",
+  mua_hang: "Duyệt nhu cầu: Leader → Trưởng phòng · Mua hàng lấy báo giá, chọn NCC · Duyệt NCC & giá: Kế toán → Giám đốc",
 };
 export const PAY_TYPE: Record<string, string> = {
   nha_cung_cap: "Thanh toán nhà cung cấp", hoan_ung: "Hoàn ứng", chi_phi_van_hanh: "Chi phí vận hành",
@@ -141,7 +151,15 @@ export function kindLabel(r: Pick<Req, "kind" | "sub_type">): string {
   }
 }
 
-export function statusLabel(r: Pick<Req, "kind" | "status">): string {
+export const BUY_STAGE_LABEL: Record<BuyStage, string> = {
+  nhu_cau: "Duyệt nhu cầu", bao_gia: "Lấy báo giá", duyet_gia: "Duyệt NCC & giá", da_chot: "Đã chốt NCC & giá",
+};
+
+export function statusLabel(r: Pick<Req, "kind" | "status"> & { buy_stage?: BuyStage | null }): string {
+  if (r.kind === "mua_hang" && r.buy_stage) {
+    if (r.status === "cho_duyet") return r.buy_stage === "duyet_gia" ? "Chờ duyệt NCC & giá" : "Chờ duyệt nhu cầu";
+    if (r.status === "da_duyet") return r.buy_stage === "bao_gia" ? "Chờ báo giá" : r.buy_stage === "da_chot" ? "Đã chốt NCC & giá" : "Đã duyệt";
+  }
   switch (r.status) {
     case "nhap": return "Nháp";
     case "cho_duyet": return "Chờ duyệt";
@@ -191,8 +209,9 @@ export { hhmm };
 export const EDITABLE_STATUS: ReqStatus[] = ["nhap", "tra_lai", "tu_choi", "da_huy"];
 export const isEditableStatus = (s: ReqStatus) => EDITABLE_STATUS.includes(s);
 /** Đã xong hẳn: nghỉ phép / ra ngoài / tờ trình chỉ cần duyệt; còn lại đợi chi tiền hoặc báo cáo thực tế */
-export const isFinished = (r: Pick<Req, "kind" | "status">) =>
-  r.status === "hoan_tat" || (r.status === "da_duyet" && (r.kind === "nghi_phep" || r.kind === "ra_ngoai" || r.kind === "loa" || r.kind === "mua_hang"));
+export const isFinished = (r: Pick<Req, "kind" | "status"> & { buy_stage?: BuyStage | null }) =>
+  r.status === "hoan_tat" || (r.status === "da_duyet" && (r.kind === "nghi_phep" || r.kind === "ra_ngoai" || r.kind === "loa"
+    || (r.kind === "mua_hang" && (!r.buy_stage || r.buy_stage === "da_chot"))));
 export const EDIT_LOCK_TIP = "Đang trong quá trình phê duyệt hoặc đã duyệt xong nên không sửa / xoá được. Chỉ sửa được khi bị trả lại, bị từ chối hoặc đã rút.";
 
 /** Ngày theo giờ Việt Nam (yyyy-mm-dd) của một thời điểm ISO */

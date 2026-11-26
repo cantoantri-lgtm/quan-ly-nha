@@ -16,6 +16,7 @@ import { KIND_ICON, LeaveBalance } from "./Office";
 import { CostGrid, CostTable, LegGrid, LegTable } from "../components/TripGrids";
 import { TRIP_TYPE, VISA_TYPE, costFilled, costFromRow, costTotal, emptyCost, emptyLeg, legFilled, legFromRow, loadTrip, saveTrip, type CostDraft, type LegDraft, type TripCost, type TripLeg } from "../lib/trip";
 import { PurchaseTable } from "../components/PurchaseGrid";
+import { PurchaseQuotes } from "../components/PurchaseQuotes";
 import { loadPLines, type PLine } from "../lib/purchase";
 import { SETTLE_LABEL, type SettleStatus } from "../lib/expense";
 import "../office.css";
@@ -48,6 +49,7 @@ export default function RequestDetail() {
   const [loaCanEdit, setLoaCanEdit] = useState(false);       // người lập hoặc người cùng soạn, khi còn sửa được
   // Đề nghị mua hàng: danh sách hàng + các đề nghị thanh toán tham chiếu; thanh toán: đề nghị mua hàng gốc
   const [pLines, setPLines] = useState<PLine[]>([]);
+  const [canQuote, setCanQuote] = useState(false);
   const [prPays, setPrPays] = useState<{ id: string; doc_no: string | null; reason: string | null; amount: number; status: string; requester_name: string | null; created_at: string; can_open: boolean }[]>([]);
   const [prOf, setPrOf] = useState<{ id: string; doc_no: string | null; reason: string; amount: number } | null>(null);
 
@@ -77,9 +79,10 @@ export default function RequestDetail() {
       setProj(pj.data ? { ...(pj.data as { id: string; code: string | null; name: string }), item: (it.data as { name: string } | null)?.name ?? null } : null);
     } else setProj(null);
     if (rq.kind === "mua_hang") {
-      const [pl, lk] = await Promise.all([loadPLines(rq.id), supabase.rpc("purchase_linked", { p_pr: rq.id })]);
-      setPLines(pl); setPrPays((lk.data ?? []) as typeof prPays);
-    } else { setPLines([]); setPrPays([]); }
+      const [pl, lk, cq] = await Promise.all([loadPLines(rq.id), supabase.rpc("purchase_linked", { p_pr: rq.id }),
+        rq.buy_stage === "bao_gia" ? supabase.rpc("purchase_can_quote", { p_request: rq.id }) : Promise.resolve({ data: false })]);
+      setPLines(pl); setPrPays((lk.data ?? []) as typeof prPays); setCanQuote(cq.data === true);
+    } else { setPLines([]); setPrPays([]); setCanQuote(false); }
     if (rq.purchase_id) {
       const { data: pr } = await supabase.from("requests").select("id,doc_no,reason,amount").eq("id", rq.purchase_id).maybeSingle();
       setPrOf((pr as typeof prOf) ?? null);
@@ -287,11 +290,12 @@ export default function RequestDetail() {
           <>
             <div className="section-title">Danh sách hàng cần mua</div>
             <PurchaseTable lines={pLines} />
+            {r.buy_stage ? <PurchaseQuotes r={r} canQuote={canQuote} onChanged={load} /> : null}
             <FileGallery owner={{ kind: "dinh_kem_de_nghi", requestId: r.id }} title="Báo giá đính kèm"
               hint="Báo giá, hình ảnh mẫu hàng (ảnh hoặc PDF, tối đa 10 MB mỗi tệp)."
-              canUpload={isManager || (mine && (r.status === "cho_duyet" || editable))}
-              canDelete={isManager || (mine && editable)} />
-            {r.status === "da_duyet" || r.status === "hoan_tat" || prPays.length ? (
+              canUpload={isManager || canQuote || (mine && (r.status === "cho_duyet" || editable))}
+              canDelete={isManager || canQuote || (mine && editable)} />
+            {((r.status === "da_duyet" || r.status === "hoan_tat") && (!r.buy_stage || r.buy_stage === "da_chot")) || prPays.length ? (
               <>
                 <div className="section-title">Thanh toán theo đề nghị mua hàng này</div>
                 <div className="card stack" style={{ gap: 8 }}>

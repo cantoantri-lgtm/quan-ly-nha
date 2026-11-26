@@ -28,6 +28,7 @@ import RequestPrint from "./pages/RequestPrint";
 import TripPrint from "./pages/TripPrint";
 import FlowSettings from "./pages/FlowSettings";
 import PermSettings from "./pages/PermSettings";
+import Vendors from "./pages/Vendors";
 import { KeepAliveOutlet } from "./components/KeepAlive";
 import Projects from "./pages/Projects";
 import ProjectForm from "./pages/ProjectForm";
@@ -188,6 +189,7 @@ export default function App() {
         <Route path="ban-do" element={<Suspense fallback={<div className="loading">Đang tải bản đồ…</div>}><MapPage /></Suspense>} />
         <Route path="van-phong" element={<Office />} />
         <Route path="van-phong/luong-duyet" element={<FlowSettings />} />
+        <Route path="van-phong/nha-cung-cap" element={<Vendors />} />
         <Route path="van-phong/ds/:kind" element={<RequestList />} />
         <Route path="van-phong/moi/:kind" element={<RequestForm />} />
         <Route path="van-phong/loa/moi" element={<LoaForm />} />

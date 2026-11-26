@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
-import { DUTY_LABEL, KINDS, type ReqKind } from "../lib/office";
+import { DUTY_LABEL, KINDS, type FlowKind } from "../lib/office";
+import { parseMoney, vnd } from "../lib/money";
+import { loadPurchaseSettings, type PurchaseSettings } from "../lib/purchase";
 import { Icon, TopBar } from "../components/ui";
 import "../office.css";
 import "../flows.css";
 
 type Step = { duty: string; approver_id: string | null; approver_name?: string | null };
-type Flow = { kind: ReqKind; steps: Step[]; is_custom: boolean; updated_at: string | null; updated_by_name: string | null };
+type Flow = { kind: FlowKind; steps: Step[]; is_custom: boolean; updated_at: string | null; updated_by_name: string | null };
 
 const DUTIES = ["leader", "truong_phong", "nhan_su", "ke_toan", "giam_doc", "khac"] as const;
 const AUTO_HINT: Record<string, string> = {
@@ -18,6 +20,11 @@ const AUTO_HINT: Record<string, string> = {
   giam_doc: "Người giữ nhiệm vụ Giám đốc trong sơ đồ công ty",
   khac: "Chọn một người cụ thể",
 };
+/** Loại luồng: đề nghị mua hàng có 2 luồng (duyệt nhu cầu, duyệt NCC & giá, SQL 108) */
+const FLOW_KINDS: { kind: FlowKind; label: string }[] = KINDS.flatMap((k) => k.kind === "mua_hang"
+  ? [{ kind: "mua_hang" as FlowKind, label: "Mua hàng · Duyệt nhu cầu" }, { kind: "mua_hang_gia" as FlowKind, label: "Mua hàng · Duyệt NCC & giá" }]
+  : [{ kind: k.kind as FlowKind, label: k.label }]);
+
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
 /** Luồng phê duyệt theo từng loại đề nghị. Ai cũng xem được; chỉ anh Trí và người giữ nhiệm vụ Nhân sự sửa (CSDL kiểm tra trong approval_flow_save). */
@@ -67,9 +74,10 @@ export default function FlowSettings() {
         <div className="ok-box">
           {isFlowAdmin
             ? "Mỗi bước chọn chức danh theo sơ đồ công ty, hoặc chỉ định một người cụ thể. Bước chưa có người giữ tự bỏ qua; một người đứng nhiều bước chỉ duyệt một lần. Luồng mới áp dụng cho phiếu gửi sau khi lưu, phiếu đang chờ duyệt giữ luồng cũ."
-            : "Luồng duyệt của từng loại đề nghị. Chỉ anh Trí và Nhân sự được thay đổi."}
+            : "Luồng duyệt của từng loại đề nghị. Chỉ người có quyền Luồng phê duyệt mức Sửa được thay đổi."}
         </div>
-        {!flows ? <div className="loading">Đang tải…</div> : KINDS.map(({ kind, label }) => {
+        <PurchaseLimitCard canEdit={isFlowAdmin} />
+        {!flows ? <div className="loading">Đang tải…</div> : FLOW_KINDS.map(({ kind, label }) => {
           const f = flows.find((x) => x.kind === kind);
           if (!f) return null;
           const steps = draft[kind] ?? f.steps;
@@ -134,5 +142,49 @@ export default function FlowSettings() {
         })}
       </main>
     </>
+  );
+}
+
+/** Hạn mức báo giá theo quy trình mua hàng: đơn từ hạn mức cần tối thiểu N báo giá (SQL 108, purchase_settings_save) */
+function PurchaseLimitCard({ canEdit }: { canEdit: boolean }) {
+  const { toast } = useSession();
+  const [cfg, setCfg] = useState<PurchaseSettings | null>(null);
+  const [limit, setLimit] = useState("");
+  const [min, setMin] = useState("3");
+  const [busy, setBusy] = useState(false);
+  const fill = (c: PurchaseSettings) => { setCfg(c); setLimit(new Intl.NumberFormat("vi-VN").format(c.quote_threshold)); setMin(String(c.min_quotes)); };
+  useEffect(() => { loadPurchaseSettings().then(fill); }, []);
+  if (!cfg) return null;
+  const amount = parseMoney(limit);
+  const dirty = amount !== cfg.quote_threshold || Number(min) !== cfg.min_quotes;
+  async function save() {
+    if (amount == null || amount < 0) { toast("Nhập hạn mức hợp lệ"); return; }
+    setBusy(true);
+    const { error } = await supabase.rpc("purchase_settings_save", { p_threshold: amount, p_min: Number(min) });
+    setBusy(false);
+    if (error) { toast(friendlyError(error)); return; }
+    toast("Đã lưu hạn mức báo giá"); fill({ quote_threshold: amount, min_quotes: Number(min) });
+  }
+  return (
+    <section className="card fl-card stack" aria-label="Hạn mức báo giá mua hàng">
+      <h2 style={{ margin: 0 }}>Mua hàng · Hạn mức báo giá</h2>
+      <p className="muted small" style={{ margin: 0 }}>Theo quy trình mua hàng: đơn từ hạn mức trở lên cần đủ số báo giá tối thiểu. Thiếu báo giá hoặc không chọn giá thấp nhất thì người mua hàng phải ghi lý do khi trình duyệt.</p>
+      {canEdit ? (
+        <>
+          <div className="row" style={{ gap: 8, flexWrap: "nowrap" }}>
+            <label className="field" style={{ flex: 2 }}><span>Hạn mức (đ)</span>
+              <input className="input num" inputMode="numeric" value={limit} onChange={(e) => setLimit(e.target.value)}
+                onBlur={() => { if (amount != null) setLimit(new Intl.NumberFormat("vi-VN").format(amount)); }} /></label>
+            <label className="field" style={{ flex: 1 }}><span>Số báo giá</span>
+              <select className="input" value={min} onChange={(e) => setMin(e.target.value)}>
+                {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+          </div>
+          <div className="row fl-foot"><span className="grow" />
+            <button type="button" className="btn sm" disabled={!dirty || busy} onClick={save}>{busy ? "Đang lưu…" : "Lưu hạn mức"}</button></div>
+        </>
+      ) : (
+        <p style={{ margin: 0 }}>Đơn từ <b>{vnd(cfg.quote_threshold)}</b> cần tối thiểu <b>{cfg.min_quotes}</b> báo giá.</p>
+      )}
+    </section>
   );
 }

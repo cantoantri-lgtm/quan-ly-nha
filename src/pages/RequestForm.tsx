@@ -742,7 +742,7 @@ export default function RequestForm() {
                   {LoaField}
                   {LoaBudget}
                   {ProjectField}
-                  <label className="field dn-span2"><span>Nhà cung cấp đề xuất</span>
+                  <label className="field dn-span2"><span>Nhà cung cấp gợi ý <small className="muted" style={{ fontWeight: 400 }}>· không bắt buộc</small></span>
                     <input id="rq-payee" className="input" value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="VD: Cửa hàng vật tư An Phát" /></label>
                   <label className="field dn-full"><span>Mục đích mua <span className="req">*</span></span>
                     <input id="rq-reason" className="input" value={reason} onChange={(e) => setReason(e.target.value)} required
@@ -751,7 +751,7 @@ export default function RequestForm() {
               </section>
               <section className="card dn-sec">
                 <PurchaseGrid rows={pLines} setRows={setPLines} />
-                <p className="muted small" style={{ margin: 0 }}>Đơn giá dự kiến theo báo giá hoặc giá thị trường. Sau khi được duyệt, lập đề nghị thanh toán và chọn đề nghị mua hàng này để tham chiếu.</p>
+                <p className="muted small" style={{ margin: 0 }}>Đơn giá dự kiến theo giá thị trường. Quy trình: (1) Leader, Trưởng phòng duyệt nhu cầu. (2) Người mua hàng lấy báo giá các nhà cung cấp, chọn NCC. (3) Kế toán, Giám đốc duyệt NCC & giá. Duyệt xong mới lập đề nghị thanh toán theo phiếu này.</p>
               </section>
               {!editing ? (
                 <section className="card dn-sec">

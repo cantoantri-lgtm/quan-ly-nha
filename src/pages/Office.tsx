@@ -138,6 +138,11 @@ export default function Office() {
               </span>
             </Link>
           ))}
+          <Link to="/van-phong/nha-cung-cap" className="kind-tile k-mua_hang">
+            <span className="rq-ico">{KIND_ICON.mua_hang}</span>
+            <span className="kt-label">Nhà cung cấp</span>
+            <span className="kt-hint">Danh bạ NCC dùng khi báo giá, thanh toán</span>
+          </Link>
           {isManager || isApprover ? (
             <Link to="/to-chuc" className="kind-tile k-thanh_toan">
               <span className="rq-ico">{Icon.org}</span>

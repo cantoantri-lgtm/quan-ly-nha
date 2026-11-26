@@ -5,7 +5,7 @@ export type Staff = {
   person_name: string | null; profile_id: string | null; status: "co" | "tap_su" | "thu_viec" | "tuyen" | "thue_ngoai"; hire_note: string | null;
   /** Ngày kết thúc tập sự / thử việc (migration 071) */
   trial_end?: string | null;
-  duty: "nhan_su" | "ke_toan" | "giam_doc" | null; is_leader: boolean; sort: number;
+  duty: "nhan_su" | "ke_toan" | "giam_doc" | "mua_hang" | null; is_leader: boolean; sort: number;
 };
 export type Pay = { staff_id: string; base_salary: number | null; note: string | null };
 export type Scale = { level: number; rank: number; base_salary: number };
@@ -20,4 +20,4 @@ export const TRIAL_HINT: Record<string, string> = {
   tap_su: "Tập nghề (Điều 61 BLLĐ 2019): tối đa 3 tháng, ký hợp đồng đào tạo, không thu học phí. Có tham gia làm việc thì phải trả lương theo thoả thuận. Hết hạn đạt yêu cầu thì ký hợp đồng lao động.",
   thu_viec: "Thử việc (Điều 24–27): mỗi công việc chỉ thử 1 lần. Tối đa 6 ngày làm việc (công việc giản đơn), 30 ngày (trung cấp, công nhân kỹ thuật, nghiệp vụ), 60 ngày (cao đẳng trở lên), 180 ngày (quản lý doanh nghiệp). Lương ít nhất 85% lương chính thức. Hết hạn phải báo kết quả.",
 };
-export const DUTY_NAME: Record<string, string> = { giam_doc: "Giám đốc (duyệt cuối)", ke_toan: "Kế toán (duyệt chi)", nhan_su: "Nhân sự (xác nhận nghỉ phép)" };
+export const DUTY_NAME: Record<string, string> = { giam_doc: "Giám đốc (duyệt cuối)", ke_toan: "Kế toán (duyệt chi)", nhan_su: "Nhân sự (xác nhận nghỉ phép)", mua_hang: "Mua hàng (lấy báo giá, chọn NCC)" };

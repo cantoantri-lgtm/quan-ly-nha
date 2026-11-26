@@ -291,3 +291,20 @@
 
 /* Danh sách gọn (thanh toán theo đề nghị mua hàng) */
 .plain-list { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+
+/* Đề nghị mua hàng 2 bước (SQL 108) */
+.ap-steps li.ap-phase { display: block; padding: 2px 0 12px 28px; font-size: 13px; color: var(--muted); }
+.ap-steps li.ap-phase b { color: var(--ink); }
+.buy-track { display: flex; gap: 4px; }
+.buy-track span { flex: 1; text-align: center; font-size: 12px; font-weight: 600; line-height: 1.25; padding: 6px 4px; border-radius: 8px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+.buy-track span.done { background: var(--brand-soft); color: var(--ink); border-color: var(--brand-line); }
+.buy-track span.now { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.quote { padding: 12px 14px; display: grid; gap: 4px; border-top: 1px solid var(--line); }
+.quote:first-child { border-top: 0; }
+.quote.chosen { background: var(--brand-soft); }
+.quote-head { display: flex; align-items: baseline; gap: 8px; }
+.quote-head b { flex: 1; min-width: 0; }
+.quote-total { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quote-meta { font-size: 13px; color: var(--muted); }
+.quote-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.quote-acts { display: flex; gap: 8px; margin-top: 4px; }

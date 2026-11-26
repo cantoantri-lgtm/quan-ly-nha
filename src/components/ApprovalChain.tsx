@@ -20,9 +20,13 @@ export function ApprovalSteps({ steps, people, requesterName, sentAt }: {
         <span className="ap-dot" aria-hidden="true" />
         <div><b>Người đề nghị</b> · {requesterName}<small>Đã gửi {clock(sentAt)}</small></div>
       </li>
-      {steps.map((s) => {
+      {steps.map((s, i) => {
         const who = nm(s.decided_by) ?? nm(s.approver_id) ?? (s.approver_id ? "—" : "Quản lý (người đầu tiên duyệt)");
-        return (
+        // Đề nghị mua hàng: bước duyệt NCC & giá đánh số từ 100 × lần trình (SQL 108)
+        const round = Math.floor(s.step_no / 100);
+        const head = round >= 1 && (i === 0 || Math.floor(steps[i - 1].step_no / 100) !== round)
+          ? <li key={`h${round}`} className="ap-phase"><b>Duyệt NCC & giá{round > 1 ? ` · lần ${round}` : ""}</b></li> : null;
+        return [head,
           <li key={s.id} className={`ap-${s.status}${s.id === firstWaiting ? " now" : ""}`}>
             <span className="ap-dot" aria-hidden="true" />
             <div>
@@ -33,8 +37,8 @@ export function ApprovalSteps({ steps, people, requesterName, sentAt }: {
                 {s.note ? ` — ${s.note}` : ""}
               </small>
             </div>
-          </li>
-        );
+          </li>,
+        ];
       })}
     </ol>
   );

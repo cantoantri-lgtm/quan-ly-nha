@@ -57,3 +57,40 @@ export async function savePLines(requestId: string, list: PLineDraft[], replace:
   const r = await supabase.from("purchase_lines").insert(rows);
   return r.error ? friendlyError(r.error) : null;
 }
+
+/* ===== Báo giá NCC và duyệt NCC & giá (SQL 108) ===== */
+export type Vendor = {
+  id: string; name: string; tax_code: string | null; contact_name: string | null; phone: string | null; email: string | null;
+  address: string | null; goods: string | null; bank_name: string | null; bank_account: string | null; bank_holder: string | null;
+  note: string | null; is_active: boolean;
+};
+export type Quote = {
+  id: string; request_id: string; vendor_id: string; total: number; vat_included: boolean; delivery_days: number | null;
+  payment_terms: string | null; warranty: string | null; note: string | null; created_at: string;
+};
+export type PurchaseSettings = { quote_threshold: number; min_quotes: number };
+export const DEFAULT_PSETTINGS: PurchaseSettings = { quote_threshold: 5_000_000, min_quotes: 3 };
+
+export async function loadVendors(): Promise<Vendor[]> {
+  const { data } = await supabase.from("purchase_vendors").select("*").order("name");
+  return (data ?? []) as Vendor[];
+}
+export async function loadQuotes(requestId: string): Promise<Quote[]> {
+  const { data } = await supabase.from("purchase_quotes").select("*").eq("request_id", requestId).order("total");
+  return (data ?? []) as Quote[];
+}
+export async function loadPurchaseSettings(): Promise<PurchaseSettings> {
+  const { data } = await supabase.from("purchase_settings").select("quote_threshold,min_quotes").eq("id", 1).maybeSingle();
+  return data ? { quote_threshold: Number(data.quote_threshold), min_quotes: Number(data.min_quotes) } : DEFAULT_PSETTINGS;
+}
+
+/** Cần ghi lý do khi trình: thiếu số báo giá trên hạn mức, hoặc không chọn giá thấp nhất (khớp purchase_price_submit) */
+export function reasonNeeded(chosen: Quote | undefined, quotes: Quote[], cfg: PurchaseSettings): string | null {
+  if (!chosen) return null;
+  const low = Math.min(...quotes.map((q) => Number(q.total)));
+  const why: string[] = [];
+  if (Number(chosen.total) >= cfg.quote_threshold && quotes.length < cfg.min_quotes)
+    why.push(`đơn từ ${new Intl.NumberFormat("vi-VN").format(cfg.quote_threshold)} đ cần ${cfg.min_quotes} báo giá, đang có ${quotes.length}`);
+  if (Number(chosen.total) > low) why.push("NCC được chọn không phải giá thấp nhất");
+  return why.length ? why.join("; ") : null;
+}
