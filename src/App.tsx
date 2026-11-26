@@ -14,6 +14,7 @@ import Notifications from "./pages/Notifications";
 import Account from "./pages/Account";
 import AdminHome from "./pages/AdminHome";
 import Staff from "./pages/Staff";
+import StaffRecords from "./pages/StaffRecords";
 import Buildings from "./pages/Buildings";
 import VoiceTask from "./pages/VoiceTask";
 import BuildingDetail from "./pages/BuildingDetail";
@@ -86,6 +87,11 @@ function MoneyOnly() {
 function LeadOnly() {
   const { isLeadUp, isAccountant } = useSession();
   return isLeadUp || isAccountant ? <Outlet /> : <Navigate to="/" replace />;
+}
+
+function HrOnly() {
+  const { isManager, isHr } = useSession();
+  return isManager || isHr ? <Outlet /> : <Navigate to="/" replace />;
 }
 
 function ManagerOnly() {
@@ -196,6 +202,9 @@ export default function App() {
         </Route>
         <Route element={<ManagerOnly />}>
           <Route path="bao-cao-ai" element={<AiReport />} />
+        </Route>
+        <Route element={<HrOnly />}>
+          <Route path="ho-so-nhan-su" element={<StaffRecords />} />
         </Route>
         <Route element={<MoneyOnly />}>
           <Route path="hoa-don-gtgt" element={<VatDaily />} />

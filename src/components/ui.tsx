@@ -174,7 +174,7 @@ export type AppItem = { to: string; label: string; icon: JSX.Element; n?: number
 
 /** Nhóm chức năng theo vai trò: dùng cho bảng Apps (điện thoại) và thanh menu xổ xuống (PC). Quyền thật vẫn chặn ở CSDL. */
 export function useMenuGroups(): { title: string; menu: string; items: AppItem[] }[] {
-  const { unread, pendingApprovals, isManager, isApprover, isLeadUp, isCollaborator, isCustomer, isAccountant, isFlowAdmin } = useSession();
+  const { unread, pendingApprovals, isManager, isApprover, isLeadUp, isCollaborator, isCustomer, isAccountant, isFlowAdmin, isHr } = useSession();
   const apps: AppItem[] = isCustomer ? [
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
@@ -192,6 +192,7 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
   return isCustomer || isCollaborator ? [{ title: "", menu: "Chức năng", items: apps }] : [
     { title: "Quản trị", menu: "Quản trị", items: [
       ...(isManager ? [{ to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user }] : []),
+      ...(isManager || isHr ? [{ to: "/ho-so-nhan-su", label: "Hồ sơ nhân sự", icon: Icon.user }] : []),
       ...(isManager || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
       ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
       ...(isManager ? [{ to: "/bao-cao-ai", label: "Báo cáo AI", icon: Icon.spark }] : []),
