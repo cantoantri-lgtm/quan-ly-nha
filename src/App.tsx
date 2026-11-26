@@ -14,7 +14,6 @@ import Notifications from "./pages/Notifications";
 import Account from "./pages/Account";
 import AdminHome from "./pages/AdminHome";
 import Staff from "./pages/Staff";
-import StaffRecords from "./pages/StaffRecords";
 import Buildings from "./pages/Buildings";
 import VoiceTask from "./pages/VoiceTask";
 import BuildingDetail from "./pages/BuildingDetail";
@@ -204,7 +203,7 @@ export default function App() {
           <Route path="bao-cao-ai" element={<AiReport />} />
         </Route>
         <Route element={<HrOnly />}>
-          <Route path="ho-so-nhan-su" element={<StaffRecords />} />
+          <Route path="nhan-su" element={<Staff />} />
         </Route>
         <Route element={<MoneyOnly />}>
           <Route path="hoa-don-gtgt" element={<VatDaily />} />
@@ -221,11 +220,12 @@ export default function App() {
         <Route path="tai-khoan" element={<Account />} />
         <Route path="quan-tri" element={<ManagerOnly />}>
           <Route index element={<AdminHome />} />
-          <Route path="nhan-su" element={<Staff />} />
+          <Route path="nhan-su" element={<Navigate to="/nhan-su" replace />} />
           <Route path="toa-nha" element={<Buildings />} />
           <Route path="thu-tien" element={<PaymentSettingsPage />} />
           <Route path="website" element={<WebSettings />} />
         </Route>
+        <Route path="ho-so-nhan-su" element={<Navigate to="/nhan-su" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -3,6 +3,7 @@ import { callAccountFn, friendlyError, normPhone, supabase } from "../lib/supaba
 import { useSession } from "../lib/session";
 import { ROLE_LABEL, type Profile, type Role } from "../lib/labels";
 import { Avatar, copyText, Empty, Sheet, TopBar, tempPassword } from "../components/ui";
+import { exportStaff, StaffRecordsPanel, useStaffRecs } from "./StaffRecords";
 
 type Member = { building_id: string; user_id: string };
 const APP_URL = typeof window !== "undefined" ? window.location.origin : "";
@@ -11,8 +12,13 @@ function credText(name: string, phone: string, pw: string) {
   return `Chào ${name}, tài khoản Next Living của bạn:\n• Vào: ${APP_URL}\n• Số điện thoại: ${phone}\n• Mật khẩu tạm: ${pw}\nLần đầu đăng nhập app sẽ yêu cầu đổi mật khẩu.`;
 }
 
+/** Trang Nhân sự: tab Hồ sơ (Quản lý, Nhân sự) và tab Tài khoản app (chỉ Quản lý) */
 export default function Staff() {
-  const { allPeople: people, buildings, reloadBase, toast, profile } = useSession();
+  const { allPeople: people, buildings, reloadBase, toast, profile, isManager } = useSession();
+  const [tab, setTab] = useState<"ho_so" | "tai_khoan">("ho_so");
+  const recs = useStaffRecs(true);
+  const codeOf = useMemo(() => Object.fromEntries((recs.rows ?? []).filter((r) => r.profile_id && r.staff_code).map((r) => [r.profile_id!, r.staff_code!])), [recs.rows]);
+  const [exporting, setExporting] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [q, setQ] = useState("");
   const [roleF, setRoleF] = useState<"" | Role>("");
@@ -21,24 +27,48 @@ export default function Staff() {
   const [cred, setCred] = useState<string | null>(null);
 
   const loadMembers = useCallback(async () => {
+    if (!isManager) return;
     const { data } = await supabase.from("building_members").select("building_id,user_id");
     setMembers(data ?? []);
-  }, []);
+  }, [isManager]);
   useEffect(() => { loadMembers(); reloadBase(); }, [loadMembers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bCode = useMemo(() => Object.fromEntries(buildings.map((b) => [b.id, b.code])), [buildings]);
   const shown = people.filter((p) =>
     (!roleF || p.role === roleF) &&
-    (!q || p.full_name.toLowerCase().includes(q.toLowerCase()) || (p.phone ?? "").includes(q.replace(/\D/g, ""))));
+    (!q || p.full_name.toLowerCase().includes(q.toLowerCase()) || (codeOf[p.id] ?? "").toLowerCase().includes(q.trim().toLowerCase()) ||
+      (q.replace(/\D/g, "").length >= 3 && (p.phone ?? "").includes(q.replace(/\D/g, "")))));
 
   const afterChange = async () => { await Promise.all([reloadBase(), loadMembers()]); };
 
+  const roleName = (r: Role) => (r === "cong_tac_vien" ? "Cộng tác viên (đã bỏ)" : ROLE_LABEL[r]);
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      await exportStaff(recs.rows ?? [], isManager ? people.map((p) => ({
+        code: codeOf[p.id] ?? "", name: p.full_name, phone: p.phone ?? "", role: roleName(p.role),
+        buildings: p.role === "quan_ly" ? "Tất cả toà" : members.filter((m) => m.user_id === p.id).map((m) => bCode[m.building_id]).filter(Boolean).join(", "),
+        leave: p.annual_leave_days == null ? null : Number(p.annual_leave_days), active: p.is_active,
+      })) : undefined);
+    } catch (e) { toast(friendlyError(e)); } finally { setExporting(false); }
+  };
+
   return (
     <>
-      <TopBar title="Nhân sự & tài khoản" back="/quan-tri"
-        action={<button className="tb-action" onClick={() => setCreating(true)}>+ Thêm</button>} />
+      <TopBar title="Nhân sự"
+        action={<div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+          <button className="tb-action" disabled={exporting || recs.rows === null} onClick={doExport}>{exporting ? "Đang xuất…" : "Tải Excel"}</button>
+          {isManager && tab === "tai_khoan" ? <button className="tb-action" onClick={() => setCreating(true)}>+ Thêm</button> : null}
+        </div>} />
       <main className="main stack">
-        <input id="staff-search" className="input" placeholder="Tìm theo tên hoặc số điện thoại" value={q} onChange={(e) => setQ(e.target.value)} />
+        {isManager ? (
+          <div className="tabs" role="tablist">
+            <button role="tab" aria-selected={tab === "ho_so"} onClick={() => setTab("ho_so")}>Hồ sơ nhân sự</button>
+            <button role="tab" aria-selected={tab === "tai_khoan"} onClick={() => setTab("tai_khoan")}>Tài khoản app</button>
+          </div>
+        ) : null}
+        {tab === "ho_so" || !isManager ? <StaffRecordsPanel rows={recs.rows} err={recs.err} reload={recs.load} /> : <>
+        <input id="staff-search" className="input" placeholder="Tìm theo mã NV, tên hoặc số điện thoại" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="chips">
           {([["", "Tất cả"], ["quan_ly", "Quản lý"], ["giam_sat", "Giám sát"], ["nhan_vien", "Nhân viên"]] as ["" | Role, string][]).map(([k, l]) => (
             <button key={k} className="chip" aria-pressed={roleF === k} onClick={() => setRoleF(k)}>
@@ -55,7 +85,7 @@ export default function Staff() {
                   onClick={() => setEditing(p)} onKeyDown={(e) => e.key === "Enter" && setEditing(p)}>
                   <Avatar name={p.full_name} />
                   <div className="grow">
-                    <div className="name">{p.full_name}{p.id === profile?.id ? " (bạn)" : ""}</div>
+                    <div className="name">{codeOf[p.id] ? <span className="staff-code">{codeOf[p.id]}</span> : null}{p.full_name}{p.id === profile?.id ? " (bạn)" : ""}</div>
                     <div className="sub">{p.phone} · {p.role === "quan_ly" ? "Tất cả toà" : p.role === "cong_tac_vien" ? "Chỉ xem bản đồ & phòng trống" : bs.length ? bs.join(", ") : "Chưa gán toà"}{p.is_active ? "" : " · Đã khoá"}</div>
                     <div className="sub">{p.annual_leave_days == null ? "Chưa nhập phép năm" : `Phép năm ${String(Number(p.annual_leave_days)).replace(".", ",")} ngày`}</div>
                   </div>
@@ -65,6 +95,7 @@ export default function Staff() {
             })}
           </section>
         )}
+        </>}
       </main>
 
       <CreateSheet open={creating} onClose={() => setCreating(false)}

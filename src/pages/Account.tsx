@@ -29,7 +29,7 @@ export default function Account() {
           <>
             <div className="section-title">Quản trị</div>
             <section className="card">
-              <Link className="list-row" to="/quan-tri/nhan-su" style={{ color: "inherit" }}><div className="grow name">Nhân sự & tài khoản</div>›</Link>
+              <Link className="list-row" to="/nhan-su" style={{ color: "inherit" }}><div className="grow name">Nhân sự & tài khoản</div>›</Link>
               <Link className="list-row" to="/quan-tri/toa-nha" style={{ color: "inherit" }}><div className="grow name">Toà nhà</div>›</Link>
             </section>
           </>

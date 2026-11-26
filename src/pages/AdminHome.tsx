@@ -38,7 +38,7 @@ export default function AdminHome() {
       <TopBar title="Quản trị" />
       <main className="main stack">
         <section className="card">
-          <Link className="list-row" to="/quan-tri/nhan-su" style={{ color: "inherit" }}>
+          <Link className="list-row" to="/nhan-su" style={{ color: "inherit" }}>
             <div className="grow"><div className="name">Nhân sự & tài khoản</div>
               <div className="sub">{active.length} người đang hoạt động · cấp tài khoản, gán toà, cấp lại mật khẩu</div></div>›
           </Link>

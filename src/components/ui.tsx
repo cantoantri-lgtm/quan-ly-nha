@@ -191,8 +191,7 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
   // Nhân viên: gom theo nhóm. Quyền hiện / ẩn giữ như cũ (CSDL vẫn là nơi chặn quyền thật).
   return isCustomer || isCollaborator ? [{ title: "", menu: "Chức năng", items: apps }] : [
     { title: "Quản trị", menu: "Quản trị", items: [
-      ...(isManager ? [{ to: "/quan-tri/nhan-su", label: "Nhân sự", icon: Icon.user }] : []),
-      ...(isManager || isHr ? [{ to: "/ho-so-nhan-su", label: "Hồ sơ nhân sự", icon: Icon.user }] : []),
+      ...(isManager || isHr ? [{ to: "/nhan-su", label: "Nhân sự", icon: Icon.user }] : []),
       ...(isManager || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
       ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
       ...(isManager ? [{ to: "/bao-cao-ai", label: "Báo cáo AI", icon: Icon.spark }] : []),
