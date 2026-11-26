@@ -113,7 +113,7 @@ export async function exportCashbook(b: { id: string; code: string; name: string
       { header: "Số tiền", width: 14, style: { numFmt: money } }, { header: "Hình thức", width: 14 }, { header: "Người thu / mã", width: 22, style: { numFmt: "@" } },
       { header: "Nộp Kế toán", width: 14 }];
     o.getRow(1).font = { bold: true };
-    bills.forEach((c) => o.addRow([dmy(c.confirmed_at), "Thu tiền khách", BILL_CAT[c.kind] ?? c.kind, c.note ?? "", Number(c.amount), "Chuyển khoản", c.txn_ref ?? c.pay_code, ""]));
+    bills.forEach((c) => o.addRow([dmy(c.confirmed_at), c.kind === "tien_coc" ? "Tiền cọc" : "Khoản thu khách", BILL_CAT[c.kind] ?? c.kind, c.note ?? "", Number(c.amount), "Chuyển khoản", c.txn_ref ?? c.pay_code, ""]));
     others.forEach((x) => o.addRow([dmy(x.received_on), "Thu khác toà", x.category, [x.note, x.payer_name ? `người nộp: ${x.payer_name}` : ""].filter(Boolean).join(" · "),
       x.amount, x.method === "chuyen_khoan" ? "Chuyển khoản" : "Tiền mặt", nameOf(x.received_by),
       x.method === "chuyen_khoan" ? "Vào TK công ty" : x.handover_status === "da_nop" ? "Đã nộp" : "Chưa nộp"]));

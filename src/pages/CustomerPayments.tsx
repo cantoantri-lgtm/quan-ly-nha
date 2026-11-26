@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { todayVN } from "../lib/dates";
@@ -193,8 +194,12 @@ export function StaffPayments() {
   const waiting = (rows ?? []).filter((b) => b.status === "cho_xac_nhan").length;
   return (
     <>
-      <TopBar title="Thu tiền khách" action={<button className="btn sm" onClick={() => setCreating(true)}>+ Khoản thu</button>} />
+      <TopBar title="Khoản thu khách (cũ)" />
       <main className="main stack">
+        <div className="card" style={{ padding: 12 }}>
+          <b>Mục này đã gộp vào chỗ khác</b>
+          <p className="small" style={{ margin: "4px 0 0" }}>Tiền phòng, điện, nước, dịch vụ: hoá đơn tháng ở <Link to="/thu-chi-toa">Thu &amp; chi toà nhà</Link>. Tiền cọc: mở hợp đồng, bấm "Thu tiền cọc". Khoản phát sinh: tab Thu khác. Trang này chỉ còn để xem và xác nhận các khoản đã tạo trước đây.</p>
+        </div>
         <div className="row" style={{ gap: 6 }}>
           {(["cho_xac_nhan", "chua_thanh_toan", "da_thanh_toan", "all"] as const).map((s) => (
             <button key={s} className={"btn sm " + (filter === s ? "" : "secondary")} onClick={() => setFilter(s)}>

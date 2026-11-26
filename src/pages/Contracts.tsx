@@ -8,6 +8,7 @@ import { naturalCompare, parseMoney, vnd } from "../lib/money";
 import { Empty, Sheet, TopBar, Combo } from "../components/ui";
 import FileGallery from "../components/FileGallery";
 import ContractQR from "../components/ContractQR";
+import DepositPanel from "../components/DepositPanel";
 import { ContractTerm } from "../components/ContractTerm";
 import { uploadFile } from "../lib/files";
 import type { Room } from "./BuildingDetail";
@@ -216,13 +217,14 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
         <VehiclesPanel contractId={c.id} active={c.status === "hieu_luc"} canEdit={canEdit} onChanged={onChanged} />
 
         <div className="row">
-          {c.deposit_status === "chua_thu" && c.deposit_amount > 0 && c.status === "hieu_luc" ? <button className="btn secondary sm" disabled={busy} onClick={() => patch({ deposit_status: "da_thu" }, "Đã đánh dấu thu cọc.")}>Đánh dấu đã thu cọc</button> : null}
+          {canEdit && c.deposit_status === "chua_thu" && c.deposit_amount > 0 && c.status === "hieu_luc" ? <DepositPanel contractId={c.id} roomCode={c.rooms?.code ?? ""} deposit={c.deposit_amount} onDone={onChanged} /> : null}
+          {canManage && c.deposit_status === "chua_thu" && c.deposit_amount > 0 && c.status === "hieu_luc" ? <button className="btn ghost sm" disabled={busy} title="Cọc đã thu trước khi dùng app, không ghi vào sổ thu chi" onClick={() => { if (window.confirm("Đánh dấu đã thu cọc mà không ghi tiền vào sổ thu chi? Chỉ dùng cho cọc đã thu trước khi dùng app.")) patch({ deposit_status: "da_thu" }, "Đã đánh dấu thu cọc."); }}>Cọc đã thu trước đây</button> : null}
           {canManage && c.deposit_status === "da_thu" ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ deposit_status: "da_hoan" }, "Đã đánh dấu hoàn cọc.")}>Đã hoàn cọc</button> : null}
           {canEdit && !c.sign_method ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ sign_method: "giay", signed_on: todayVN() }, "Đã ghi nhận ký giấy.")}>Ghi nhận đã ký giấy</button> : null}
           {canEdit && !c.sign_method ? <button className="btn ghost sm" disabled={busy} onClick={() => patch({ sign_method: "dien_tu", signed_on: todayVN() }, "Đã ghi nhận ký điện tử.")}>Ghi nhận đã ký điện tử</button> : null}
         </div>
 
-        {c.status === "hieu_luc" ? <ContractQR buildingId={c.building_id} tenantName={c.tenants?.full_name ?? ""} roomCode={c.rooms?.code ?? ""} rent={c.rent_amount} deposit={c.deposit_amount} /> : null}
+        {c.status === "hieu_luc" ? <ContractQR buildingId={c.building_id} tenantName={c.tenants?.full_name ?? ""} roomCode={c.rooms?.code ?? ""} rent={c.rent_amount} deposit={0} />  {/* tiền cọc thu qua DepositPanel để tự ghi sổ */} : null}
 
         <FileGallery owner={{ kind: "hop_dong", buildingId: c.building_id, contractId: c.id }} title="File hợp đồng (ảnh chụp, PDF đã ký)"
           canUpload={canEdit} canDelete={canEdit}

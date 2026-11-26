@@ -63,7 +63,7 @@ export default function BuildingIncomes({ buildingId, embedded, range }: { build
         {embedded ? <button className="btn" onClick={() => setEdit("new")}>+ Ghi khoản thu khác</button> : null}
         <p className="muted small" style={{ margin: 0 }}>
           Các khoản thu ngoài tiền phòng: gửi xe vãng lai, giặt sấy, bán phế liệu, đền bù hư hỏng… Thu tiền mặt thì nộp Kế toán trong 24 giờ; Kế toán xác nhận "Đã nhận tiền".
-          Tiền cọc và phí trên tài khoản khách ghi ở Thu tiền khách.
+          Tiền cọc thu trong hợp đồng (nút "Thu tiền cọc").
         </p>
         <div className="rpt-kpis" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
           <div className="card" style={{ padding: 10 }}><b className="num">{vnd(sum())}</b><br /><small className="muted">Tổng thu khác {rangeLabel(r)}</small></div>

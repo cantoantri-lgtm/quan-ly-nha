@@ -9,7 +9,7 @@ import BuildingExpenses from "./BuildingExpenses";
 import BuildingIncomes from "./BuildingIncomes";
 
 /** Thu & chi toà nhà: chọn toà, tab Thu (hoá đơn tiền phòng theo tháng) và tab Chi (chi phí toà, nhân viên ứng / công ty trả).
- *  Khoản thu khác (cọc, phí phát sinh trên tài khoản khách) ở trang Thu tiền khách; sổ thu chi tổng hợp ở Báo cáo. */
+ *  Tiền cọc thu trong hợp đồng (DepositPanel, SQL 101); sổ thu chi tổng hợp ở Báo cáo. */
 type Tab = "thu" | "thu_khac" | "chi";
 
 export default function BuildingCash() {
@@ -73,7 +73,7 @@ export default function BuildingCash() {
             <Invoices key={`thu-${bid}`} buildingId={bid} embedded range={range} />
             <p className="muted small" style={{ margin: 0 }}>Danh sách gồm hoá đơn của các tháng trong khoảng ngày, cộng hoá đơn tháng khác nhưng thu trong khoảng ngày.</p>
             <p className="muted small" style={{ margin: 0 }}>
-              Tiền cọc và các khoản thu khác trên tài khoản khách: <Link to="/thu-tien-khach">Thu tiền khách</Link>.
+              Tiền cọc: mở hợp đồng, bấm "Thu tiền cọc". Khoản phát sinh ngoài tiền phòng: tab Thu khác.
             </p>
           </>
         ) : tab === "thu_khac" ? (
