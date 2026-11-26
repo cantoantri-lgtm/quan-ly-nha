@@ -1,4 +1,4 @@
-// Edge Function: quản lý tài khoản (Quản lý: mọi hành động; Quản lý/Giám sát/Sale: tạo tài khoản khách hàng)
+// Edge Function: quản lý tài khoản (Quản lý: mọi hành động; Nhân sự: tài khoản Nhân viên, Giám sát; Quản lý/Giám sát/Sale: tạo tài khoản khách hàng)
 // Hành động: create | reset_password | set_active | change_phone | create_customer | reset_customer_password
 // create_customer: id_type = "cccd" (12 số, mặc định) | "passport" (khách nước ngoài, 6–20 chữ/số)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -41,11 +41,25 @@ Deno.serve(async (req) => {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Dữ liệu gửi lên không hợp lệ" }, 400); }
 
-  // Tài khoản khách hàng: Quản lý, Giám sát và Sale (nhân viên) được tạo; các hành động khác chỉ Quản lý
+  // Tài khoản khách hàng: Quản lý, Giám sát và Sale (nhân viên) được tạo.
+  // Tài khoản nhân sự: Quản lý toàn quyền; người giữ nhiệm vụ Nhân sự (Sơ đồ công ty) chỉ với tài khoản Nhân viên, Giám sát,
+  // không với tài khoản Quản lý và tài khoản của chính mình (cùng quy tắc với can_admin_account trong CSDL, 104).
   const STAFF = ["quan_ly", "giam_sat", "nhan_vien"];
+  const HR_ROLES = ["nhan_vien", "giam_sat"];
   if (body.action === "create_customer" || body.action === "reset_customer_password") {
     if (!STAFF.includes(me.role)) return json({ error: "Không có quyền tạo tài khoản khách hàng" }, 403);
-  } else if (me.role !== "quan_ly") return json({ error: "Chỉ quản lý được quản lý tài khoản" }, 403);
+  } else if (me.role !== "quan_ly") {
+    const { data: duty } = await admin.from("org_staff").select("id").eq("profile_id", who.user.id).eq("duty", "nhan_su").limit(1);
+    if (!duty?.length) return json({ error: "Chỉ Quản lý hoặc Nhân sự được quản lý tài khoản" }, 403);
+    if (body.action === "create") {
+      if (!HR_ROLES.includes(String(body.role ?? "nhan_vien"))) return json({ error: "Nhân sự chỉ tạo tài khoản Nhân viên hoặc Giám sát" }, 403);
+    } else {
+      const tid = String(body.user_id ?? "");
+      if (tid === who.user.id) return json({ error: "Nhân sự không tự sửa tài khoản của mình ở đây. Nhờ Quản lý." }, 403);
+      const { data: t } = await admin.from("profiles").select("role").eq("id", tid).maybeSingle();
+      if (!t || !HR_ROLES.includes(t.role)) return json({ error: "Nhân sự chỉ quản lý tài khoản Nhân viên, Giám sát" }, 403);
+    }
+  }
 
   try {
     switch (body.action) {

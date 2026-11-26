@@ -20,7 +20,7 @@ const AUTO_HINT: Record<string, string> = {
 };
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
-/** Luồng phê duyệt theo từng loại đề nghị. Ai cũng xem được; chỉ anh Trí sửa (CSDL kiểm tra trong approval_flow_save). */
+/** Luồng phê duyệt theo từng loại đề nghị. Ai cũng xem được; chỉ anh Trí và người giữ nhiệm vụ Nhân sự sửa (CSDL kiểm tra trong approval_flow_save). */
 export default function FlowSettings() {
   const { people, isFlowAdmin, toast } = useSession();
   const [flows, setFlows] = useState<Flow[] | null>(null);
@@ -67,7 +67,7 @@ export default function FlowSettings() {
         <div className="ok-box">
           {isFlowAdmin
             ? "Mỗi bước chọn chức danh theo sơ đồ công ty, hoặc chỉ định một người cụ thể. Bước chưa có người giữ tự bỏ qua; một người đứng nhiều bước chỉ duyệt một lần. Luồng mới áp dụng cho phiếu gửi sau khi lưu, phiếu đang chờ duyệt giữ luồng cũ."
-            : "Luồng duyệt của từng loại đề nghị. Chỉ anh Trí được thay đổi."}
+            : "Luồng duyệt của từng loại đề nghị. Chỉ anh Trí và Nhân sự được thay đổi."}
         </div>
         {!flows ? <div className="loading">Đang tải…</div> : KINDS.map(({ kind, label }) => {
           const f = flows.find((x) => x.kind === kind);

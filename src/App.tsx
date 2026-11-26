@@ -204,6 +204,7 @@ export default function App() {
         </Route>
         <Route element={<HrOnly />}>
           <Route path="nhan-su" element={<Staff />} />
+          <Route path="cai-dat-website" element={<WebSettings />} />
         </Route>
         <Route element={<MoneyOnly />}>
           <Route path="hoa-don-gtgt" element={<VatDaily />} />
@@ -223,7 +224,7 @@ export default function App() {
           <Route path="nhan-su" element={<Navigate to="/nhan-su" replace />} />
           <Route path="toa-nha" element={<Buildings />} />
           <Route path="thu-tien" element={<PaymentSettingsPage />} />
-          <Route path="website" element={<WebSettings />} />
+          <Route path="website" element={<Navigate to="/cai-dat-website" replace />} />
         </Route>
         <Route path="ho-so-nhan-su" element={<Navigate to="/nhan-su" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
