@@ -23,6 +23,9 @@
     send: "Send", fresh: "New chat", privacy: "We only use your phone number to contact you about renting a room.",
     errPhone: "Please enter a 10-digit Vietnamese mobile number before sending.", errMsg: "Please enter a message.", errSend: "Could not send. Please try again in a few minutes.",
     nl: "Next Living · ", locale: "en-GB", roomsPath: "/en/phong",
+    cat: "You need *", catPh: "— Choose one —", errCat: "Please choose what you need.",
+    cats: { tu_van: "Advice & support", phan_anh: "Report & complaint", gop_y: "Feedback & suggestions" },
+    catMsg: { tu_van: "Where would you like to live, what budget, when do you move in?", phan_anh: "What happened, where (building, room), since when?", gop_y: "Your feedback for Next Living" },
   } : {
     btn: "LIÊN HỆ", title: "Liên hệ để được tư vấn", chat: "Nhắn tin cho Next Living", chatSub: "Trả lời trong giờ làm việc", ms: "Liên hệ Messenger", zl: "Liên hệ Zalo",
     call1: "Gọi thuê phòng", call2: "Gọi hỗ trợ khách thuê", rooms: "Xem phòng trống", roomsSub: "Ảnh, giá và đặt lịch xem phòng",
@@ -32,6 +35,9 @@
     send: "Gửi", fresh: "Cuộc mới", privacy: "Số điện thoại chỉ dùng để Next Living liên hệ lại về việc thuê phòng.",
     errPhone: "Vui lòng nhập số điện thoại di động 10 số trước khi gửi.", errMsg: "Bạn chưa nhập tin nhắn.", errSend: "",
     nl: "Next Living · ", locale: "vi-VN", roomsPath: "/phong",
+    cat: "Bạn cần *", catPh: "— Chọn một mục —", errCat: "Vui lòng chọn bạn cần gì.",
+    cats: { tu_van: "Tư vấn & hỗ trợ", phan_anh: "Phản ánh & khiếu nại", gop_y: "Phản hồi & góp ý" },
+    catMsg: { tu_van: "Bạn cần thuê phòng ở đâu, giá bao nhiêu, khi nào vào ở?", phan_anh: "Việc gì xảy ra, ở đâu (tòa, phòng), từ khi nào?", gop_y: "Ý kiến của bạn để Next Living làm tốt hơn" },
   };
   var TK = "nl_chat_token";
   var store = {
@@ -108,7 +114,7 @@
     ".err{color:var(--e);font-size:13.5px;margin:0}",
     "form{display:flex;flex-direction:column;gap:8px;padding:12px;border-top:1px solid var(--l);background:var(--s)}",
     "label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--m)}",
-    "input,textarea{font:inherit;font-size:16px;color:var(--i);background:var(--s);border:1px solid var(--l);border-radius:10px;padding:9px 11px;box-sizing:border-box;width:100%}",
+    "input,textarea,select{font:inherit;font-size:16px;color:var(--i);background:var(--s);border:1px solid var(--l);border-radius:10px;padding:9px 11px;box-sizing:border-box;width:100%}",
     "textarea{min-height:64px;resize:vertical}",
     ".row{display:flex;gap:8px;align-items:center}",
     ".go{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:10px;background:var(--b);color:var(--bi);font:700 15px/1 inherit;padding:12px;cursor:pointer}",
@@ -204,6 +210,12 @@
       var btn = el("button", { class: "go", type: "submit" }, [svg(IC.send), L.send]);
       var phoneRow = el("label", null, [L.phone, inPhone]);
       var nameRow = el("label", null, [L.name, inName]);
+      // 3 loại yêu cầu (supabase/109): chọn khi mở cuộc mới
+      var inCat = el("select", { required: "" }, [el("option", { value: "", text: L.catPh })].concat(
+        ["tu_van", "phan_anh", "gop_y"].map(function (k) { return el("option", { value: k, text: L.cats[k] }); })));
+      inCat.addEventListener("change", function () { inText.placeholder = (L.catMsg[inCat.value] || L.msgPh); });
+      var catRow = el("label", null, [L.cat, inCat]);
+      var catNow = el("p", { class: "note" });
 
       function paint(data) {
         list.textContent = "";
@@ -221,17 +233,17 @@
         if (!token) { paint(null); return Promise.resolve(); }
         return rpc("web_chat_get", { p_token: token }).then(function (d) {
           if (!d) { token = ""; store.set(""); phone = ""; }
-          else { phone = d.phone || ""; if (d.status === "dong") { token = ""; store.set(""); } }
+          else { phone = d.phone || ""; catNow.textContent = d.category && L.cats[d.category] ? L.cats[d.category] : ""; if (d.status === "dong") { token = ""; store.set(""); } }
           paint(d); layout();
         }).catch(function () { paint(null); });
       }
       function layout() {
-        phoneRow.hidden = !!token; nameRow.hidden = !!token;
+        phoneRow.hidden = !!token; nameRow.hidden = !!token; catRow.hidden = !!token; catNow.hidden = !token;
         newBtn.hidden = !token;
       }
-      var newBtn = el("button", { type: "button", class: "lnk", text: L.fresh, on: { click: function () { token = ""; phone = ""; store.set(""); paint(null); layout(); inPhone.focus(); } } });
+      var newBtn = el("button", { type: "button", class: "lnk", text: L.fresh, on: { click: function () { token = ""; phone = ""; store.set(""); inCat.value = ""; inText.placeholder = L.msgPh; paint(null); layout(); inCat.focus(); } } });
 
-      f.appendChild(phoneRow); f.appendChild(nameRow);
+      f.appendChild(catNow); f.appendChild(catRow); f.appendChild(phoneRow); f.appendChild(nameRow);
       f.appendChild(el("label", null, [L.msg, inText]));
       f.appendChild(err);
       f.appendChild(el("div", { class: "row" }, [btn, newBtn]));
@@ -240,10 +252,11 @@
         e.preventDefault(); err.textContent = "";
         var ph = token ? phone : inPhone.value.replace(/\D/g, "").replace(/^84(?=\d{9}$)/, "0");
         var tx = inText.value.trim();
+        if (!token && !inCat.value) { err.textContent = L.errCat; inCat.focus(); return; }
         if (!/^0[35789]\d{8}$/.test(ph)) { err.textContent = L.errPhone; inPhone.focus(); return; }
         if (!tx) { err.textContent = L.errMsg; inText.focus(); return; }
         btn.disabled = true;
-        rpc("web_chat_send", { p_token: token || null, p_phone: ph, p_text: tx, p_name: inName.value.trim() || null, p_room: roomId() })
+        rpc("web_chat_send", { p_token: token || null, p_phone: ph, p_text: tx, p_name: inName.value.trim() || null, p_room: roomId(), p_category: token ? null : inCat.value })
           .then(function (r) { token = r.token; store.set(token); phone = ph; inText.value = ""; return load(); })
           .catch(function (x) { err.textContent = L.errSend || x.message; })   // lỗi máy chủ viết tiếng Việt
           .then(function () { btn.disabled = false; });
@@ -252,7 +265,7 @@
       layout(); load();
       if (!chatOn) return;
       timer = setInterval(function () { if (token && !pn.hidden) load(); }, 20000);
-      setTimeout(function () { (token ? inText : inPhone).focus(); }, 30);
+      setTimeout(function () { (token ? inText : inCat).focus(); }, 30);
     }
   }
 })();
