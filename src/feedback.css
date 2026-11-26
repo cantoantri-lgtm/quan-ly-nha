@@ -4,6 +4,9 @@
 .fb-st.cho_cong_ty { background: var(--today-bg); color: var(--today); }
 .fb-st.cho_khach { background: var(--s-done-bg); color: var(--s-done); }
 .fb-st.dong { background: var(--s-todo-bg); color: var(--s-todo); }
+.fb-cat { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.fb-cat.phan_anh { border-color: var(--danger); color: var(--danger); }
+.fb-cat.tu_van { border-color: var(--brand-line); color: var(--brand); }
 .fb-chat { display: grid; gap: 8px; }
 .fb-msg { max-width: 86%; padding: 9px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere; }
 .fb-msg small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 4px; }

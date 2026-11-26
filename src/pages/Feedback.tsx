@@ -4,14 +4,14 @@ import { RelatedPanel } from "../components/RelatedPanel";
 import { supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
 import { timeAgo } from "../lib/dates";
-import { Empty, Sheet, TopBar } from "../components/ui";
+import { Combo, Empty, Sheet, TopBar } from "../components/ui";
 import { attachFeedbackImage, attachmentUrls, MAX_FEEDBACK_IMAGES, type FeedbackAttachment } from "../lib/files";
 import "../feedback.css";
 
 export type Thread = {
   id: string; customer_id: string | null; subject: string; status: "cho_cong_ty" | "cho_khach" | "dong";
   closed_reason: "khach_ket_thuc" | "tu_dong" | null; last_company_reply_at: string | null;
-  created_at: string; updated_at: string; kind: "khach" | "ctv" | "web";
+  created_at: string; updated_at: string; kind: "khach" | "ctv" | "web"; category: FbCat;
   guest_phone?: string | null; guest_name?: string | null;
   building_id: string | null; building_code: string | null; building_name: string | null; room_code: string | null;
   customer?: { full_name: string; phone: string | null } | null;
@@ -22,6 +22,15 @@ export const fbPlace = (t: Thread) => t.kind === "ctv" ? "CTV"
   : t.kind === "web" ? ["Website", t.building_code, t.room_code ? "P." + t.room_code : null].filter(Boolean).join(" · ")
   : [t.building_code, t.room_code ? "P." + t.room_code : "Khu vực chung"].filter(Boolean).join(" · ");
 export const FB_STATUS: Record<string, string> = { cho_cong_ty: "Chờ công ty", cho_khach: "Chờ khách", dong: "Đã kết thúc" };
+/** 3 loại yêu cầu dùng chung cho khung chat website và mục Phản ánh của khách (supabase/109) */
+export const FB_CAT = { phan_anh: "Phản ánh & khiếu nại", tu_van: "Tư vấn & hỗ trợ", gop_y: "Phản hồi & góp ý" } as const;
+export type FbCat = keyof typeof FB_CAT;
+const FB_CAT_HINT: Record<FbCat, string> = {
+  phan_anh: "Sự cố trong phòng, tòa nhà; hóa đơn, tiền cọc tính sai; thái độ nhân viên.",
+  tu_van: "Hỏi thủ tục, hợp đồng, gia hạn, chuyển phòng, cách dùng app.",
+  gop_y: "Ý kiến để Next Living làm tốt hơn.",
+};
+export const FbCatTag = ({ c }: { c: FbCat }) => <span className={"fb-cat " + c}>{FB_CAT[c] ?? c}</span>;
 
 const AUTO_MS = 3 * 24 * 3600 * 1000;
 function autoCloseText(t: Thread): string | null {
@@ -86,25 +95,25 @@ export default function Feedback() {
 
   return (
     <>
-      <TopBar title="Phản ánh" action={<button className="btn sm" onClick={() => setCreating(true)}>+ Gửi phản ánh</button>} />
+      <TopBar title="Phản ánh" action={<button className="btn sm" onClick={() => setCreating(true)}>+ Gửi mới</button>} />
       <main className="main stack">
-        <p className="fb-note">{isCollaborator ? "Gửi phản ánh cho Lead Sale trở lên. Chỉ Lead Sale trở lên mới đọc và trả lời được." : "Gửi góp ý hoặc sự cố cho Next Living."} Câu trả lời hiện tại đây. Khi đã ổn, bạn bấm "Kết thúc"; nếu đã được trả lời mà sau 3 ngày bạn chưa phản hồi thì phản ánh tự kết thúc.</p>
+        <p className="fb-note">{isCollaborator ? "Gửi phản ánh cho Lead Sale trở lên. Chỉ Lead Sale trở lên mới đọc và trả lời được." : "Gửi cho Next Living theo 3 loại: Phản ánh & khiếu nại, Tư vấn & hỗ trợ, Phản hồi & góp ý."} Câu trả lời hiện tại đây. Khi đã ổn, bạn bấm "Kết thúc"; nếu đã được trả lời mà sau 3 ngày bạn chưa phản hồi thì phản ánh tự kết thúc.</p>
         {items === null ? <div className="loading">Đang tải…</div> : items.length === 0 ? (
-          <Empty title="Chưa có phản ánh nào">Bấm "Gửi phản ánh" để liên hệ công ty.</Empty>
+          <Empty title="Chưa có yêu cầu nào">Bấm "Gửi mới" để liên hệ công ty.</Empty>
         ) : (
           <section className="card">
             {items.map((t) => (
               <div key={t.id} className="list-row fb-row" onClick={() => nav(`/phan-anh/${t.id}`)}>
                 <div className="grow">
                   <div className="name">{t.subject}</div>
-                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> {fbPlace(t)} · {timeAgo(t.updated_at)}</div>
+                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> <FbCatTag c={t.category} /> {fbPlace(t)} · {timeAgo(t.updated_at)}</div>
                 </div>›
               </div>
             ))}
           </section>
         )}
       </main>
-      <NewSheet open={creating} onClose={() => setCreating(false)} onDone={(id) => { setCreating(false); toast("Đã gửi phản ánh."); nav(`/phan-anh/${id}`); }} />
+      <NewSheet open={creating} onClose={() => setCreating(false)} onDone={(id) => { setCreating(false); toast("Đã gửi."); nav(`/phan-anh/${id}`); }} />
     </>
   );
 }
@@ -115,6 +124,7 @@ type Place = { building_id: string | null; building_code: string | null; buildin
 function NewSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (id: string) => void }) {
   const { isCollaborator, toast } = useSession();
   const [place, setPlace] = useState<Place | null | undefined>(undefined);
+  const [cat, setCat] = useState<FbCat | "">("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [imgs, setImgs] = useState<File[]>([]);
@@ -122,14 +132,15 @@ function NewSheet({ open, onClose, onDone }: { open: boolean; onClose: () => voi
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     if (!open) return;
-    setSubject(""); setBody(""); setImgs([]); setErr(null); setPlace(undefined);
+    setCat(""); setSubject(""); setBody(""); setImgs([]); setErr(null); setPlace(undefined);
     if (isCollaborator) { setPlace(null); return; }
     supabase.rpc("customer_my_place").then(({ data }) => setPlace(((data as Place[]) ?? [])[0] ?? null));
   }, [open, isCollaborator]);
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!cat) { setErr("Chọn loại yêu cầu."); return; }
     setBusy(true); setErr(null);
-    const { data, error } = await supabase.rpc("feedback_create", { p_subject: subject, p_body: body });
+    const { data, error } = await supabase.rpc("feedback_create", { p_subject: subject, p_body: body, p_category: cat });
     if (error) { setBusy(false); setErr(error.message); return; }
     const r = ((data as { thread_id: string; message_id: string }[]) ?? [])[0];
     const fail = r && imgs.length ? await uploadAll(r.thread_id, r.message_id, imgs) : 0;
@@ -139,7 +150,7 @@ function NewSheet({ open, onClose, onDone }: { open: boolean; onClose: () => voi
   }
   const has = isCollaborator || !!place?.building_id;
   return (
-    <Sheet open={open} onClose={onClose} title="Gửi phản ánh">
+    <Sheet open={open} onClose={onClose} title="Gửi cho Next Living">
       <form className="stack" onSubmit={submit}>
         {isCollaborator ? (
           <p className="fb-note">Phản ánh của CTV không gắn toà nhà hay phòng. Chỉ Lead Sale trở lên đọc và trả lời.</p>
@@ -148,6 +159,9 @@ function NewSheet({ open, onClose, onDone }: { open: boolean; onClose: () => voi
         ) : (
           <div className="error-box" role="alert">Tài khoản của bạn chưa được gán toà nhà và phòng. Vui lòng liên hệ nhân viên Next Living để được cập nhật.</div>
         )}
+        <label className="field"><span>Bạn cần *</span>
+          <Combo id="fb-cat" value={cat} options={FB_CAT} onChange={setCat} placeholder="— Chọn loại yêu cầu —" label="Loại yêu cầu" disabled={!has} /></label>
+        {cat ? <p className="fb-note">{FB_CAT_HINT[cat]}{cat === "phan_anh" ? " Sự cố khẩn cấp (cháy, chập điện, ngập nước) hãy gọi hotline ngay." : ""}</p> : null}
         <label className="field"><span>Tiêu đề *</span>
           <input className="input" maxLength={120} value={subject} onChange={(e) => setSubject(e.target.value)} required disabled={!has} /></label>
         <label className="field"><span>Nội dung *</span>
@@ -173,6 +187,14 @@ export function FeedbackThread() {
   const [attUrl, setAttUrl] = useState<Record<string, string>>({});
   const [imgs, setImgs] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
+
+  async function changeCat(c: FbCat) {
+    setBusy(true);
+    const { error } = await supabase.rpc("feedback_set_category", { p_thread: id, p_category: c });
+    setBusy(false);
+    if (error) { toast(error.message); return; }
+    toast("Đã đổi loại yêu cầu."); load();
+  }
 
   const load = useCallback(async () => {
     const [a, b, c] = await Promise.all([
@@ -228,7 +250,7 @@ export function FeedbackThread() {
       <TopBar title={t.subject} back="/phan-anh" />
       <main className="main stack">
         <div className="row" style={{ justifyContent: "space-between" }}>
-          <span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span>
+          <span className="row" style={{ gap: 6 }}><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span>{isRequester || t.status === "dong" ? <FbCatTag c={t.category} /> : null}</span>
           {!isRequester && t.customer ? <span className="muted small">{t.customer.full_name} · {t.customer.phone}</span> : null}
           {!isRequester && t.kind === "web" && t.guest_phone ? <a className="small" href={`tel:${t.guest_phone}`}>Gọi {t.guest_phone}{t.guest_name ? ` · ${t.guest_name}` : ""}</a> : null}
         </div>
@@ -236,6 +258,10 @@ export function FeedbackThread() {
             Người gửi chưa có tài khoản. Trả lời ở đây thì khách thấy khi mở lại khung chat trên cùng trình duyệt. Nên gọi hoặc nhắn Zalo số {t.guest_phone} để chắc khách nhận được.</p>
           : t.kind === "ctv" ? <p className="fb-note"><b>Phản ánh của CTV</b><br />Chỉ Lead Sale trở lên đọc và trả lời.</p>
           : <p className="fb-note"><b>{fbPlace(t)}</b>{t.building_name ? ` — ${t.building_name}` : ""}<br />Sale phụ trách: {sales.length ? sales.join(", ") : "chưa có (Quản lý sẽ xử lý)"}</p>}
+        {!isRequester && t.status !== "dong" ? (
+          <label className="field"><span>Loại yêu cầu (đổi nếu khách chọn nhầm)</span>
+            <Combo id="fb-cat-edit" value={t.category} options={FB_CAT} onChange={changeCat} label="Loại yêu cầu" disabled={busy} /></label>
+        ) : null}
         {auto && isRequester ? <p className="fb-note">Nếu bạn không phản hồi, phản ánh sẽ tự kết thúc lúc {auto}.</p> : null}
         {auto && !isRequester ? <p className="fb-note">Chờ khách phản hồi. Không có phản hồi thì tự kết thúc lúc {auto}. Công ty không đóng thay khách.</p> : null}
         <div className="fb-chat">
@@ -280,6 +306,7 @@ export function FeedbackInbox() {
   const [st, setSt] = useState<"" | Thread["status"]>("cho_cong_ty");
   const [bld, setBld] = useState("");
   const [src, setSrc] = useState<"" | "web" | "khach">("");
+  const [cat, setCat] = useState<"" | FbCat>("");
   const load = useCallback(async () => {
     const { data } = await supabase.from("feedback_threads").select("*, customer:profiles!customer_id(full_name,phone)").order("updated_at", { ascending: false }).limit(300);
     setItems((data as Thread[]) ?? []);
@@ -291,7 +318,7 @@ export function FeedbackInbox() {
     return () => window.removeEventListener("neo:notification", h);
   }, [load]);
   const blds = Array.from(new Set((items ?? []).map((t) => t.building_code).filter(Boolean))) as string[];
-  const shown = (items ?? []).filter((t) => (!st || t.status === st) && (!bld || t.building_code === bld) && (!src || (src === "web" ? t.kind === "web" : t.kind !== "web")));
+  const shown = (items ?? []).filter((t) => (!st || t.status === st) && (!bld || t.building_code === bld) && (!src || (src === "web" ? t.kind === "web" : t.kind !== "web")) && (!cat || t.category === cat));
   const webN = (items ?? []).filter((t) => t.kind === "web" && t.status === "cho_cong_ty").length;
   const cnt = (s: Thread["status"]) => (items ?? []).filter((t) => t.status === s).length;
   return (
@@ -309,6 +336,13 @@ export function FeedbackInbox() {
           <button className="chip" aria-pressed={src === "web"} onClick={() => setSrc("web")}>Tin nhắn website{webN ? <span className="n">{webN}</span> : null}</button>
           <button className="chip" aria-pressed={src === "khach"} onClick={() => setSrc("khach")}>Khách thuê</button>
         </div>
+        <div className="chips" role="group" aria-label="Loại yêu cầu">
+          <button className="chip" aria-pressed={cat === ""} onClick={() => setCat("")}>Mọi loại</button>
+          {(Object.keys(FB_CAT) as FbCat[]).map((k) => {
+            const n = (items ?? []).filter((t) => t.category === k && t.status === "cho_cong_ty").length;
+            return <button key={k} className="chip" aria-pressed={cat === k} onClick={() => setCat(k)}>{FB_CAT[k]}{n ? <span className="n">{n}</span> : null}</button>;
+          })}
+        </div>
         {blds.length > 1 ? (
           <select className="input" value={bld} onChange={(e) => setBld(e.target.value)}>
             <option value="">Tất cả toà</option>
@@ -321,7 +355,7 @@ export function FeedbackInbox() {
               <div key={t.id} className="list-row fb-row" onClick={() => nav(`/phan-anh/${t.id}`)}>
                 <div className="grow">
                   <div className="name">{t.subject}</div>
-                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> {fbPlace(t)} · {t.kind === "web" ? (t.guest_name ?? "Khách website") : t.customer?.full_name} · {timeAgo(t.updated_at)}</div>
+                  <div className="sub"><span className={"fb-st " + t.status}>{FB_STATUS[t.status]}</span> <FbCatTag c={t.category} /> {fbPlace(t)} · {t.kind === "web" ? (t.guest_name ?? "Khách website") : t.customer?.full_name} · {timeAgo(t.updated_at)}</div>
                 </div>›
               </div>
             ))}
