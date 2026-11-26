@@ -4,7 +4,7 @@ import { ddmmyyyy } from "../lib/dates";
 import { taskLinkFrom, type AiAnswer, type AiChart } from "../lib/ai";
 import "../ai.css";
 
-const COLORS = ["var(--ai)", "var(--ai-2)", "var(--brand)", "var(--soon)"];
+const COLORS = ["var(--ai)", "var(--ai-2)", "var(--brand)", "var(--late)"];
 
 export function Spark({ size = 16 }: { size?: number }) {
   return (

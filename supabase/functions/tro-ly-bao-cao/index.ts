@@ -1,4 +1,4 @@
-// Edge Function: trợ lý báo cáo AI (chỉ Quản lý).
+// Edge Function: trợ lý báo cáo AI (theo bảng phân quyền, chức năng Báo cáo AI).
 // AI không tự viết truy vấn. Hàm này gọi các hàm SQL ai_* bằng phiên của chính người hỏi
 // (Postgres kiểm tra quyền), rồi gửi số liệu đã tổng hợp cho Gemini phân tích.
 // Không gửi tên/điện thoại/CCCD khách thuê, không gửi lương.
@@ -213,7 +213,9 @@ Deno.serve(async (req) => {
   if (!who?.user) return json({ error: "Phiên đăng nhập đã hết, vui lòng đăng nhập lại" }, 401);
   const { data: me } = await admin.from("profiles").select("id,full_name,role,is_active").eq("id", who.user.id).single();
   if (!me?.is_active) return json({ error: "Tài khoản chưa được kích hoạt" }, 403);
-  if (me.role !== "quan_ly") return json({ error: "Chỉ Quản lý dùng được trợ lý báo cáo AI" }, 403);
+  // Quyền theo bảng phân quyền (105): chức năng "Báo cáo AI" mức Xem trở lên
+  const { data: lv } = await admin.rpc("perm_level_for", { p_user: me.id, p_feature: "bao_cao_ai" });
+  if (Number(lv ?? 0) < 1) return json({ error: "Bạn chưa được quyền dùng trợ lý báo cáo AI" }, 403);
 
   // Mọi truy vấn số liệu và lưu lịch sử chạy bằng phiên của người hỏi (RLS + ai_guard)
   const db = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {

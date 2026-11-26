@@ -29,7 +29,8 @@ type FB = { grp_key: string; grp_name: string; total: number; cho_cong_ty: numbe
 type PR = { building_id: string; building_name: string; thu: number; chi: number; thue_nha: number; loi_nhuan: number; tien_coc: number };
 
 export default function Reports() {
-  const { isManager, isAccountant, isLeadUp } = useSession();
+  const { isManager, isAccountant, can } = useSession();
+  const isLeadUp = can("bao_cao");   // tab Phản ánh: cùng quyền Báo cáo (report_feedback)
   const fin = isManager || isAccountant;   // Quản lý, Kế toán: chi phí, lợi nhuận, mọi toà
   const [qs] = useSearchParams();
   const [tab, setTab] = useState<Tab>(() => { const t = qs.get("tab"); return t === "so_thu_chi" || t === "chot_thang" ? t : "thu_chi"; });

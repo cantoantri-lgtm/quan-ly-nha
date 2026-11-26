@@ -14,7 +14,8 @@ type Txn = { id: number; amount: number; content: string | null; txn_time: strin
 
 /** Quản lý cài tài khoản nhận tiền thuê; xem giao dịch ngân hàng đã nhận từ SePay */
 export default function PaymentSettingsPage() {
-  const { toast } = useSession();
+  const { toast, can } = useSession();
+  const canSave = can("tk_nhan_tien", 2);
   const [bin, setBin] = useState(BANKS[0].bin);
   const [customBin, setCustomBin] = useState("");
   const [customName, setCustomName] = useState("");
@@ -77,7 +78,7 @@ export default function PaymentSettingsPage() {
               <label className="field"><span>Số tài khoản</span><input id="p-acct" className="input num" inputMode="numeric" value={acct} onChange={(e) => setAcct(e.target.value)} required /></label>
               <label className="field"><span>Tên chủ tài khoản (không dấu)</span><input id="p-holder" className="input" value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="CONG TY ..." required /></label>
               {err ? <div className="error-box" role="alert">{err}</div> : null}
-              <button className="btn block" disabled={busy}>{busy ? "Đang lưu…" : "Lưu"}</button>
+              <button className="btn block" disabled={busy || !canSave}>{busy ? "Đang lưu…" : canSave ? "Lưu" : "Bạn chỉ có quyền xem"}</button>
             </>
           )}
         </form>

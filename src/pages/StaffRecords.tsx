@@ -42,12 +42,13 @@ function headRow(ws: import("exceljs").Worksheet, head: string[]) {
 const byCode = (a: string | null, b: string | null) => (a && b ? a.localeCompare(b, "vi", { numeric: true }) : a ? -1 : b ? 1 : 0);
 
 /** Tải Excel trang Nhân sự: sheet HỒ SƠ NHÂN SỰ (Quản lý, Nhân sự) và TÀI KHOẢN APP (chỉ Quản lý). Không có lương. */
-export async function exportStaff(rows: StaffRec[], accounts?: AccountRow[]) {
+export async function exportStaff(rows: StaffRec[] | null, accounts?: AccountRow[]) {
   const { Workbook } = await import("exceljs");
   const wb = new Workbook();
   const today = todayVN();
   const yellow = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFFFF2CC" } };
 
+  if (rows) {
   const ws = wb.addWorksheet("HỒ SƠ NHÂN SỰ");
   ws.addRow([`DANH SÁCH NHÂN SỰ NEXT VISION · NGÀY ${ddmmyyyy(today)}`]).font = { bold: true, size: 13 };
   ws.addRow(["CONFIDENTIAL: có ngày sinh và số CCCD (dữ liệu cá nhân theo Nghị định 13/2023). Chỉ dùng cho bộ phận Nhân sự."]).font = { italic: true, color: { argb: "FFC00000" } };
@@ -69,6 +70,7 @@ export async function exportStaff(rows: StaffRec[], accounts?: AccountRow[]) {
     if (!r.id_number) row.getCell(15).fill = yellow;
   });
   [6, 9, 26, 18, 16, 24, 13, 7, 12, 12, 14, 14, 12, 7, 15, 13].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+  }
 
   if (accounts) {
     const wa = wb.addWorksheet("TÀI KHOẢN APP");
@@ -98,7 +100,7 @@ export function useStaffRecs(enabled: boolean) {
 }
 
 /** Tab "Hồ sơ" trong trang Nhân sự */
-export function StaffRecordsPanel({ rows, err, reload }: { rows: StaffRec[] | null; err: string; reload: () => Promise<void> }) {
+export function StaffRecordsPanel({ rows, err, reload, canEdit = true }: { rows: StaffRec[] | null; err: string; reload: () => Promise<void>; canEdit?: boolean }) {
   const { toast } = useSession();
   const [q, setQ] = useState("");
   const [onlyMissing, setOnlyMissing] = useState(false);
@@ -146,7 +148,7 @@ export function StaffRecordsPanel({ rows, err, reload }: { rows: StaffRec[] | nu
                   <div className="grow">
                     <div className="name">{r.staff_code ? <span className="staff-code">{r.staff_code}</span> : null}{r.full_name ?? "(chưa có tên)"}</div>
                     <div className="sub">{[r.job_title, STATUS_LABEL[r.status], r.phone].filter(Boolean).join(" · ")}</div>
-                    <div className="sub" style={missing(r) ? { color: "var(--soon)" } : undefined}>
+                    <div className="sub" style={missing(r) ? { color: "var(--late)" } : undefined}>
                       {[!r.staff_code && "Thiếu mã NV",
                         r.birth_date ? `${ddmmyyyy(r.birth_date)}${a != null ? ` · ${a} tuổi` : ""}` : "Thiếu ngày sinh",
                         r.id_number ? `CCCD ${maskId(r.id_number)}` : "Thiếu CCCD"].filter(Boolean).join(" · ")}
@@ -159,12 +161,12 @@ export function StaffRecordsPanel({ rows, err, reload }: { rows: StaffRec[] | nu
           </div>
         </section>
       ))}
-      <PersonalSheet rec={editing} nextCode={nextCode} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); toast("Đã lưu hồ sơ"); }} />
+      <PersonalSheet rec={editing} nextCode={nextCode} readOnly={!canEdit} onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await reload(); toast("Đã lưu hồ sơ"); }} />
     </>
   );
 }
 
-function PersonalSheet({ rec, nextCode, onClose, onSaved }: { rec: StaffRec | null; nextCode: string; onClose: () => void; onSaved: () => void }) {
+function PersonalSheet({ rec, nextCode, readOnly, onClose, onSaved }: { rec: StaffRec | null; nextCode: string; readOnly: boolean; onClose: () => void; onSaved: () => void }) {
   const [code, setCode] = useState("");
   const [birth, setBirth] = useState("");
   const [idn, setIdn] = useState("");
@@ -193,6 +195,8 @@ function PersonalSheet({ rec, nextCode, onClose, onSaved }: { rec: StaffRec | nu
     <Sheet open={!!rec} onClose={onClose} title={rec?.full_name ?? "Hồ sơ nhân sự"}>
       {rec && (
         <form className="stack" onSubmit={submit}>
+          {readOnly ? <p className="muted" style={{ margin: 0 }}>Bạn chỉ có quyền xem hồ sơ nhân sự.</p> : null}
+          <fieldset disabled={readOnly} className="stack" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <div className="muted" style={{ fontSize: 13.5 }}>
             {[rec.job_title, rec.department, rec.team, STATUS_LABEL[rec.status]].filter(Boolean).join(" · ")}
             {rec.trial_end ? ` · hết thử việc ${ddmmyyyy(rec.trial_end)}` : ""}
@@ -216,6 +220,7 @@ function PersonalSheet({ rec, nextCode, onClose, onSaved }: { rec: StaffRec | nu
           {rec.personal_updated_at && <small className="muted">Cập nhật lần cuối {ddmmyyyy(rec.personal_updated_at.slice(0, 10))}</small>}
           {err && <div style={{ color: "var(--danger)", fontSize: 14 }}>{err}</div>}
           <button className="btn block" disabled={saving || idBad || codeBad}>{saving ? "Đang lưu…" : "Lưu"}</button>
+          </fieldset>
         </form>
       )}
     </Sheet>

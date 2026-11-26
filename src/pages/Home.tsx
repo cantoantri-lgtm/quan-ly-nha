@@ -21,7 +21,8 @@ type TaskLite = { id: string; title: string; due_date: string | null; assignee_i
 
 /** Trang chủ: danh sách phiếu chờ tôi duyệt (bảng) + Bàn làm việc + lịch */
 export default function Home() {
-  const { profile, people, unread, isManager, isLeadUp, isAccountant } = useSession();
+  const { profile, people, unread, isManager, isAccountant, can } = useSession();
+  const isLeadUp = can("bao_cao");
   const who = useMemo(() => ({ isManager, isLeadUp, isAccountant }), [isManager, isLeadUp, isAccountant]);
   const [saved, setSaved] = useState<string[] | null | undefined>(undefined);   // undefined = đang tải, null = chưa tuỳ chỉnh
   const [custom, setCustom] = useState(false);

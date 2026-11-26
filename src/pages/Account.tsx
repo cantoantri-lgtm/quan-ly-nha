@@ -6,7 +6,7 @@ import { Avatar, TopBar } from "../components/ui";
 import ChangePassword from "./ChangePassword";
 
 export default function Account() {
-  const { profile, buildings, isManager, isCollaborator, isCustomer } = useSession();
+  const { profile, buildings, isManager, isCollaborator, isCustomer, permGroupName, isPermSuper } = useSession();
   if (!profile) return null;
   return (
     <>
@@ -17,6 +17,7 @@ export default function Account() {
           <div className="grow">
             <div className="name">{profile.full_name}</div>
             <div className="sub">{profile.phone} · {ROLE_LABEL[profile.role]}</div>
+            {permGroupName ? <div className="sub">Nhóm quyền: {isPermSuper ? "Toàn quyền" : permGroupName}</div> : null}
           </div>
         </section>
         {isCollaborator || isCustomer ? null : <div className="section-title">Toà nhà phụ trách</div>}

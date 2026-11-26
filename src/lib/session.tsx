@@ -35,9 +35,22 @@ type Ctx = {
   isAccountant: boolean;
   /** Nhân viên phụ trách nhân sự (xác nhận ngày công tác) */
   isHr: boolean;
-  /** Người được cài đặt luồng phê duyệt (anh Trí). CSDL chặn thật trong approval_flow_save */
+  /** Được sửa luồng phê duyệt (bảng phân quyền, chức năng luong_duyet mức Sửa). CSDL chặn thật trong approval_flow_save */
   isFlowAdmin: boolean;
+  /** Bảng phân quyền (105): mức quyền của tôi theo từng chức năng, 0 Không, 1 Xem, 2 Sửa */
+  perms: Record<string, number>;
+  /** Có quyền chức năng ở mức tối thiểu (mặc định Xem). Chỉ để ẩn/hiện, CSDL chặn thật */
+  can: (feature: PermFeature, level?: 1 | 2) => boolean;
+  permGroup: string | null;
+  permGroupName: string | null;
+  /** Anh Trí hoặc nhóm Admin: mở trang Phân quyền */
+  isPermEditor: boolean;
+  isPermSuper: boolean;
 };
+
+export type PermFeature = "so_do" | "luong" | "ho_so_ns" | "tai_khoan" | "bao_cao" | "bao_cao_ai" | "hd_gtgt" | "tk_nhan_tien" | "website" | "luong_duyet";
+type MyPerms = { group: string | null; group_name?: string | null; perms: Record<string, number>; editor: boolean; super: boolean };
+const NO_PERMS: MyPerms = { group: null, group_name: null, perms: {}, editor: false, super: false };
 
 const SessionContext = createContext<Ctx | null>(null);
 
@@ -51,7 +64,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0);
   const [pendingApprovals, setPending] = useState(0);
   const [myStaff, setMyStaff] = useState<Staff | null>(null);
-  const [flowAdmin, setFlowAdmin] = useState(false);
+  const [mp, setMp] = useState<MyPerms>(NO_PERMS);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<number>();
   const userRef = useRef<string | null>(null);   // người đang đăng nhập đã tải dữ liệu nền
@@ -78,9 +91,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       supabase.from("profiles").select("id,full_name,phone,role,is_active,annual_leave_days").order("full_name"),
       supabase.from("building_members").select("building_id").eq("user_id", uid),
       supabase.from("org_staff").select("*").eq("profile_id", uid).maybeSingle(),
-      supabase.rpc("is_flow_admin"),
+      supabase.rpc("my_perms"),
     ]);
-    setFlowAdmin(fa.data === true);
+    setMp((fa.data as MyPerms | null) ?? NO_PERMS);
     setMyStaff((st.data as Staff) ?? null);
     setProfile((p.data as Profile) ?? null);
     setBuildings((b.data as Building[]) ?? []);
@@ -108,7 +121,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       if (event === "SIGNED_OUT") {
         userRef.current = null;
-        setProfile(null); setBuildings([]); setPeople([]); setMyBuildingIds([]); setUnread(0); setPending(0);
+        setProfile(null); setBuildings([]); setPeople([]); setMyBuildingIds([]); setUnread(0); setPending(0); setMp(NO_PERMS);
       }
     });
     return () => sub.subscription.unsubscribe();
@@ -135,6 +148,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session?.user?.id, profile?.is_active, refreshUnread, toast]);
 
   const people = useMemo(() => allPeople.filter((x) => x.role !== "cong_tac_vien" && x.role !== "khach_hang"), [allPeople]);
+  const can = useCallback((f: PermFeature, level: 1 | 2 = 1) => (mp.perms?.[f] ?? 0) >= level, [mp]);
   const value = useMemo<Ctx>(() => ({
     session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg,
     isManager: profile?.role === "quan_ly",
@@ -146,8 +160,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     isLeadUp: profile?.role === "quan_ly" || profile?.role === "giam_sat" || (!!myStaff && profile?.role === "nhan_vien" && (myStaff.is_leader || (myStaff.level ?? 0) >= 2)),
     isAccountant: myStaff?.duty === "ke_toan",
     isHr: myStaff?.duty === "nhan_su",
-    isFlowAdmin: flowAdmin,
-  }), [session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff, flowAdmin]);
+    isFlowAdmin: (mp.perms?.luong_duyet ?? 0) >= 2,
+    perms: mp.perms ?? {},
+    can,
+    permGroup: mp.group,
+    permGroupName: mp.group_name ?? null,
+    isPermEditor: mp.editor,
+    isPermSuper: mp.super,
+  }), [session, profile, buildings, people, allPeople, myBuildingIds, loading, unread, pendingApprovals, refreshUnread, reloadBase, toast, toastMsg, myStaff, mp, can]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

@@ -12,12 +12,15 @@ function credText(name: string, phone: string, pw: string) {
   return `Chào ${name}, tài khoản Next Living của bạn:\n• Vào: ${APP_URL}\n• Số điện thoại: ${phone}\n• Mật khẩu tạm: ${pw}\nLần đầu đăng nhập app sẽ yêu cầu đổi mật khẩu.`;
 }
 
-/** Trang Nhân sự: tab Hồ sơ và tab Tài khoản app (Quản lý; Nhân sự chỉ sửa tài khoản Nhân viên, Giám sát, CSDL kiểm tra) */
+/** Trang Nhân sự theo bảng phân quyền: tab Hồ sơ (ho_so_ns) và tab Tài khoản app (tai_khoan). CSDL và Edge Function kiểm tra thật */
 export default function Staff() {
-  const { allPeople: people, buildings, reloadBase, toast, profile, isManager, isHr } = useSession();
-  const canAccounts = isManager || isHr;
-  const [tab, setTab] = useState<"ho_so" | "tai_khoan">("ho_so");
-  const recs = useStaffRecs(true);
+  const { allPeople: people, buildings, reloadBase, toast, profile, can } = useSession();
+  const canRecords = can("ho_so_ns");
+  const canAccounts = can("tai_khoan");
+  const canAccountsEdit = can("tai_khoan", 2);
+  const [tabSel, setTab] = useState<"ho_so" | "tai_khoan">("ho_so");
+  const tab = !canRecords ? "tai_khoan" : !canAccounts ? "ho_so" : tabSel;
+  const recs = useStaffRecs(canRecords);
   const codeOf = useMemo(() => Object.fromEntries((recs.rows ?? []).filter((r) => r.profile_id && r.staff_code).map((r) => [r.profile_id!, r.staff_code!])), [recs.rows]);
   const [exporting, setExporting] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
@@ -46,7 +49,7 @@ export default function Staff() {
   const doExport = async () => {
     setExporting(true);
     try {
-      await exportStaff(recs.rows ?? [], canAccounts ? people.map((p) => ({
+      await exportStaff(canRecords ? recs.rows ?? [] : null, canAccounts ? people.map((p) => ({
         code: codeOf[p.id] ?? "", name: p.full_name, phone: p.phone ?? "", role: roleName(p.role),
         buildings: p.role === "quan_ly" ? "Tất cả toà" : members.filter((m) => m.user_id === p.id).map((m) => bCode[m.building_id]).filter(Boolean).join(", "),
         leave: p.annual_leave_days == null ? null : Number(p.annual_leave_days), active: p.is_active,
@@ -59,16 +62,16 @@ export default function Staff() {
       <TopBar title="Nhân sự"
         action={<div className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
           <button className="tb-action" disabled={exporting || recs.rows === null} onClick={doExport}>{exporting ? "Đang xuất…" : "Tải Excel"}</button>
-          {canAccounts && tab === "tai_khoan" ? <button className="tb-action" onClick={() => setCreating(true)}>+ Thêm</button> : null}
+          {canAccountsEdit && tab === "tai_khoan" ? <button className="tb-action" onClick={() => setCreating(true)}>+ Thêm</button> : null}
         </div>} />
       <main className="main stack">
-        {canAccounts ? (
+        {canAccounts && canRecords ? (
           <div className="tabs" role="tablist">
             <button role="tab" aria-selected={tab === "ho_so"} onClick={() => setTab("ho_so")}>Hồ sơ nhân sự</button>
             <button role="tab" aria-selected={tab === "tai_khoan"} onClick={() => setTab("tai_khoan")}>Tài khoản app</button>
           </div>
         ) : null}
-        {tab === "ho_so" || !canAccounts ? <StaffRecordsPanel rows={recs.rows} err={recs.err} reload={recs.load} /> : <>
+        {tab === "ho_so" ? <StaffRecordsPanel rows={recs.rows} err={recs.err} reload={recs.load} canEdit={can("ho_so_ns", 2)} /> : <>
         <input id="staff-search" className="input" placeholder="Tìm theo mã NV, tên hoặc số điện thoại" value={q} onChange={(e) => setQ(e.target.value)} />
         <div className="chips">
           {([["", "Tất cả"], ["quan_ly", "Quản lý"], ["giam_sat", "Giám sát"], ["nhan_vien", "Nhân viên"]] as ["" | Role, string][]).map(([k, l]) => (
@@ -194,10 +197,10 @@ function CreateSheet({ open, onClose, onDone }: { open: boolean; onClose: () => 
 function EditSheet({ person, members, onClose, onChanged, onCred }: {
   person: Profile; members: Member[]; onClose: () => void; onChanged: () => Promise<void>; onCred: (t: string) => void;
 }) {
-  const { toast, profile, isManager } = useSession();
+  const { toast, profile, isManager, can } = useSession();
   const isSelf = person.id === profile?.id;
   // Nhân sự chỉ sửa tài khoản Nhân viên, Giám sát của người khác (CSDL và Edge Function chặn giống vậy)
-  const locked = !isManager && (isSelf || (person.role !== "nhan_vien" && person.role !== "giam_sat"));
+  const locked = !can("tai_khoan", 2) || (!isManager && (isSelf || (person.role !== "nhan_vien" && person.role !== "giam_sat")));
   const [name, setName] = useState(person.full_name);
   const [role, setRole] = useState<Role>(person.role);
   const [bIds, setBIds] = useState<string[]>(members.filter((m) => m.user_id === person.id).map((m) => m.building_id));
@@ -264,7 +267,7 @@ function EditSheet({ person, members, onClose, onChanged, onCred }: {
 
   return (
     <Sheet open onClose={onClose} title={person.full_name}>
-      {locked ? <p className="muted" style={{ marginTop: 0 }}>{isSelf ? "Tài khoản của bạn: nhờ Quản lý sửa vai trò, phép năm, khoá tài khoản." : "Tài khoản Quản lý chỉ Quản lý được sửa."}</p> : null}
+      {locked ? <p className="muted" style={{ marginTop: 0 }}>{!can("tai_khoan", 2) ? "Bạn chỉ có quyền xem tài khoản." : isSelf ? "Tài khoản của bạn: nhờ Quản lý sửa vai trò, phép năm, khoá tài khoản." : "Tài khoản Quản lý chỉ người có vai trò Quản lý sửa."}</p> : null}
       <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <form className="stack" onSubmit={save}>
         <label className="field"><span>Họ tên</span>

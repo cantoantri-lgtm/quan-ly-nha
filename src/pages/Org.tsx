@@ -27,10 +27,12 @@ const rowOf = (s: Staff) => ({
 });
 
 export default function Org() {
-  const { myStaff, people, toast, isFlowAdmin } = useSession();
-  const level = myStaff?.level ?? 0;
-  const canSee = level >= 3;
-  const canEdit = level >= 4;
+  const { myStaff, people, toast, isFlowAdmin, can } = useSession();
+  // Bảng phân quyền: Sơ đồ công ty (so_do) và Bảng lương (luong) tách riêng. CSDL chặn thật (RLS)
+  const canSee = can("so_do");
+  const canEdit = can("so_do", 2);
+  const canPay = can("luong");
+  const canPayEdit = can("luong", 2);
   const [base, setBase] = useState<{ depts: Dept[]; staff: Staff[]; pay: Pay[] }>({ depts: [], staff: [], pay: [] });
   const [depts, setDepts] = useState<Dept[]>([]);   // bản đang sửa (chưa lưu)
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -127,7 +129,7 @@ export default function Org() {
       sort: old?.sort ?? (Math.max(0, ...staff.map((x) => x.sort)) + 1),
     };
     setStaff(old ? staff.map((s) => (s.id === id ? row : s)) : [...staff, row]);
-    if (level >= 4) {
+    if (canPayEdit) {
       const others = pay.filter((x) => x.staff_id !== id);
       setPay(sal != null ? [...others, { staff_id: id, base_salary: sal, note: pay.find((x) => x.staff_id === id)?.note ?? null }] : others);
     }
@@ -159,7 +161,7 @@ export default function Org() {
         if (r.error) return fail(r.error);
       }
     }
-    if (level >= 4) {
+    if (canPayEdit) {
       for (const p of pay) {
         const o = base.pay.find((x) => x.staff_id === p.staff_id);
         if (o && o.base_salary === p.base_salary) continue;
@@ -189,7 +191,7 @@ export default function Org() {
       <>
         <TopBar title="Sơ đồ công ty" back />
         <main className="main stack">
-          <Empty title="Chỉ cấp Trưởng phòng trở lên xem được sơ đồ công ty">Bạn vẫn xem được vị trí và mức lương cơ bản của chính mình ở dưới.</Empty>
+          <Empty title="Bạn chưa được quyền xem sơ đồ công ty">Bạn vẫn xem được vị trí và mức lương cơ bản của chính mình ở dưới.</Empty>
           {myStaff ? (
             <dl className="card kv">
               <dt>Vị trí</dt><dd>{myStaff.position}</dd>
@@ -341,7 +343,7 @@ export default function Org() {
             <ul className="org-list">{unplaced.map((m) => <PersonCard key={m.id} s={m} />)}</ul></section>
         ) : null}
 
-        {pay.length ? (
+        {canPay && pay.length ? (
           <>
             <h2 className="dn-h dn-h-out">Lương cơ bản hiện tại</h2>
             <div className="card dn-grid">
@@ -355,11 +357,11 @@ export default function Org() {
                 </tbody>
               </table>
             </div>
-            <p className="muted small" style={{ margin: 0 }}>Chỉ Phó Giám đốc xem được bảng này. Lương Phó Giám đốc theo thỏa thuận riêng, không đưa vào.</p>
+            <p className="muted small" style={{ margin: 0 }}>Chỉ nhóm có quyền Bảng lương xem được bảng này. Lương Phó Giám đốc theo thỏa thuận riêng, không đưa vào.</p>
           </>
         ) : null}
 
-        {scale.length ? (
+        {canPay && scale.length ? (
           <>
             <h2 className="dn-h dn-h-out">Thang lương cơ bản theo cấp bậc</h2>
             <div className="card dn-grid">
@@ -430,7 +432,7 @@ export default function Org() {
               <label className="field"><span>Nhiệm vụ duyệt cấp công ty</span>
                 <select className="input" value={edit.duty} onChange={(e) => setEdit({ ...edit, duty: e.target.value })}>
                   <option value="">Không</option>{Object.entries(DUTY_NAME).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-              {level >= 4 ? (
+              {canPayEdit ? (
                 <label className="field"><span>Lương cơ bản</span>
                   <input className="input num" inputMode="decimal" value={edit.salary} onChange={(e) => setEdit({ ...edit, salary: e.target.value })} placeholder="VD: 8.500.000 hoặc 8tr5" /></label>
               ) : null}

@@ -174,7 +174,7 @@ export type AppItem = { to: string; label: string; icon: JSX.Element; n?: number
 
 /** Nhóm chức năng theo vai trò: dùng cho bảng Apps (điện thoại) và thanh menu xổ xuống (PC). Quyền thật vẫn chặn ở CSDL. */
 export function useMenuGroups(): { title: string; menu: string; items: AppItem[] }[] {
-  const { unread, pendingApprovals, isManager, isApprover, isLeadUp, isCollaborator, isCustomer, isAccountant, isFlowAdmin, isHr } = useSession();
+  const { unread, pendingApprovals, isManager, isApprover, isCollaborator, isCustomer, isFlowAdmin, can, isPermEditor } = useSession();
   const apps: AppItem[] = isCustomer ? [
     { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
     { to: "/ban-do", label: "Bản đồ toà nhà", icon: Icon.map },
@@ -191,13 +191,14 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
   // Nhân viên: gom theo nhóm. Quyền hiện / ẩn giữ như cũ (CSDL vẫn là nơi chặn quyền thật).
   return isCustomer || isCollaborator ? [{ title: "", menu: "Chức năng", items: apps }] : [
     { title: "Quản trị", menu: "Quản trị", items: [
-      ...(isManager || isHr ? [{ to: "/nhan-su", label: "Nhân sự", icon: Icon.user }] : []),
-      ...(isManager || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
-      ...(isLeadUp || isAccountant ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
-      ...(isManager ? [{ to: "/bao-cao-ai", label: "Báo cáo AI", icon: Icon.spark }] : []),
+      ...(can("ho_so_ns") || can("tai_khoan") ? [{ to: "/nhan-su", label: "Nhân sự", icon: Icon.user }] : []),
+      ...(can("so_do") || isApprover ? [{ to: "/to-chuc", label: "Sơ đồ công ty", icon: Icon.org }] : []),
+      ...(can("bao_cao") ? [{ to: "/bao-cao", label: "Báo cáo", icon: Icon.chart }] : []),
+      ...(can("bao_cao_ai") ? [{ to: "/bao-cao-ai", label: "Báo cáo AI", icon: Icon.spark }] : []),
       ...(isManager ? [{ to: "/quan-tri", label: "Tổng quan quản trị", icon: Icon.gear }] : []),
-      ...(isManager || isHr ? [{ to: "/cai-dat-website", label: "Cài đặt website", icon: Icon.map }] : []),
+      ...(can("website") ? [{ to: "/cai-dat-website", label: "Cài đặt website", icon: Icon.map }] : []),
       ...(isFlowAdmin ? [{ to: "/van-phong/luong-duyet", label: "Luồng phê duyệt", icon: Icon.org }] : []),
+      ...(isPermEditor ? [{ to: "/phan-quyen", label: "Phân quyền", icon: Icon.gear }] : []),
     ] },
     { title: "Quản lý toà nhà", menu: "Toà nhà & khách", items: [
       { to: "/ban-do", label: "Bản đồ", icon: Icon.map },
@@ -206,8 +207,8 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
       { to: "/lich-xem-phong", label: "Lịch hẹn xem phòng", icon: Icon.tasks },
       { to: "/phong", label: "Website phòng trống", icon: Icon.map },
       { to: "/thu-chi-toa", label: "Thu & chi toà nhà", icon: Icon.money },
-      ...(isManager ? [{ to: "/quan-tri/thu-tien", label: "Tài khoản nhận tiền", icon: Icon.money }] : []),
-      ...(isManager || isAccountant ? [{ to: "/hoa-don-gtgt", label: "Hoá đơn GTGT", icon: Icon.money }] : []),
+      ...(can("tk_nhan_tien") ? [{ to: "/tai-khoan-nhan-tien", label: "Tài khoản nhận tiền", icon: Icon.money }] : []),
+      ...(can("hd_gtgt") ? [{ to: "/hoa-don-gtgt", label: "Hoá đơn GTGT", icon: Icon.money }] : []),
       { to: "/phan-anh", label: "Phản ánh", icon: Icon.help },
       { to: "/khach-hang", label: "Khách hàng", icon: Icon.user },
     ] },

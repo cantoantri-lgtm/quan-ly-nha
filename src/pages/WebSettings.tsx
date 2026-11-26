@@ -58,7 +58,8 @@ const BLOCKS: { k: "show_features" | "show_buildings" | "show_app" | "show_brand
 type RoomLite = { id: string; code: string; building_id: string; floor: number | null };
 
 export default function WebSettings() {
-  const { buildings, toast } = useSession();
+  const { buildings, toast, can } = useSession();
+  const canSave = can("website", 2);
   const [saved, setSaved] = useState<WebConfig | null>(null);
   const [cfg, setCfg] = useState<WebConfig>({});
   const [meta, setMeta] = useState<{ at: string | null; by: string | null }>({ at: null, by: null });
@@ -185,7 +186,7 @@ export default function WebSettings() {
           {dirty ? <span className="ws-dirty">Có thay đổi chưa lưu</span> : null}
         </div>
         <div className="toolbar ribbon" role="toolbar" aria-label="Thao tác">
-          <button type="button" className="rb rb-main" disabled={!dirty || busy} onClick={save}>{Icon.check}{busy ? "Đang lưu…" : "Lưu"}</button>
+          <button type="button" className="rb rb-main" disabled={!dirty || busy || !canSave} title={canSave ? undefined : "Bạn chỉ có quyền xem"} onClick={save}>{Icon.check}{busy ? "Đang lưu…" : "Lưu"}</button>
           <button type="button" className="rb" disabled={!dirty || busy} onClick={() => setCfg(saved)}>{Icon.undo}Bỏ thay đổi</button>
           <span className="rb-sep" aria-hidden="true" />
           <a className="rb" href="/phong" target="_blank" rel="noopener">{Icon.eye}Mở website</a>

@@ -63,6 +63,7 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount, l
   /** Nhân viên phụ trách toà: không đổi mã toà, loại hình (khớp tg_buildings_guard) */
   limited?: boolean;
 }) {
+  const canBank = useSession().can("tk_nhan_tien", 2);
   const [code, setCode] = useState(value.code ?? "");
   const [name, setName] = useState(value.name ?? "");
   const [address, setAddress] = useState(value.address ?? "");
@@ -193,7 +194,7 @@ export function BuildingSheet({ value, onClose, onSaved, onDeleted, roomCount, l
           ) : <button type="button" className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setDelOpen(true)}>Xoá toà nhà</button>
         ) : null}
       </form>
-      {value.id && onDeleted ? <BuildingBank buildingId={value.id} /> : null}
+      {value.id && onDeleted && canBank ? <BuildingBank buildingId={value.id} /> : null}
     </Sheet>
   );
 }

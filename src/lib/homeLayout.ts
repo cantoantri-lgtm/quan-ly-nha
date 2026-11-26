@@ -6,7 +6,8 @@ type Who = { isManager: boolean; isLeadUp: boolean; isAccountant: boolean };
 export type WidgetDef = { key: WidgetKey; title: string; desc: string; need: (w: Who) => boolean };
 
 const all = () => true;
-const lead = (w: Who) => w.isLeadUp || w.isManager || w.isAccountant;
+// isLeadUp ở đây = có quyền Báo cáo trong bảng phân quyền (số liệu do report_* kiểm quyền)
+const lead = (w: Who) => w.isLeadUp;
 export const WIDGETS: WidgetDef[] = [
   { key: "duyet", title: "Chờ bạn duyệt", desc: "Phiếu đến lượt bạn duyệt hoặc chi tiền", need: all },
   { key: "viec", title: "Việc cần làm", desc: "Việc chưa xong, trễ hạn và sắp đến hạn", need: all },
@@ -15,7 +16,7 @@ export const WIDGETS: WidgetDef[] = [
   { key: "hop_dong", title: "Hợp đồng & CCCD", desc: "Phòng chưa có hợp đồng, thiếu CCCD, hợp đồng sắp hết hạn", need: all },
   { key: "lap_day", title: "Lấp đầy hôm nay", desc: "Tỉ lệ phòng đang ở theo toà", need: lead },
   { key: "thu_chi", title: "Thu chi tháng này", desc: "Tiền đã thu từ đầu tháng theo toà", need: lead },
-  { key: "phan_anh", title: "Phản ánh tháng này", desc: "Phản ánh của khách chưa trả lời, chưa đóng", need: (w) => w.isLeadUp || w.isManager },
+  { key: "phan_anh", title: "Phản ánh tháng này", desc: "Phản ánh của khách chưa trả lời, chưa đóng", need: lead },
 ];
 
 export function defaultLayout(w: Who): WidgetKey[] {

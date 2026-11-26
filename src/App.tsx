@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import { useSession } from "./lib/session";
+import { useSession, type PermFeature } from "./lib/session";
 import { signOutHere } from "./lib/supabase";
 import { AppHeader, BottomNav, Toast } from "./components/ui";
 import { OpenTabs, StatusBar } from "./components/DesktopShell";
@@ -27,6 +27,7 @@ import RequestDetail from "./pages/RequestDetail";
 import RequestPrint from "./pages/RequestPrint";
 import TripPrint from "./pages/TripPrint";
 import FlowSettings from "./pages/FlowSettings";
+import PermSettings from "./pages/PermSettings";
 import { KeepAliveOutlet } from "./components/KeepAlive";
 import Projects from "./pages/Projects";
 import ProjectForm from "./pages/ProjectForm";
@@ -78,20 +79,20 @@ function AssignerOnly() {
   return isManager || isSupervisor ? <Outlet /> : <Navigate to="/" replace />;
 }
 
-function MoneyOnly() {
-  const { isManager, isAccountant } = useSession();
-  return isManager || isAccountant ? <Outlet /> : <Navigate to="/" replace />;
+/** Chặn trang theo bảng phân quyền (chỉ ẩn/hiện; CSDL chặn thật) */
+function Perm({ f, any }: { f?: PermFeature; any?: PermFeature[] }) {
+  const { can } = useSession();
+  const ok = f ? can(f) : (any ?? []).some((x) => can(x));
+  return ok ? <Outlet /> : <Navigate to="/" replace />;
 }
 
-function LeadOnly() {
-  const { isLeadUp, isAccountant } = useSession();
-  return isLeadUp || isAccountant ? <Outlet /> : <Navigate to="/" replace />;
+function PermEditorOnly() {
+  const { isPermEditor } = useSession();
+  return isPermEditor ? <Outlet /> : <Navigate to="/" replace />;
 }
 
-function HrOnly() {
-  const { isManager, isHr } = useSession();
-  return isManager || isHr ? <Outlet /> : <Navigate to="/" replace />;
-}
+
+
 
 function ManagerOnly() {
   const { isManager } = useSession();
@@ -196,18 +197,26 @@ export default function App() {
         <Route path="van-phong/:id/in" element={<RequestPrint />} />
         <Route path="van-phong/:id/in-cong-tac/:mau" element={<TripPrint />} />
         <Route path="to-chuc" element={<Org />} />
-        <Route element={<LeadOnly />}>
+        <Route element={<Perm f="bao_cao" />}>
           <Route path="bao-cao" element={<Reports />} />
         </Route>
-        <Route element={<ManagerOnly />}>
+        <Route element={<Perm f="bao_cao_ai" />}>
           <Route path="bao-cao-ai" element={<AiReport />} />
         </Route>
-        <Route element={<HrOnly />}>
+        <Route element={<Perm any={["ho_so_ns", "tai_khoan"]} />}>
           <Route path="nhan-su" element={<Staff />} />
+        </Route>
+        <Route element={<Perm f="website" />}>
           <Route path="cai-dat-website" element={<WebSettings />} />
         </Route>
-        <Route element={<MoneyOnly />}>
+        <Route element={<Perm f="hd_gtgt" />}>
           <Route path="hoa-don-gtgt" element={<VatDaily />} />
+        </Route>
+        <Route element={<Perm f="tk_nhan_tien" />}>
+          <Route path="tai-khoan-nhan-tien" element={<PaymentSettingsPage />} />
+        </Route>
+        <Route element={<PermEditorOnly />}>
+          <Route path="phan-quyen" element={<PermSettings />} />
         </Route>
         <Route path="toa-nha" element={<Buildings />} />
         <Route path="khach-hang" element={<Customers />} />
@@ -223,7 +232,7 @@ export default function App() {
           <Route index element={<AdminHome />} />
           <Route path="nhan-su" element={<Navigate to="/nhan-su" replace />} />
           <Route path="toa-nha" element={<Buildings />} />
-          <Route path="thu-tien" element={<PaymentSettingsPage />} />
+          <Route path="thu-tien" element={<Navigate to="/tai-khoan-nhan-tien" replace />} />
           <Route path="website" element={<Navigate to="/cai-dat-website" replace />} />
         </Route>
         <Route path="ho-so-nhan-su" element={<Navigate to="/nhan-su" replace />} />

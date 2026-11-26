@@ -202,7 +202,7 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 .due { font-size: 13px; font-weight: 600; color: var(--muted); }
 .due.late { color: var(--late); }
 .due.today { color: var(--today); }
-.due.soon { color: var(--soon); }
+.due.soon { color: var(--late); }
 .prio { font-size: 12px; font-weight: 700; color: var(--danger); }
 
 /* ---------- Danh sách việc ---------- */
@@ -347,3 +347,16 @@ textarea.input { min-height: 84px; resize: vertical; line-height: 1.45; }
 
 /* Mã nhân viên trước tên (trang Nhân sự) */
 .staff-code { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 6px; background: var(--brand-soft); color: var(--brand); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; vertical-align: 1px; }
+
+/* Trang Phân quyền */
+.perm-row { align-items: flex-start; }
+.perm-row .sub { white-space: normal; overflow: visible; text-overflow: clip; }
+.perm-pick { width: 100px; flex: none; }
+.perm-table { overflow-x: auto; }
+.perm-table th, .perm-table td { white-space: nowrap; }
+.perm-table td:first-child, .perm-table th:first-child { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.perm-table .c { text-align: center; }
+.perm-l0 { color: var(--muted); }
+.perm-l1 { color: var(--ink); background: var(--brand-soft); }
+.perm-l2 { color: var(--brand); font-weight: 700; }
+.tag.perm-l2 { border-color: var(--brand-line); }
