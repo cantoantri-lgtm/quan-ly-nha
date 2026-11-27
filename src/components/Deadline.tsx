@@ -104,7 +104,7 @@ function DlCard({ r, onChanged, showItem }: { r: DlReq; onChanged: () => void; s
   return (
     <article className={`dl-card ${r.status}`}>
       <header>
-        <b>Xin gia hạn {what}{showItem && r.item_name ? `: ${r.item_name}` : ""}</b>
+        <b>Xin gia hạn {r.target === "task" && r.item_name ? "hạng mục" : what}{(showItem || r.target === "task") && r.item_name ? `: ${r.item_name}` : ""}</b>
         <span className={`dl-chip ${r.status}`}>{DL_STATUS[r.status]}</span>
       </header>
       <p className="dl-dates num">
@@ -113,8 +113,9 @@ function DlCard({ r, onChanged, showItem }: { r: DlReq; onChanged: () => void; s
         <span className="muted"> · {r.requester ?? "?"}, {timeAgo(r.created_at)}</span>
       </p>
       <dl className="dl-kv">
-        <dt>Vướng mắc</dt><dd>{r.report}</dd>
-        <dt>Phương án</dt><dd>{r.plan}</dd>
+        <dt>{r.target === "task" ? "Vấn đề" : "Vướng mắc"}</dt><dd>{r.report}</dd>
+        {r.cause ? (<><dt>Nguyên nhân</dt><dd>{r.cause}</dd></>) : null}
+        <dt>{r.target === "task" ? "Giải pháp" : "Phương án"}</dt><dd>{r.plan}</dd>
         {r.status !== "cho_duyet" && r.status !== "da_huy" ? (<>
           <dt>{r.status === "da_duyet" ? "Đã duyệt" : "Không duyệt"}</dt>
           <dd>{r.decider ?? ""}{r.approved_due && r.approved_due !== r.new_due ? ` · hạn duyệt ${ddmmyyyy(r.approved_due)}` : ""}{r.decision_note ? ` · ${r.decision_note}` : ""}</dd>

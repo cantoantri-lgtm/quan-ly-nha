@@ -7,6 +7,7 @@ import { daysBetween, ddmm, dueInfo, dueLevel, todayVN } from "../lib/dates";
 import { Empty, Icon, TopBar } from "../components/ui";
 import "../projects.css";
 import "../deadline.css";
+import "../taskwork.css";
 
 type Row = Task & { assignee: { full_name: string } | null; creator: { full_name: string } | null; building: { code: string } | null; members: { user_id: string }[] | null };
 type Tab = "mine" | "given" | "all";
@@ -56,8 +57,14 @@ export default function Tasks() {
     const all = [...(open.data as Row[]), ...(done.data as Row[])];
     setRows(all);
     const ids = all.map((r) => r.id);
-    const { data: dl } = await supabase.from("deadline_requests").select("task_id,new_due").eq("status", "cho_duyet").eq("target", "task");
-    setExt(Object.fromEntries(((dl ?? []) as { task_id: string; new_due: string }[]).map((x) => [x.task_id, x.new_due])));
+    // Đề xuất gia hạn đang chờ của việc hoặc của hạng mục trong việc
+    const { data: dl } = await supabase.from("deadline_requests").select("task_id,new_due, task:tasks(parent_id)").eq("status", "cho_duyet").eq("target", "task");
+    const ex: Record<string, string> = {};
+    ((dl ?? []) as unknown as { task_id: string; new_due: string; task: { parent_id: string | null } | null }[]).forEach((x) => {
+      const k = x.task?.parent_id ?? x.task_id;
+      if (!ex[k] || x.new_due > ex[k]) ex[k] = x.new_due;
+    });
+    setExt(ex);
     if (ids.length) {
       const { data } = await supabase.from("tasks").select("parent_id,status").in("parent_id", ids);
       const m: Record<string, { total: number; done: number }> = {};
@@ -148,9 +155,13 @@ export default function Tasks() {
                     {d ? <span className={`due ${d.tone}`}>{d.text}</span> : null}
                     {ext[r.id] && r.status !== "xong" ? <span className="dl-tag">xin gia hạn → {ddmm(ext[r.id])}</span> : null}
                     {r.priority === "cao" || r.priority === "gap" ? <span className="prio">{PRIORITY_LABEL[r.priority]}</span> : null}
-                    {s ? <span className="num">{s.done}/{s.total} bước</span> : null}
+                    {s ? <span className="num">{s.done}/{s.total} hạng mục</span> : null}
+                    {r.progress ? <span className="num">Đạt {r.progress}%</span> : null}
                   </div>
-                  {s && s.total > 0 ? <div className="progress" aria-hidden="true"><span style={{ width: `${(s.done / s.total) * 100}%` }} /></div> : null}
+                  {r.kpi ? <div className="muted small task-kpi">KPI: {r.kpi}</div> : null}
+                  {(r.progress ?? 0) > 0 || (s && s.total > 0) ? (
+                    <div className="progress" aria-hidden="true"><span style={{ width: `${r.progress || (s ? (s.done / s.total) * 100 : 0)}%` }} /></div>
+                  ) : null}
                 </Link>
               );
             })}

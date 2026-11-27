@@ -80,4 +80,10 @@ export type Task = {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Giao việc theo KPI (SQL 110): kết quả cần đạt, chỉ tiêu số (không bắt buộc), kết quả đã đạt, % tiến độ */
+  kpi?: string | null;
+  kpi_target?: number | null;
+  kpi_unit?: string | null;
+  kpi_actual?: number | null;
+  progress?: number;
 };

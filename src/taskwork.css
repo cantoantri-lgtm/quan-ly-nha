@@ -1,0 +1,52 @@
+/* Giao việc theo KPI, phản hồi tiến độ, hạng mục (SQL 110) */
+.tw-fs { border: 0; padding: 0; margin: 0; }
+.tw-fs legend { padding: 0; }
+.tw-checks { max-height: 200px; overflow-y: auto; }
+.tw-kpi { display: grid; gap: 8px; }
+.tw-kpi-num { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+
+.tw-prog { display: grid; gap: 4px; min-width: 0; }
+.tw-prog-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 14px; }
+.tw-prog.compact .tw-prog-head { font-size: 12.5px; }
+.tw-bar { height: 7px; }
+.tw-prog.compact .tw-bar { height: 5px; }
+.tw-bar.slow > span { background: var(--today); }
+.tw-bar.late > span { background: var(--late); }
+.tw-pace { font-size: 12.5px; font-weight: 600; border-radius: 999px; padding: 1px 8px; }
+.tw-pace.ok { color: var(--s-done); background: var(--s-done-bg); }
+.tw-pace.slow { color: var(--today); background: var(--today-bg); }
+.tw-pace.late { color: var(--late); background: var(--late-bg); }
+.tw-pace.done { color: var(--s-done); background: var(--s-done-bg); }
+
+.tw-fb { padding: 14px; }
+.tw-fb-kpi { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+.tw-toggle { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14.5px; cursor: pointer; }
+.tw-toggle input { width: 20px; height: 20px; margin: 0; accent-color: var(--brand); flex: none; }
+.tw-issue { padding: 10px 12px; border-left: 3px solid var(--s-block); background: var(--s-block-bg); border-radius: 0 10px 10px 0; }
+
+.tw-up-prog { font-size: 13px; font-weight: 600; color: var(--s-doing); }
+.tw-up-issue { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 2px 10px; margin: 4px 0 0; font-size: 13.5px;
+  padding: 8px 10px; border-radius: 8px; background: var(--s-block-bg); }
+.tw-up-issue dt { color: var(--s-block); font-weight: 600; }
+.tw-up-issue dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Danh sách hạng mục */
+.tw-steps { list-style: none; margin: 0; padding: 0; }
+.tw-steps > li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-top: 1px solid var(--line); }
+.tw-steps > li:first-child { border-top: 0; }
+.tw-steps input[type="checkbox"] { width: 22px; height: 22px; margin: 2px 0 0; accent-color: var(--brand); flex: none; }
+.tw-step { flex: 1; min-width: 0; display: grid; gap: 4px; color: inherit; text-decoration: none; }
+.tw-step .t { font-weight: 600; }
+.tw-steps li.done .tw-step .t { color: var(--muted); text-decoration: line-through; }
+.tw-step .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--muted); }
+.tw-step .meta .due { font-size: 12.5px; }
+.tw-step-kpi { font-size: 13px; color: var(--ink); }
+.tw-step-edit { flex: none; }
+.tw-add { padding: 10px 16px 14px; border-top: 1px solid var(--line); }
+.tw-parent { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 13.5px; }
+
+.tw-form-step { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); }
+.tw-form-step-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+@media (max-width: 380px) { .tw-up-issue { grid-template-columns: 1fr; } .tw-up-issue dt { margin-top: 4px; } }
+.task-kpi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -7,7 +7,7 @@ export type DlStatus = "cho_duyet" | "da_duyet" | "tu_choi" | "da_huy";
 export type DlReq = {
   id: string; target: DlTarget; item_id: string | null; item_name: string | null;
   requested_by: string; requester: string | null; old_due: string | null; new_due: string;
-  report: string; plan: string; status: DlStatus; approved_due: string | null;
+  report: string; cause?: string | null; plan: string; status: DlStatus; approved_due: string | null;
   decider: string | null; decided_at: string | null; decision_note: string | null; created_at: string;
   can_decide: boolean; can_cancel: boolean;
 };

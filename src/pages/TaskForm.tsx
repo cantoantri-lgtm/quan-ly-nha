@@ -9,6 +9,12 @@ import { addLink } from "../lib/links";
 import { ddmmyyyy } from "../lib/dates";
 import { dirLine, useDirectory } from "../lib/directory";
 import { assignableFor } from "../lib/reassign";
+import { setStepPeople } from "../lib/tasks";
+import { Combo } from "../components/ui";
+import { KpiFields, kpiError, kpiFrom, kpiRow, type KpiValue } from "../components/TaskWork";
+
+type StepDraft = { title: string; due: string; kpi: string; main: string; others: string[] };
+const emptyStep = (due = ""): StepDraft => ({ title: "", due, kpi: "", main: "", others: [] });
 
 export default function TaskForm() {
   const { id } = useParams();
@@ -43,7 +49,9 @@ export default function TaskForm() {
     if (pre("uu-tien") in PRIORITY_LABEL) setPriority(pre("uu-tien") as Priority);
     if (buildings.some((x) => x.id === pre("toa"))) setBuildingId(pre("toa"));
   }, [preKey]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const [steps, setSteps] = useState<{ title: string; due: string }[]>([{ title: "", due: "" }]);
+  const [kpi, setKpi] = useState<KpiValue>(kpiFrom(null));
+  const [steps, setSteps] = useState<StepDraft[]>([emptyStep()]);
+  const patchStep = (i: number, v: Partial<StepDraft>) => setSteps((list) => list.map((x, j) => (j === i ? { ...x, ...v } : x)));
   const [members, setMembers] = useState<{ building_id: string; user_id: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const dir = useDirectory();
@@ -62,7 +70,7 @@ export default function TaskForm() {
       if (error || !data) { setErr("Không tìm thấy việc này."); return; }
       const t = data as Task;
       setTitle(t.title); setDescription(t.description ?? ""); setBuildingId(t.building_id ?? "");
-      setAssigneeId(t.assignee_id ?? ""); setDue(t.due_date ?? ""); setPriority(t.priority);
+      setAssigneeId(t.assignee_id ?? ""); setDue(t.due_date ?? ""); setPriority(t.priority); setKpi(kpiFrom(t));
       supabase.from("task_assignees").select("user_id").eq("task_id", id).then(({ data: m }) => {
         setPicked([...(t.assignee_id ? [t.assignee_id] : []), ...((m ?? []) as { user_id: string }[]).map((x) => x.user_id)]);
       });
@@ -81,10 +89,15 @@ export default function TaskForm() {
     const main = canAssign ? (picked.includes(assigneeId) ? assigneeId : picked[0] ?? "") : assigneeId;
     if (!main) { setErr("Chọn người làm."); return; }
     const others = canAssign ? picked.filter((x) => x !== main) : [];
+    const forOthers = main !== profile?.id || others.length > 0;
+    const ke = kpiError(kpi, !editing && forOthers); if (ke) { setErr(ke); return; }
+    if (!editing && forOthers && !due) { setErr("Đặt hạn hoàn thành cho việc giao."); return; }
+    const drafts = editing ? [] : steps.filter((s) => s.title.trim());
+    if (due && drafts.some((s) => s.due && s.due > due)) { setErr(`Có hạng mục hạn sau hạn của việc (${ddmmyyyy(due)}).`); return; }
     setBusy(true);
     const row = {
       title: title.trim(), description: description.trim() || null, building_id: buildingId || null,
-      assignee_id: main, due_date: due || null, priority,
+      assignee_id: main, due_date: due || null, priority, ...kpiRow(kpi),
     };
     if (editing) {
       const { error } = await supabase.from("tasks").update(row).eq("id", id!);
@@ -104,11 +117,21 @@ export default function TaskForm() {
       const m = await supabase.rpc("task_set_members", { p_task: data.id, p_users: others });
       if (m.error) { setBusy(false); setErr("Đã giao việc cho người chính nhưng chưa thêm được người cùng làm: " + friendlyError(m.error)); nav(`/viec/${data.id}/sua`, { replace: true }); return; }
     }
-    const stepRows = steps.map((s) => ({ title: s.title.trim(), due: s.due })).filter((s) => s.title)
-      .map((s, i) => ({ parent_id: data.id, title: s.title, due_date: s.due || null, sort_order: i + 1 }));
+    const team = [main, ...others];
+    const stepRows = drafts.map((s, i) => ({
+      parent_id: data.id, title: s.title.trim(), due_date: s.due || null, sort_order: i + 1,
+      kpi: s.kpi.trim() || null, assignee_id: team.includes(s.main) ? s.main : main,
+    }));
     if (stepRows.length) {
-      const r = await supabase.from("tasks").insert(stepRows);
-      if (r.error) { setBusy(false); setErr("Đã tạo việc nhưng chưa thêm được các bước: " + friendlyError(r.error)); return; }
+      const r = await supabase.from("tasks").insert(stepRows).select("id,sort_order");
+      if (r.error) { setBusy(false); setErr("Đã tạo việc nhưng chưa thêm được hạng mục: " + friendlyError(r.error)); nav(`/viec/${data.id}`, { replace: true }); return; }
+      for (const [i, s] of drafts.entries()) {
+        const sub = s.others.filter((x) => team.includes(x) && x !== stepRows[i].assignee_id);
+        const sid = (r.data ?? []).find((x) => x.sort_order === i + 1)?.id;
+        if (!sub.length || !sid) continue;
+        try { await setStepPeople(sid, stepRows[i].assignee_id, sub); }
+        catch (e2) { toast("Chưa thêm được người phụ cho hạng mục " + s.title + ": " + (e2 as Error).message); }
+      }
     }
     if (link.from) {
       const le = await addLink("task", data.id, link.from.type, link.from.id);
@@ -118,6 +141,10 @@ export default function TaskForm() {
     toast(main === profile?.id && !others.length ? "Đã thêm việc." : others.length ? `Đã giao việc cho ${others.length + 1} người. Mọi người sẽ nhận thông báo.` : "Đã giao việc. Người làm sẽ nhận thông báo.");
     nav(`/viec/${data.id}`, { replace: true });
   }
+
+  const mainId = canAssign ? (picked.includes(assigneeId) ? assigneeId : picked[0] ?? "") : assigneeId;
+  const teamIds = canAssign ? [mainId, ...picked.filter((x) => x !== mainId)].filter(Boolean) : [assigneeId].filter(Boolean);
+  const nameOf = (pid: string) => (pid === profile?.id ? "Tôi" : people.find((p) => p.id === pid)?.full_name ?? "?");
 
   return (
     <>
@@ -135,6 +162,7 @@ export default function TaskForm() {
             <textarea id="t-desc" className="input" value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="Yêu cầu cụ thể, người liên hệ, lưu ý…" />
           </label>
+          <KpiFields idPrefix="t" value={kpi} onChange={setKpi} required={!editing && (canAssign ? picked.some((x) => x !== profile?.id) : false)} />
           {buildings.length ? (
             <label className="field">
               <span>Toà nhà</span>
@@ -147,7 +175,7 @@ export default function TaskForm() {
           {canAssign ? (
             <>
             <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
-              <legend style={{ padding: 0 }}><span>Người làm * <small className="muted">(chọn một hoặc nhiều người)</small></span></legend>
+              <legend style={{ padding: 0 }}><span>Người làm * <small className="muted">(chọn một hoặc nhiều người, sau đó chọn người chính)</small></span></legend>
               <div className="checks" style={{ maxHeight: 280, overflowY: "auto" }}>
                 {[...assignable, ...people.filter((p) => picked.includes(p.id) && !assignable.some((a) => a.id === p.id))].map((p) => (
                   <label key={p.id}>
@@ -157,7 +185,7 @@ export default function TaskForm() {
                       <b>{p.id === profile?.id ? `Tôi (${p.full_name})` : p.full_name}</b>
                       <small>{dirLine(dir.get(p.id)) || `${ROLE_LABEL[p.role]} · chưa xếp vị trí trên sơ đồ`}</small>
                     </span>
-                    {picked.length > 1 && (assigneeId === p.id || (!picked.includes(assigneeId) && picked[0] === p.id)) ? <span className="tag">Phụ trách chính</span> : null}
+                    {picked.length > 1 ? (assigneeId === p.id || (!picked.includes(assigneeId) && picked[0] === p.id) ? <span className="tag">Người chính</span> : picked.includes(p.id) ? <span className="tag muted">Người phụ</span> : null) : null}
                   </label>
                 ))}
               </div>
@@ -167,18 +195,18 @@ export default function TaskForm() {
             </fieldset>
             {picked.length > 1 ? (
               <label className="field">
-                <span>Người phụ trách chính</span>
+                <span>Người chính</span>
                 <select id="t-main" className="input" value={picked.includes(assigneeId) ? assigneeId : picked[0]} onChange={(e) => setAssigneeId(e.target.value)}>
                   {picked.map((pid) => { const d = dir.get(pid); return <option key={pid} value={pid}>{people.find((p) => p.id === pid)?.full_name ?? "?"}{d ? ` · ${d.job_title}` : ""}</option>; })}
                 </select>
-                <small className="muted">Người chính chịu trách nhiệm cuối. Mọi người đều cập nhật được tiến độ và tick các bước.</small>
+                <small className="muted">Người chính chịu trách nhiệm KPI. Người phụ hỗ trợ, cùng gửi phản hồi tiến độ.</small>
               </label>
             ) : null}
             </>
           ) : null}
           <div className="row" style={{ alignItems: "flex-start" }}>
             <label className="field" style={{ flex: "1 1 160px" }}>
-              <span>Hạn hoàn thành</span>
+              <span>Hạn hoàn thành{!editing && canAssign && picked.some((x) => x !== profile?.id) ? " *" : ""}</span>
               <input id="t-due" className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
             </label>
             <label className="field" style={{ flex: "1 1 160px" }}>
@@ -191,27 +219,56 @@ export default function TaskForm() {
 
           {!editing ? (
             <div className="field">
-              <span>Các bước thực hiện (không bắt buộc)</span>
-              <div className="stack" style={{ gap: 8 }}>
-                {steps.map((s, i) => (
-                  <div key={i} className="step-row">
-                    <span className="muted num step-no">{i + 1}.</span>
-                    <input id={`t-step-${i}`} className="input step-title" value={s.title} placeholder="Tên bước" aria-label={`Tên bước ${i + 1}`}
-                      onChange={(e) => setSteps(steps.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} />
-                    <input id={`t-step-due-${i}`} className="input step-due" type="date" value={s.due} aria-label={`Hạn bước ${i + 1}`} title="Hạn hoàn thành bước"
-                      max={due || undefined} onChange={(e) => setSteps(steps.map((x, j) => (j === i ? { ...x, due: e.target.value } : x)))} />
-                    {steps.length > 1 ? (
-                      <button type="button" className="btn ghost sm" aria-label={`Xoá bước ${i + 1}`}
-                        onClick={() => setSteps(steps.filter((_, j) => j !== i))}>Xoá</button>
-                    ) : null}
-                  </div>
-                ))}
-                {due && steps.some((s) => s.due && s.due > due) ? <small className="err-text">Có bước hạn sau hạn của việc ({ddmmyyyy(due)}). Kiểm tra lại ngày.</small> : null}
+              <span>Hạng mục <small className="muted">(không bắt buộc – chia việc lớn thành phần nhỏ)</small></span>
+              <div className="stack" style={{ gap: 10 }}>
+                {steps.map((s, i) => {
+                  const stepMain = teamIds.includes(s.main) ? s.main : mainId;
+                  return (
+                    <div key={i} className="tw-form-step">
+                      <div className="tw-form-step-head">
+                        <b className="num">Hạng mục {i + 1}</b>
+                        {steps.length > 1 ? (
+                          <button type="button" className="btn ghost sm" aria-label={`Xoá hạng mục ${i + 1}`}
+                            onClick={() => setSteps(steps.filter((_, j) => j !== i))}>Xoá</button>
+                        ) : null}
+                      </div>
+                      <input id={`t-step-${i}`} className="input" value={s.title} placeholder="Nội dung hạng mục" aria-label={`Nội dung hạng mục ${i + 1}`}
+                        onChange={(e) => patchStep(i, { title: e.target.value })} />
+                      {s.title.trim() ? (
+                        <>
+                          <input id={`t-step-kpi-${i}`} className="input" maxLength={500} value={s.kpi} placeholder="KPI hạng mục, VD: 10 phòng tầng 1"
+                            aria-label={`KPI hạng mục ${i + 1}`} onChange={(e) => patchStep(i, { kpi: e.target.value })} />
+                          <div className="tw-kpi-num">
+                            {teamIds.length > 1 ? (
+                              <Combo id={`t-step-main-${i}`} label={`Người chính hạng mục ${i + 1}`} value={stepMain}
+                                options={teamIds.map((pid) => [pid, `Chính: ${nameOf(pid)}`] as const)}
+                                onChange={(v) => patchStep(i, { main: v, others: s.others.filter((x) => x !== v) })} />
+                            ) : null}
+                            <input id={`t-step-due-${i}`} className="input" type="date" value={s.due} aria-label={`Hạn hạng mục ${i + 1}`} title="Hạn hạng mục (để trống = theo hạn việc)"
+                              max={due || undefined} onChange={(e) => patchStep(i, { due: e.target.value })} />
+                          </div>
+                          {teamIds.length > 1 ? (
+                            <div className="checks tw-checks" aria-label={`Người phụ hạng mục ${i + 1}`}>
+                              {teamIds.filter((pid) => pid !== stepMain).map((pid) => (
+                                <label key={pid}>
+                                  <input type="checkbox" checked={s.others.includes(pid)}
+                                    onChange={(e) => patchStep(i, { others: e.target.checked ? [...s.others, pid] : s.others.filter((x) => x !== pid) })} />
+                                  <span className="pick-who"><b>Phụ: {nameOf(pid)}</b></span>
+                                </label>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
+                  );
+                })}
+                {due && steps.some((s) => s.due && s.due > due) ? <small className="err-text">Có hạng mục hạn sau hạn của việc ({ddmmyyyy(due)}). Kiểm tra lại ngày.</small> : null}
                 <button type="button" className="btn secondary sm" style={{ justifySelf: "start" }}
-                  onClick={() => setSteps([...steps, { title: "", due: steps[steps.length - 1]?.due ?? "" }])}>
-                  + Thêm bước
+                  onClick={() => setSteps([...steps, emptyStep(steps[steps.length - 1]?.due ?? "")])}>
+                  + Thêm hạng mục
                 </button>
-                <small className="muted">Mỗi bước có thể đặt hạn riêng (không bắt buộc). Bước đến hạn mà chưa xong sẽ hiện màu cảnh báo.</small>
+                <small className="muted">Mỗi hạng mục có người chính, người phụ, KPI và hạn riêng. Để trống hạn thì lấy theo hạn của việc. Người làm hạng mục chọn trong nhóm người làm ở trên.</small>
               </div>
             </div>
           ) : null}
