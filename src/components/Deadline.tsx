@@ -115,7 +115,7 @@ function DlCard({ r, onChanged, showItem }: { r: DlReq; onChanged: () => void; s
       <dl className="dl-kv">
         <dt>{r.target === "task" ? "Vấn đề" : "Vướng mắc"}</dt><dd>{r.report}</dd>
         {r.cause ? (<><dt>Nguyên nhân</dt><dd>{r.cause}</dd></>) : null}
-        <dt>{r.target === "task" ? "Giải pháp" : "Phương án"}</dt><dd>{r.plan}</dd>
+        <dt>{r.target === "task" ? "Hành động" : "Phương án"}</dt><dd>{r.plan}</dd>
         {r.status !== "cho_duyet" && r.status !== "da_huy" ? (<>
           <dt>{r.status === "da_duyet" ? "Đã duyệt" : "Không duyệt"}</dt>
           <dd>{r.decider ?? ""}{r.approved_due && r.approved_due !== r.new_due ? ` · hạn duyệt ${ddmmyyyy(r.approved_due)}` : ""}{r.decision_note ? ` · ${r.decision_note}` : ""}</dd>

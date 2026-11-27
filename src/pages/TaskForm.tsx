@@ -152,17 +152,31 @@ export default function TaskForm() {
       <main className="main">
         <form className="stack" onSubmit={submit}>
           <LinkFromNote from={link.from} info={link.info} />
+          {/* Giao việc gọn (SQL 111): Nội dung công việc · KPI · Deadline. Phần còn lại không bắt buộc. */}
           <label className="field">
-            <span>Tên việc *</span>
+            <span>Nội dung công việc *</span>
             <input id="t-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)}
-              placeholder="VD: Dán bảng số tầng" required />
+              placeholder="VD: Kiểm tra PCCC toà 89 CMT8" required />
           </label>
+          <KpiFields idPrefix="t" value={kpi} onChange={setKpi} required={!editing && (canAssign ? picked.some((x) => x !== profile?.id) : false)} />
           <label className="field">
-            <span>Mô tả, yêu cầu</span>
+            <span>Deadline{!editing && canAssign && picked.some((x) => x !== profile?.id) ? " *" : ""}</span>
+            <input id="t-due" className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          </label>
+          <details className="tw-more" open={!!description || !!buildingId || priority !== "binh_thuong"}>
+            <summary>Thêm chi tiết, toà, mức độ <small className="muted">(không bắt buộc)</small></summary>
+            <div className="stack" style={{ marginTop: 10 }}>
+          <label className="field">
+            <span>Chi tiết, yêu cầu</span>
             <textarea id="t-desc" className="input" value={description} onChange={(e) => setDescription(e.target.value)}
               placeholder="Yêu cầu cụ thể, người liên hệ, lưu ý…" />
           </label>
-          <KpiFields idPrefix="t" value={kpi} onChange={setKpi} required={!editing && (canAssign ? picked.some((x) => x !== profile?.id) : false)} />
+          <label className="field">
+            <span>Mức độ</span>
+            <select id="t-prio" className="input" value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
+              {(Object.keys(PRIORITY_LABEL) as Priority[]).map((k) => <option key={k} value={k}>{PRIORITY_LABEL[k]}</option>)}
+            </select>
+          </label>
           {buildings.length ? (
             <label className="field">
               <span>Toà nhà</span>
@@ -172,6 +186,8 @@ export default function TaskForm() {
               </select>
             </label>
           ) : null}
+            </div>
+          </details>
           {canAssign ? (
             <>
             <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
@@ -204,18 +220,6 @@ export default function TaskForm() {
             ) : null}
             </>
           ) : null}
-          <div className="row" style={{ alignItems: "flex-start" }}>
-            <label className="field" style={{ flex: "1 1 160px" }}>
-              <span>Hạn hoàn thành{!editing && canAssign && picked.some((x) => x !== profile?.id) ? " *" : ""}</span>
-              <input id="t-due" className="input" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
-            </label>
-            <label className="field" style={{ flex: "1 1 160px" }}>
-              <span>Mức độ</span>
-              <select id="t-prio" className="input" value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
-                {(Object.keys(PRIORITY_LABEL) as Priority[]).map((k) => <option key={k} value={k}>{PRIORITY_LABEL[k]}</option>)}
-              </select>
-            </label>
-          </div>
 
           {!editing ? (
             <div className="field">

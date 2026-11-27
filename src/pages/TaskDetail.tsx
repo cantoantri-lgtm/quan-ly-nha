@@ -20,7 +20,7 @@ type Detail = Task & {
   building: { code: string; name: string } | null;
 };
 type Parent = Task & { creator: { full_name: string } | null; members: { user_id: string }[] };
-const UPD_SELECT = "id,note,status_after,created_at,progress,kpi_actual,issue,cause,solution,deadline_request_id, author:profiles!task_updates_author_id_fkey(full_name)";
+const UPD_SELECT = "id,note,status_after,created_at,progress,issue,cause,solution,commit_due,deadline_request_id, author:profiles!task_updates_author_id_fkey(full_name)";
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -237,8 +237,8 @@ export default function TaskDetail() {
         <DeadlineList list={dls} onChanged={load} showItem={!isStep} />
         {canExtend ? (
           <div className="dl-ask">
-            <span>{t.status === "vuong" || (t.due_date && t.due_date < todayVN()) ? "Đang vướng hoặc trễ hạn?" : "Không kịp hạn?"} Gửi phản hồi kèm vấn đề, nguyên nhân, giải pháp và hạn mới cho {giver} duyệt.</span>
-            <button type="button" className="btn secondary sm" onClick={askExtend}>Xin gia hạn</button>
+            <span>{t.status === "vuong" || (t.due_date && t.due_date < todayVN()) ? "Đang vướng hoặc trễ hạn?" : "Không kịp hạn?"} Ghi deadline cam kết mới trong phản hồi, {giver} duyệt xong thì báo cáo tiếp theo deadline mới.</span>
+            <button type="button" className="btn secondary sm" onClick={askExtend}>Đổi deadline cam kết</button>
           </div>
         ) : null}
 
@@ -251,7 +251,7 @@ export default function TaskDetail() {
                 <li key={u.id}>
                   <div className="row"><span className="who">{u.author?.full_name ?? "?"}</span><span className="when">{clock(u.created_at)}</span>
                     {u.status_after ? <span className={`pill ${u.status_after}`}>{STATUS_LABEL[u.status_after]}</span> : null}</div>
-                  <UpdateBody u={u} unit={t.kpi_unit} />
+                  <UpdateBody u={u} />
                 </li>
               ))}
             </ul>

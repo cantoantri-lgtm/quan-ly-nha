@@ -50,3 +50,7 @@
 
 @media (max-width: 380px) { .tw-up-issue { grid-template-columns: 1fr; } .tw-up-issue dt { margin-top: 4px; } }
 .task-kpi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Giao việc gọn (SQL 111): phần không bắt buộc gói lại */
+.tw-more { border: 1px dashed var(--line); border-radius: 12px; padding: 10px 12px; }
+.tw-more > summary { cursor: pointer; font-weight: 600; }

@@ -2,7 +2,7 @@ import { friendlyError, supabase } from "./supabase";
 import { daysBetween, todayVN } from "./dates";
 import type { Task, TaskStatus } from "./labels";
 
-/* Giao việc theo KPI, phản hồi tiến độ, người làm hạng mục. Quyền và kiểm tra nằm ở SQL 110. */
+/* Giao việc theo KPI, phản hồi tiến độ, người làm hạng mục. Quyền và kiểm tra nằm ở SQL 110, 111. */
 
 async function run<T = unknown>(fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args);
@@ -10,17 +10,15 @@ async function run<T = unknown>(fn: string, args: Record<string, unknown>): Prom
   return data as T;
 }
 
+/** Phản hồi (SQL 111): tiến độ, vấn đề, nguyên nhân, hành động, deadline cam kết. Báo xong thì chỉ cần tiến độ. */
 export type Feedback = {
-  note: string; progress: number | null; actual: number | null;
-  issue: string; cause: string; solution: string;
-  status: TaskStatus | null; newDue: string | null;
+  progress: number; issue: string; cause: string; action: string; commitDue: string | null; status: TaskStatus | null;
 };
-/** Gửi phản hồi: tiến độ so với KPI, kết quả, vấn đề – nguyên nhân – giải pháp, xin gia hạn (nếu có) */
+/** Gửi phản hồi. Deadline cam kết trễ hơn hạn hiện tại thì CSDL tự tạo đề xuất gia hạn cho người giao duyệt. */
 export const sendFeedback = (task: string, f: Feedback) =>
-  run<{ update_id: string; request_id: string | null }>("task_feedback", {
-    p_task: task, p_note: f.note, p_progress: f.progress, p_actual: f.actual,
-    p_issue: f.issue || null, p_cause: f.cause || null, p_solution: f.solution || null,
-    p_status: f.status, p_new_due: f.newDue,
+  run<{ update_id: string; request_id: string | null; pending: boolean }>("task_feedback", {
+    p_task: task, p_progress: f.progress, p_issue: f.issue || null, p_cause: f.cause || null, p_action: f.action || null,
+    p_commit_due: f.commitDue, p_status: f.status,
   });
 
 /** Người chính + người phụ của hạng mục (phải nằm trong nhóm việc chính) */
@@ -30,10 +28,9 @@ export const setStepPeople = (step: string, main: string, others: string[]) =>
 /** Số gọn: 12, 12,5 */
 export const num = (n: number) => n.toLocaleString("vi-VN", { maximumFractionDigits: 2 });
 
-/** "Kiểm tra 30 phòng · chỉ tiêu 30 phòng" */
-export function kpiLine(t: Pick<Task, "kpi" | "kpi_target" | "kpi_unit">): string {
-  const target = t.kpi_target != null ? `chỉ tiêu ${num(t.kpi_target)}${t.kpi_unit ? ` ${t.kpi_unit}` : ""}` : "";
-  return [t.kpi?.trim(), target].filter(Boolean).join(" · ");
+/** KPI của việc (chỉ tiêu số, đơn vị đã bỏ theo SQL 111) */
+export function kpiLine(t: Pick<Task, "kpi">): string {
+  return t.kpi?.trim() ?? "";
 }
 
 /** Tiến độ theo thời gian: đến hôm nay lẽ ra phải đạt bao nhiêu % (tính từ ngày giao đến hạn) */
