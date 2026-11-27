@@ -86,4 +86,6 @@ export type Task = {
   kpi_unit?: string | null;
   kpi_actual?: number | null;
   progress?: number;
+  progress_note?: string | null;   // tiến độ mới nhất bằng chữ (SQL 112)
+  progress_at?: string | null;
 };

@@ -61,18 +61,15 @@ export function KpiFields({ idPrefix, value, onChange, required, hint }: {
   );
 }
 
-/* ---------- Thanh tiến độ so với KPI ---------- */
+/* ---------- Tiến độ mới nhất (chữ) + tình trạng deadline ---------- */
 export function ProgressLine({ t, compact }: { t: Task; compact?: boolean }) {
-  const p = t.progress ?? 0;
   const pace = paceInfo(t);
   return (
     <div className={`tw-prog${compact ? " compact" : ""}`}>
       <div className="tw-prog-head">
-        <b className="num">{p}%</b>
+        <span className="tw-prog-text">{t.progress_note ? <>Tiến độ: {t.progress_note}</> : <span className="muted">Chưa báo tiến độ</span>}</span>
         {pace && !compact ? <span className={`tw-pace ${pace.tone}`}>{pace.text}</span> : null}
       </div>
-      <div className={`progress tw-bar ${pace?.tone ?? ""}`} role="progressbar" aria-valuenow={p} aria-valuemin={0} aria-valuemax={100}
-        aria-label="Tiến độ"><span style={{ width: `${p}%` }} /></div>
     </div>
   );
 }
@@ -165,7 +162,7 @@ export function FeedbackForm({ t, giver, canExtend, extendNow, onExtendShown, on
   const { toast } = useSession();
   const today = todayVN();
   const defCommit = t.due_date && t.due_date >= today ? t.due_date : today;
-  const [prog, setProg] = useState("");
+  const [prog, setProg] = useState("");   // tiến độ bằng chữ (SQL 112)
   const [issue, setIssue] = useState("");
   const [cause, setCause] = useState("");
   const [action, setAction] = useState("");
@@ -184,13 +181,12 @@ export function FeedbackForm({ t, giver, canExtend, extendNow, onExtendShown, on
   }, [extendNow]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const done = status === "xong";
-  const progN = done ? 100 : prog.trim() ? Number(prog) : null;
   const later = !done && !!commit && (!t.due_date || commit > t.due_date);
   const late = t.due_date && t.due_date < today ? daysBetween(t.due_date, today) : 0;
 
   async function submit(e: FormEvent) {
     e.preventDefault(); setErr(null);
-    if (progN == null || !(progN >= 0 && progN <= 100)) { setErr("Ghi tiến độ từ 0 đến 100%."); return; }
+    if (!done && !prog.trim()) { setErr("Ghi tiến độ công việc."); return; }
     if (!done) {
       if (!issue.trim() || !cause.trim() || !action.trim()) { setErr('Ghi đủ vấn đề, nguyên nhân, hành động. Không có vấn đề thì ghi "Không".'); return; }
       if (!commit || commit < today) { setErr("Chọn deadline cam kết từ hôm nay trở đi."); return; }
@@ -199,7 +195,7 @@ export function FeedbackForm({ t, giver, canExtend, extendNow, onExtendShown, on
     setBusy(true);
     try {
       const r = await sendFeedback(t.id, {
-        progress: progN, issue: done ? "" : issue.trim(), cause: done ? "" : cause.trim(), action: done ? "" : action.trim(),
+        progress: prog.trim(), issue: done ? "" : issue.trim(), cause: done ? "" : cause.trim(), action: done ? "" : action.trim(),
         commitDue: done ? null : commit, status: status || null,
       });
       toast(r.request_id ? `Đã gửi phản hồi. Deadline mới chờ ${giver} duyệt.` : r.pending ? "Đã gửi phản hồi. Đề xuất deadline trước vẫn đang chờ duyệt." : "Đã gửi phản hồi.");
@@ -214,19 +210,19 @@ export function FeedbackForm({ t, giver, canExtend, extendNow, onExtendShown, on
       <div className="tw-fb-kpi">
         <span className="muted small">KPI</span>
         <b>{kpiLine(t) || "Chưa đặt KPI"}</b>
-        <span className="muted small">Hiện đạt {t.progress ?? 0}% · deadline {t.due_date ? ddmmyyyy(t.due_date) : "chưa đặt"}{late ? `, đã trễ ${late} ngày` : ""}</span>
+        <span className="muted small">Deadline {t.due_date ? ddmmyyyy(t.due_date) : "chưa đặt"}{late ? `, đã trễ ${late} ngày` : ""}{t.progress_note ? ` · lần trước: ${t.progress_note}` : ""}</span>
       </div>
+      <label className="field"><span>Tiến độ{done ? "" : " *"}</span>
+        <textarea id="fb-prog" className="input" rows={2} maxLength={2000} value={prog} onChange={(e) => setProg(e.target.value)}
+          placeholder={done ? "Đã hoàn thành (có thể ghi thêm)" : "VD: Đã kiểm tra 25/30 phòng, còn tầng 3"} /></label>
       <div className="tw-kpi-num">
-        <label className="field"><span>Tiến độ (%) *</span>
-          <input id="fb-prog" className="input num" inputMode="numeric" value={done ? "100" : prog} disabled={done}
-            onChange={(e) => setProg(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder={String(t.progress ?? 0)} /></label>
         <label className="field"><span>Trạng thái</span>
           <Combo id="fb-status" value={status} placeholder={`Giữ: ${STATUS_LABEL[t.status]}`}
             options={STATUS_ORDER.filter((x) => x !== t.status).map((x) => [x, `Chuyển: ${STATUS_LABEL[x]}`] as const)}
             onChange={(v) => setStatus(v)} /></label>
       </div>
       {done ? (
-        <p className="muted small" style={{ margin: 0 }}>Báo hoàn thành: tiến độ 100%, không cần ghi vấn đề và deadline.</p>
+        <p className="muted small" style={{ margin: 0 }}>Báo hoàn thành: không cần ghi vấn đề và deadline.</p>
       ) : (
         <>
           <label className="field"><span>Vấn đề *</span>
@@ -265,13 +261,8 @@ export function UpdateBody({ u }: { u: UpdateRow }) {
   const auto = /^Báo cáo tiến độ \d+%( · cam kết xong \d{2}\/\d{2}\/\d{4})?$|^Báo hoàn thành$/.test(u.note);
   return (
     <>
-      {u.progress != null || u.commit_due ? (
-        <div className="tw-up-prog num">
-          {u.progress != null ? `Tiến độ ${u.progress}%` : ""}{u.progress != null && u.commit_due ? " · " : ""}
-          {u.commit_due ? `Cam kết xong ${ddmmyyyy(u.commit_due)}` : ""}
-        </div>
-      ) : null}
-      {auto ? null : <div className="note">{u.note}</div>}
+      {auto ? null : <div className="note">{u.issue || u.commit_due ? <b>Tiến độ: </b> : null}{u.note}</div>}
+      {u.commit_due ? <div className="tw-up-prog num">Cam kết xong {ddmmyyyy(u.commit_due)}{u.progress != null && u.progress > 0 && u.progress < 100 ? ` · ${u.progress}%` : ""}</div> : null}
       {u.issue ? (
         <dl className="tw-up-issue">
           <dt>Vấn đề</dt><dd>{u.issue}</dd>

@@ -10,14 +10,14 @@ async function run<T = unknown>(fn: string, args: Record<string, unknown>): Prom
   return data as T;
 }
 
-/** Phản hồi (SQL 111): tiến độ, vấn đề, nguyên nhân, hành động, deadline cam kết. Báo xong thì chỉ cần tiến độ. */
+/** Phản hồi (SQL 111, 112): tiến độ (chữ), vấn đề, nguyên nhân, hành động, deadline cam kết. Báo xong thì không cần ghi gì thêm. */
 export type Feedback = {
-  progress: number; issue: string; cause: string; action: string; commitDue: string | null; status: TaskStatus | null;
+  progress: string; issue: string; cause: string; action: string; commitDue: string | null; status: TaskStatus | null;
 };
 /** Gửi phản hồi. Deadline cam kết trễ hơn hạn hiện tại thì CSDL tự tạo đề xuất gia hạn cho người giao duyệt. */
 export const sendFeedback = (task: string, f: Feedback) =>
   run<{ update_id: string; request_id: string | null; pending: boolean }>("task_feedback", {
-    p_task: task, p_progress: f.progress, p_issue: f.issue || null, p_cause: f.cause || null, p_action: f.action || null,
+    p_task: task, p_progress: null, p_note: f.progress || null, p_issue: f.issue || null, p_cause: f.cause || null, p_action: f.action || null,
     p_commit_due: f.commitDue, p_status: f.status,
   });
 
@@ -43,14 +43,13 @@ export function expectedProgress(t: Pick<Task, "created_at" | "due_date" | "stat
   return Math.max(0, Math.min(100, Math.round((gone / total) * 100)));
 }
 
-/** Đánh giá tiến độ so với KPI và thời gian */
+/** Tình trạng theo deadline (tiến độ ghi bằng chữ từ SQL 112, không so %) */
 export function paceInfo(t: Pick<Task, "created_at" | "due_date" | "status" | "progress">):
   { tone: "ok" | "slow" | "late" | "done"; text: string } | null {
-  const p = t.progress ?? 0;
   if (t.status === "xong") return { tone: "done", text: "Đã xong" };
-  const exp = expectedProgress(t);
-  if (exp == null) return null;
-  if (t.due_date && t.due_date < todayVN()) return { tone: "late", text: `Quá hạn, mới đạt ${p}%` };
-  if (p + 10 < exp) return { tone: "slow", text: `Chậm: theo thời gian cần ${exp}%` };
-  return { tone: "ok", text: `Đúng tiến độ (cần ${exp}%)` };
+  if (!t.due_date) return null;
+  const today = todayVN();
+  if (t.due_date < today) return { tone: "late", text: `Quá deadline ${daysBetween(t.due_date, today)} ngày` };
+  const left = daysBetween(today, t.due_date);
+  return left <= 2 ? { tone: "slow", text: left === 0 ? "Deadline hôm nay" : `Còn ${left} ngày` } : { tone: "ok", text: `Còn ${left} ngày` };
 }

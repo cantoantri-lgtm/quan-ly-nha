@@ -156,11 +156,11 @@ export default function Tasks() {
                     {ext[r.id] && r.status !== "xong" ? <span className="dl-tag">xin gia hạn → {ddmm(ext[r.id])}</span> : null}
                     {r.priority === "cao" || r.priority === "gap" ? <span className="prio">{PRIORITY_LABEL[r.priority]}</span> : null}
                     {s ? <span className="num">{s.done}/{s.total} hạng mục</span> : null}
-                    {r.progress ? <span className="num">Đạt {r.progress}%</span> : null}
                   </div>
                   {r.kpi ? <div className="muted small task-kpi">KPI: {r.kpi}</div> : null}
-                  {(r.progress ?? 0) > 0 || (s && s.total > 0) ? (
-                    <div className="progress" aria-hidden="true"><span style={{ width: `${r.progress || (s ? (s.done / s.total) * 100 : 0)}%` }} /></div>
+                  {r.progress_note && r.status !== "xong" ? <div className="small task-kpi">Tiến độ: {r.progress_note}</div> : null}
+                  {s && s.total > 0 ? (
+                    <div className="progress" aria-hidden="true"><span style={{ width: `${(s.done / s.total) * 100}%` }} /></div>
                   ) : null}
                 </Link>
               );
