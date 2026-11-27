@@ -33,9 +33,9 @@ export default function BuildingBank({ buildingId }: { buildingId: string }) {
     e.preventDefault(); setErr(null);
     const finalBin = bin === "khac" ? customBin.trim() : bin;
     const bankName = bin === "khac" ? customName.trim() : BANKS.find((b) => b.bin === bin)!.name;
-    const acc = acct.replace(/\s/g, "");
+    const acc = acct.replace(/[\s.-]/g, "").toUpperCase();
     if (!/^\d{6}$/.test(finalBin)) { setErr("Mã BIN ngân hàng gồm 6 chữ số."); return; }
-    if (!/^\d{6,19}$/.test(acc)) { setErr("Số tài khoản gồm 6–19 chữ số."); return; }
+    if (!/^[0-9A-Z]{6,19}$/.test(acc)) { setErr("Số tài khoản gồm 6–19 ký tự, chỉ có chữ và số."); return; }
     if (!bankName) { setErr("Nhập tên ngân hàng."); return; }
     if (!holder.trim()) { setErr("Nhập tên chủ tài khoản."); return; }
     setBusy(true);
@@ -70,7 +70,7 @@ export default function BuildingBank({ buildingId }: { buildingId: string }) {
               <label className="field" style={{ flex: "1 1 160px" }}><span>Tên ngân hàng</span><input id="bb-bname" className="input" value={customName} onChange={(e) => setCustomName(e.target.value)} /></label>
             </div>
           ) : null}
-          <label className="field"><span>Số tài khoản</span><input id="bb-acct" className="input num" inputMode="numeric" value={acct} onChange={(e) => setAcct(e.target.value)} /></label>
+          <label className="field"><span>Số tài khoản</span><input id="bb-acct" className="input num" autoCapitalize="characters" autoComplete="off" spellCheck={false} value={acct} onChange={(e) => setAcct(e.target.value)} /></label>
           <label className="field"><span>Tên chủ tài khoản (không dấu)</span><input id="bb-holder" className="input" value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="CONG TY ..." /></label>
           {err ? <div className="error-box" role="alert">{err}</div> : null}
           <div className="row">
