@@ -44,9 +44,9 @@ export default function PaymentSettingsPage() {
     e.preventDefault(); setErr(null);
     const finalBin = bin === "khac" ? customBin.trim() : bin;
     const bankName = bin === "khac" ? customName.trim() : BANKS.find((b) => b.bin === bin)!.name;
-    const acc = acct.replace(/\s/g, "");
+    const acc = acct.replace(/[\s.-]/g, "").toUpperCase();
     if (!/^\d{6}$/.test(finalBin)) { setErr("Mã BIN ngân hàng gồm 6 chữ số."); return; }
-    if (!/^\d{6,19}$/.test(acc)) { setErr("Số tài khoản gồm 6–19 chữ số."); return; }
+    if (!/^[0-9A-Z]{6,19}$/.test(acc)) { setErr("Số tài khoản gồm 6–19 ký tự, chỉ có chữ và số."); return; }
     if (!bankName) { setErr("Nhập tên ngân hàng."); return; }
     setBusy(true);
     const { error } = await supabase.from("payment_settings").upsert({ id: 1, bank_bin: finalBin, bank_name: bankName, account_no: acc, account_name: holder.trim().toUpperCase() });
@@ -75,7 +75,7 @@ export default function PaymentSettingsPage() {
                   <label className="field" style={{ flex: "1 1 160px" }}><span>Tên ngân hàng</span><input id="p-bname" className="input" value={customName} onChange={(e) => setCustomName(e.target.value)} /></label>
                 </div>
               ) : null}
-              <label className="field"><span>Số tài khoản</span><input id="p-acct" className="input num" inputMode="numeric" value={acct} onChange={(e) => setAcct(e.target.value)} required /></label>
+              <label className="field"><span>Số tài khoản</span><input id="p-acct" className="input num" autoCapitalize="characters" autoComplete="off" spellCheck={false} value={acct} onChange={(e) => setAcct(e.target.value)} required /></label>
               <label className="field"><span>Tên chủ tài khoản (không dấu)</span><input id="p-holder" className="input" value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="CONG TY ..." required /></label>
               {err ? <div className="error-box" role="alert">{err}</div> : null}
               <button className="btn block" disabled={busy || !canSave}>{busy ? "Đang lưu…" : canSave ? "Lưu" : "Bạn chỉ có quyền xem"}</button>
