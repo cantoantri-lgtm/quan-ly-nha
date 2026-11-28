@@ -19,6 +19,7 @@ import VoiceTask from "./pages/VoiceTask";
 import BuildingDetail from "./pages/BuildingDetail";
 import BuildingMeters from "./pages/BuildingMeters";
 import RoomUtilities from "./pages/RoomUtilities";
+import ElecEntry from "./pages/ElecEntry";
 import Reports from "./pages/Reports";
 import Office from "./pages/Office";
 import RequestForm from "./pages/RequestForm";
@@ -226,6 +227,7 @@ export default function App() {
         <Route path="khach-hang/:id" element={<CustomerInfo />} />
         <Route path="thu-tien-khach" element={<StaffPayments />} />
         <Route path="thu-chi-toa" element={<BuildingCash />} />
+        <Route path="ghi-dien" element={<ElecEntry />} />
         <Route path="phan-anh" element={<FeedbackInbox />} />
         <Route path="phan-anh/:id" element={<FeedbackThread />} />
         <Route path="thong-bao" element={<Notifications />} />

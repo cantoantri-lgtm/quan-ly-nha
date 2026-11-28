@@ -203,6 +203,7 @@ export function useMenuGroups(): { title: string; menu: string; items: AppItem[]
     { title: "Quản lý toà nhà", menu: "Toà nhà & khách", items: [
       { to: "/ban-do", label: "Bản đồ", icon: Icon.map },
       { to: "/toa-nha", label: "Toà nhà & phòng", icon: Icon.building },
+      { to: "/ghi-dien", label: "Ghi số điện phòng", icon: Icon.tasks },
       { to: "/phong-trong", label: "Phòng trống", icon: Icon.building },
       { to: "/lich-xem-phong", label: "Lịch hẹn xem phòng", icon: Icon.tasks },
       { to: "/phong", label: "Website phòng trống", icon: Icon.map },
