@@ -6,6 +6,7 @@ import { SessionProvider } from "./lib/session";
 import { applyTheme, savedTheme } from "./components/ui";
 import "./styles.css";
 import "./shell.css";
+import "./apple.css";
 
 applyTheme(savedTheme());
 

@@ -1,0 +1,123 @@
+/* Phong cách Apple (iOS / macOS) cho khung app – nạp sau styles.css và shell.css.
+   Nguyên tắc: kính (blur) chỉ dùng cho lớp điều hướng nổi (thanh trên, thanh dưới, nút nổi);
+   nội dung (thẻ, danh sách, bảng) giữ nền trơn. Chỉ dùng token trong :root của styles.css. */
+
+body { font-size: 15px; letter-spacing: -.005em; }
+h1, h2, h3 { letter-spacing: -.01em; }
+
+/* ---------- Kính: thanh trên cùng có logo ---------- */
+.apphead {
+  background: var(--glass); border-bottom: .5px solid var(--glass-line);
+  -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+}
+.ah-btn { background: transparent; }
+.ah-btn:hover, .ah-btn[aria-expanded="true"] { background: var(--fill); }
+.ah-btn.apps { background: var(--brand-soft); }
+.ah-me { box-shadow: 0 0 0 2px var(--surface); }
+
+/* ---------- Thanh tiêu đề trang: chữ đậm trên nền kính, không còn khối màu xanh ---------- */
+.topbar {
+  background: var(--glass); color: var(--ink); border-bottom: .5px solid var(--glass-line);
+  -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
+  min-height: 52px;
+}
+.topbar h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.topbar .back { color: var(--brand); width: 40px; height: 40px; border-radius: 20px; }
+.topbar .back:hover { background: var(--fill); }
+.topbar .tb-action { background: var(--brand-soft); color: var(--brand); border-radius: 999px; padding: 8px 14px; min-height: 36px; }
+
+/* ---------- Thanh dưới: viên kính nổi (tab bar) ---------- */
+.bottomnav {
+  left: max(var(--nav-gap), env(safe-area-inset-left)); right: max(var(--nav-gap), env(safe-area-inset-right));
+  bottom: calc(var(--nav-gap) + env(safe-area-inset-bottom, 0px)); padding: 4px;
+  background: var(--glass); border: .5px solid var(--glass-line); border-radius: 34px; box-shadow: var(--shadow-lg);
+  -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%);
+}
+.bottomnav .inner { max-width: 720px; margin: 0 auto; gap: 2px; }
+.bottomnav a { height: calc(var(--nav-h) - 8px); border-radius: 28px; font-size: 11px; color: var(--muted); }
+.bottomnav a.active { color: var(--brand); background: var(--brand-soft); font-weight: 600; }
+.bottomnav svg { width: 23px; height: 23px; }
+.badge { top: 4px; box-shadow: 0 0 0 2px var(--surface); }
+.main { padding-bottom: calc(var(--nav-h) + var(--nav-gap) + 32px + env(safe-area-inset-bottom, 0px)); }
+.toast, .fab { bottom: calc(var(--nav-h) + var(--nav-gap) + 14px + env(safe-area-inset-bottom, 0px)); }
+.toast { border-radius: 999px; padding: 11px 18px; box-shadow: var(--shadow-lg); }
+
+/* ---------- Nút nổi Giao việc ---------- */
+.fab { border-radius: 999px; height: 52px; padding: 0 20px; box-shadow: var(--shadow-lg); }
+
+/* ---------- Thẻ, danh sách: kiểu nhóm bo tròn của iOS ---------- */
+.card { border-color: transparent; border-radius: var(--radius); }
+.task-card { padding: 14px 16px; }
+.task-card:hover { border-color: var(--brand-line); }
+.task-card .t { font-size: 16px; font-weight: 600; }
+.list-row, .notif, .timeline li, .steps li, .add-step { border-top-width: .5px; }
+.list-row:hover { background: var(--surface-2); }
+.section-title { font-size: 13px; font-weight: 500; letter-spacing: .02em; margin: 22px 16px 6px; }
+.empty { padding: 44px 16px; }
+.progress { border: 0; background: var(--fill); height: 6px; }
+
+/* ---------- Nút ---------- */
+.btn { border-radius: 12px; font-weight: 600; letter-spacing: -.01em; }
+.btn.sm { border-radius: 10px; }
+.btn.secondary { background: var(--brand-soft); color: var(--brand); }
+
+/* ---------- Ô nhập ---------- */
+.input, select.input, textarea.input { border: .5px solid var(--line); border-radius: 12px; }
+.input:focus { outline: 2px solid var(--brand); outline-offset: 0; border-color: transparent; }
+
+/* ---------- Bộ lọc dạng chip và nút chọn (segmented control) ---------- */
+.chip { border-color: transparent; background: var(--surface); padding: 7px 14px; font-weight: 600; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.tabs { background: var(--fill); border: 0; border-radius: 11px; padding: 2px; gap: 2px; }
+.tabs button { border-radius: 9px; padding: 7px 6px; color: var(--ink); font-weight: 500; }
+.tabs button[aria-selected="true"] { font-weight: 600; box-shadow: var(--shadow); }
+.seg button { border-radius: 12px; min-height: 44px; }
+.pill { padding: 3px 10px; }
+
+/* ---------- Bảng trượt (sheet) ---------- */
+.sheet { border-radius: 22px 22px 0 0; }
+.sheet .grip { width: 36px; height: 5px; border-radius: 3px; background: var(--fill); }
+.sheet-x { background: var(--fill); width: 32px; height: 32px; margin: -4px -4px 0 0; }
+@media (min-width: 700px) { .sheet { border-radius: 22px; } }
+
+/* ---------- Đăng nhập: nền sáng, thẻ trắng, không khối xanh ---------- */
+.auth-wrap { background: var(--bg); }
+.auth-card { border-radius: 24px; box-shadow: var(--shadow-lg); }
+
+/* ---------- Menu Ứng dụng ---------- */
+.apps-pop { border: .5px solid var(--glass-line); border-radius: 20px; background: var(--surface); }
+.apps-pop a { border-radius: 14px; }
+.apps-pop .ai { background: var(--brand-soft); border-radius: 12px; }
+.apps-pop .ai svg { width: 26px; height: 26px; }
+
+/* ---------- Máy tính (≥ 900px): thanh menu, tab màn hình, thanh trạng thái kiểu macOS ---------- */
+@media (min-width: 900px) {
+  .apphead { background: var(--glass); border-bottom: .5px solid var(--glass-line); }
+  .mm-btn { color: var(--ink); font-weight: 500; }
+  .mm-btn:hover, .mm-btn[aria-expanded="true"] { background: var(--fill); }
+  .mm-pop { border: .5px solid var(--glass-line); border-radius: 14px; }
+  .ah-btn:hover { background: var(--fill); }
+  .otabs { background: var(--bg); border-bottom: .5px solid var(--line); }
+  .otab { border-radius: 10px 10px 0 0; }
+  .otab.on { border-color: var(--line); }
+  .topbar { background: var(--glass); color: var(--ink); border-bottom: .5px solid var(--glass-line); }
+  .topbar .back:hover { background: var(--fill); }
+  .statusbar { background: var(--glass); color: var(--muted); border-top: .5px solid var(--glass-line);
+    -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); }
+  .toast { bottom: 44px; }
+  .fab { bottom: 44px; }
+  .main { padding-bottom: 40px; }
+}
+
+/* ---------- Trợ năng: Giảm độ trong suốt / trình duyệt không hỗ trợ blur → nền đặc ---------- */
+@media (prefers-reduced-transparency: reduce) {
+  .apphead, .topbar, .bottomnav, .statusbar { background: var(--glass-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .apphead, .topbar, .bottomnav, .statusbar { background: var(--glass-solid); }
+}
+@media (prefers-contrast: more) {
+  .apphead, .topbar, .bottomnav, .statusbar { background: var(--surface); border-color: var(--ink); }
+  .card { border-color: var(--line); }
+}
+@media print { .bottomnav { display: none !important; } }
