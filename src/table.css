@@ -220,3 +220,5 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 .tile.tile-late[aria-pressed="true"] b, .tile.tile-near[aria-pressed="true"] b { color: var(--brand-ink); }
 .re-photo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
 .re-photo img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2, var(--line)); }
+.meter-shot { display: flex; align-items: center; gap: 8px; }
+.meter-shot img { width: 52px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); display: block; }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { friendlyError, supabase } from "../lib/supabase";
 import { useSession } from "../lib/session";
@@ -6,6 +6,7 @@ import { useCanEditBuilding } from "../lib/useCanEdit";
 import { meterPeriodVN, todayVN } from "../lib/dates";
 import { vnd } from "../lib/money";
 import { Empty, TopBar } from "../components/ui";
+import { fileUrls, uploadMeterPhoto, type MeterPhoto, type StoredFile } from "../lib/files";
 import "../reports.css";
 
 type Row = {
@@ -15,6 +16,8 @@ type Row = {
   elec_price: number | null; elec_amount: number | null; water_price: number | null; water_amount: number | null; updated_at: string | null;
 };
 type Draft = { start: string; end: string };
+type Shot = { p: MeterPhoto; url: string; ocr: boolean };
+type SavedPhoto = { thumb: string; full: string };
 const num = (s: string) => { const t = s.trim().replace(/\s/g, "").replace(",", "."); return t === "" ? null : Number(t); };
 const fmt = (n: number | null | undefined) => (n == null ? "" : new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(Number(n)));
 const monthStart = (iso: string) => iso.slice(0, 7) + "-01";
@@ -35,10 +38,17 @@ export default function RoomUtilities({ buildingId, embedded }: { buildingId?: s
   const [onlyRented, setOnlyRented] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Ảnh đồng hồ: ảnh mới chụp theo phòng (bắt buộc khi lưu) và ảnh đã lưu của kỳ
+  const [shots, setShots] = useState<Record<string, Shot>>({});
+  const [saved, setSaved] = useState<Record<string, SavedPhoto>>({});
+  const [shooting, setShooting] = useState<string | null>(null);
+  const [rowMsg, setRowMsg] = useState<Record<string, string>>({});
+  const fileRef = useRef<HTMLInputElement>(null);
+  const target = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
-    setRows(null);
+    setRows(null); setShots({}); setSaved({}); setRowMsg({});
     const { data, error } = await supabase.rpc("room_utility_month", { p_building: id, p_period: month });
     if (error) { setErr(friendlyError(error)); setRows([]); return; }
     const list = (data ?? []) as Row[];
@@ -47,7 +57,36 @@ export default function RoomUtilities({ buildingId, embedded }: { buildingId?: s
       start: r.start_reading != null ? String(r.start_reading) : r.prev_end != null ? String(r.prev_end) : "",
       end: r.end_reading != null ? String(r.end_reading) : "",
     }])));
+    const { data: ph } = await supabase.from("room_elec_readings").select("id,room_id,photo_path,photo_store,photo_thumb")
+      .eq("building_id", id).eq("period", month).not("photo_path", "is", null);
+    const files = ((ph ?? []) as { id: string; room_id: string; photo_path: string; photo_store: "r2" | "supabase"; photo_thumb: boolean }[])
+      .map((x) => ({ room: x.room_id, f: { id: x.id, path: x.photo_path, store: x.photo_store, thumb: x.photo_thumb } as unknown as StoredFile }));
+    if (files.length) {
+      const [t, full] = await Promise.all([fileUrls(files.map((x) => x.f), "thumb"), fileUrls(files.map((x) => x.f), "full")]).catch(() => [{}, {}] as Record<string, string>[]);
+      setSaved(Object.fromEntries(files.filter((x) => t[x.f.id]).map((x) => [x.room, { thumb: t[x.f.id], full: full[x.f.id] ?? t[x.f.id] }])));
+    }
   }, [id, month]);
+
+  function shoot(roomId: string) { target.current = roomId; fileRef.current?.click(); }
+  async function pick(f: File | undefined) {
+    const rid = target.current;
+    if (fileRef.current) fileRef.current.value = "";
+    if (!f || !id || !rid) return;
+    setShooting(rid); setRowMsg((m) => ({ ...m, [rid]: "Đang tải ảnh…" }));
+    try {
+      const p = await uploadMeterPhoto(id, f);
+      setRowMsg((m) => ({ ...m, [rid]: "Đang đọc số…" }));
+      const { data, error } = await supabase.functions.invoke("doc-dong-ho", { body: { image: p.base64, mime: p.mime } });
+      const v = (data as { reading?: number | null } | null)?.reading;
+      const ocr = !error && typeof v === "number";
+      if (ocr) setDrafts((cur) => ({ ...cur, [rid]: { ...(cur[rid] ?? { start: "", end: "" }), end: String(v) } }));
+      setShots((cur) => { if (cur[rid]) URL.revokeObjectURL(cur[rid].url); return { ...cur, [rid]: { p, url: URL.createObjectURL(f), ocr } }; });
+      setRowMsg((m) => ({ ...m, [rid]: ocr ? "Đã đọc số, kiểm tra lại" : "Chưa đọc được, nhập tay" }));
+    } catch (e) {
+      setRowMsg((m) => ({ ...m, [rid]: (e as Error).message }));
+    }
+    setShooting(null);
+  }
   useEffect(() => { load(); }, [load]);
 
   const shown = useMemo(() => (rows ?? []).filter((r) => !onlyRented || r.contract_id || r.reading_id), [rows, onlyRented]);
@@ -58,8 +97,10 @@ export default function RoomUtilities({ buildingId, embedded }: { buildingId?: s
     const d = drafts[r.room_id]; if (!d) return false;
     const s = num(d.start), e = num(d.end);
     if (s == null || e == null) return false;
+    if (shots[r.room_id]) return true;
     return s !== (r.start_reading == null ? null : Number(r.start_reading)) || e !== (r.end_reading == null ? null : Number(r.end_reading));
   });
+  const missing = changed.filter((r) => !shots[r.room_id]).length;
   const preview = (r: Row) => {
     const d = drafts[r.room_id]; const s = d ? num(d.start) : null, e = d ? num(d.end) : null;
     if (s == null || e == null || Number.isNaN(s) || Number.isNaN(e) || e < s) return null;
@@ -77,10 +118,17 @@ export default function RoomUtilities({ buildingId, embedded }: { buildingId?: s
       if (Number.isNaN(s) || Number.isNaN(e) || s < 0) { setErr(`Phòng ${r.room_code}: số chưa đúng.`); return; }
       if (e < s) { setErr(`Phòng ${r.room_code}: số cuối kỳ (${fmt(e)}) nhỏ hơn số đầu kỳ (${fmt(s)}).`); return; }
     }
+    const noPhoto = changed.filter((r) => !shots[r.room_id]);
+    if (noPhoto.length) { setErr(`Chụp ảnh đồng hồ phòng ${noPhoto.map((r) => r.room_code).join(", ")} rồi mới lưu được.`); return; }
     setBusy(true);
     for (const r of changed) {
-      const d = drafts[r.room_id];
-      const { error } = await supabase.rpc("room_elec_save", { p_room: r.room_id, p_period: month, p_start: num(d.start), p_end: num(d.end), p_note: r.note });
+      const d = drafts[r.room_id]; const sh = shots[r.room_id].p;
+      const { error } = await supabase.rpc("room_elec_save", {
+        p_room: r.room_id, p_period: month, p_start: num(d.start), p_end: num(d.end),
+        p_note: shots[r.room_id].ocr ? "Đọc tự động từ ảnh, đã kiểm tra" : r.note,
+        p_path: sh.path, p_store: sh.store, p_thumb: sh.thumb, p_lat: sh.geo?.lat ?? null, p_lng: sh.geo?.lng ?? null,
+        p_accuracy: sh.geo?.accuracy ?? null, p_taken_at: sh.takenAt,
+      });
       if (error) { setBusy(false); setErr(`Phòng ${r.room_code}: ${friendlyError(error)}`); load(); return; }
     }
     setBusy(false);
@@ -116,7 +164,7 @@ export default function RoomUtilities({ buildingId, embedded }: { buildingId?: s
           <Empty title="Không có phòng nào">{onlyRented ? "Toà chưa có phòng nào đang có hợp đồng. Bỏ tích “Chỉ phòng đang cho thuê” để xem tất cả." : "Toà chưa có phòng thuê tháng."}</Empty>
         ) : (
           <div className="pg-card"><div className="dt-wrap"><table className="dt cards meter-cards">
-            <thead><tr><th>Phòng</th><th>Số đầu kỳ</th><th>Số cuối kỳ</th><th>kWh · tiền điện</th><th>Tiền nước</th></tr></thead>
+            <thead><tr><th>Phòng</th><th>Ảnh đồng hồ</th><th>Số đầu kỳ</th><th>Số cuối kỳ</th><th>kWh · tiền điện</th><th>Tiền nước</th></tr></thead>
             <tbody>{shown.map((r) => {
               const d = drafts[r.room_id] ?? { start: "", end: "" }; const p = preview(r);
               const set = (k: keyof Draft, v: string) => setDrafts((cur) => ({ ...cur, [r.room_id]: { ...d, [k]: v } }));
@@ -125,6 +173,17 @@ export default function RoomUtilities({ buildingId, embedded }: { buildingId?: s
                 <tr key={r.room_id} className={r.contract_id && r.end_reading == null ? "meter-todo" : undefined}>
                   <td data-label="Phòng"><div className="t1">{r.room_code}{r.end_reading == null && r.contract_id ? <span className="meter-flag"> chưa ghi</span> : null}</div>
                     <div className="t2">{r.tenant_name ?? (r.room_status === "trong" ? "Trống" : "Chưa có hợp đồng")}{r.contract_id ? ` · ${r.occupants}${r.max_occupants ? `/${r.max_occupants}` : ""} người` : ""}</div></td>
+                  <td data-label="Ảnh đồng hồ">
+                    <div className="meter-shot">
+                      {shots[r.room_id] || saved[r.room_id] ? (
+                        <a href={shots[r.room_id]?.url ?? saved[r.room_id].full} target="_blank" rel="noreferrer" title={shots[r.room_id] ? "Ảnh mới, chưa lưu" : "Ảnh đã lưu"}>
+                          <img src={shots[r.room_id]?.url ?? saved[r.room_id].thumb} alt={`Ảnh đồng hồ phòng ${r.room_code}`} /></a>
+                      ) : null}
+                      {canEdit ? <button type="button" className={`btn sm${shots[r.room_id] ? " secondary" : ""}`} disabled={!!shooting} onClick={() => shoot(r.room_id)}>
+                        {shooting === r.room_id ? "Đang xử lý…" : shots[r.room_id] ? "Chụp lại" : "Chụp"}</button> : null}
+                    </div>
+                    {rowMsg[r.room_id] ? <div className="t2">{rowMsg[r.room_id]}</div> : null}
+                  </td>
                   <td data-label={r.prev_end == null && canEdit ? "Số đầu kỳ (cần nhập)" : "Số đầu kỳ"}>
                     {startEditable ? <input className="input num meter-in" inputMode="decimal" aria-label={`Số đầu kỳ phòng ${r.room_code}`} value={d.start} onChange={(e) => set("start", e.target.value)} placeholder="Số đầu" />
                       : <span className="num">{canEdit ? d.start : fmt(r.start_reading)}</span>}</td>
@@ -140,9 +199,11 @@ export default function RoomUtilities({ buildingId, embedded }: { buildingId?: s
           <div className="row meter-total"><span>Cộng</span><span className="num">{fmt(total.kwh)} kWh · điện {vnd(total.dien)} · nước {vnd(total.nuoc)}</span></div></div>
         )}
         {canEdit && shown.length ? (
-          <button className="btn block meter-save" disabled={busy || !changed.length} onClick={saveAll}>{busy ? "Đang lưu…" : changed.length ? `Lưu số điện ${changed.length} phòng` : "Chưa có số nào thay đổi"}</button>
+          <button className="btn block meter-save" disabled={busy || !changed.length || missing > 0} onClick={saveAll}>{busy ? "Đang lưu…" : missing ? `Còn ${missing} phòng chưa chụp ảnh đồng hồ` : changed.length ? `Lưu số điện ${changed.length} phòng` : "Chưa có số nào thay đổi"}</button>
         ) : null}
+        {canEdit ? <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(ev) => pick(ev.target.files?.[0])} /> : null}
         <p className="muted small" style={{ margin: 0 }}>
+          Mỗi phòng phải chụp ảnh đồng hồ mới lưu được số; app ghi giờ, vị trí lên ảnh và tự đọc số vào ô Số cuối kỳ.
           Ghi đồng hồ từ ngày 28 đến cuối tháng; số này tính vào hoá đơn ngày 1 tháng sau. Số đầu kỳ tự lấy từ số cuối kỳ tháng trước. Phòng chưa có số tháng trước (phòng mới, khách mới vào) thì nhập cả số đầu kỳ (số lúc khách vào ở) và số cuối kỳ. Thay đồng hồ thì báo Giám sát hoặc Quản lý sửa số đầu kỳ. Hoá đơn tháng sau đã lập mà chưa thu sẽ tự tính lại tiền điện. Tiền điện = (số cuối kỳ − số đầu kỳ) × giá điện.
           Tiền nước = số người đang ở × giá nước/người (không ghi số nước). Số người lấy theo mục “Người ở” trong hợp đồng.
           {canEdit ? "" : " Bạn chỉ xem: sale phòng Kinh doanh phụ trách toà, Giám sát hoặc Quản lý mới ghi số."}

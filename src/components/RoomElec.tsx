@@ -82,7 +82,6 @@ export default function RoomElec({ buildingId, roomId, roomCode }: { buildingId:
   const price = row?.elec_price ?? null;
   const ok = s != null && e != null && !Number.isNaN(s) && !Number.isNaN(e) && e >= s;
   const kwh = ok ? e! - s! : null;
-  const changed = !!photo || s !== (row?.start_reading ?? null) || e !== (row?.end_reading ?? null);
   const startEditable = canEdit && (row?.prev_end == null || isManager || isSupervisor);
 
   async function save() {
@@ -90,6 +89,7 @@ export default function RoomElec({ buildingId, roomId, roomCode }: { buildingId:
     if (s == null || Number.isNaN(s) || s < 0) { setErr("Nhập số đầu kỳ."); return; }
     if (e == null || Number.isNaN(e)) { setErr("Nhập số cuối kỳ trên đồng hồ."); return; }
     if (e < s) { setErr(`Số cuối kỳ (${fmt(e)}) nhỏ hơn số đầu kỳ (${fmt(s)}).`); return; }
+    if (!photo) { setErr("Cần chụp ảnh đồng hồ mới lưu được số."); return; }
     setBusy(true);
     const { error } = await supabase.rpc("room_elec_save", {
       p_room: roomId, p_period: month, p_start: s, p_end: e,
@@ -117,11 +117,11 @@ export default function RoomElec({ buildingId, roomId, roomCode }: { buildingId:
         <>
           {canEdit ? (
             <div className="field">
-              <span>Ảnh đồng hồ điện</span>
+              <span>Ảnh đồng hồ điện *</span>
               <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(ev) => pick(ev.target.files?.[0])} />
               <button type="button" className="btn secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
                 {photo || savedUrl ? "Chụp lại ảnh đồng hồ" : "Chụp ảnh đồng hồ"}</button>
-              <small className="muted">Chụp rõ dãy số. App ghi giờ, vị trí lên ảnh và tự đọc số vào ô Số cuối kỳ.</small>
+              <small className="muted">Bắt buộc mỗi lần lưu. Chụp rõ dãy số; app ghi giờ, vị trí lên ảnh và tự đọc số vào ô Số cuối kỳ.</small>
             </div>
           ) : null}
           {msg ? <p className="small" role="status" style={{ margin: 0 }}>{msg}</p> : null}
@@ -144,7 +144,7 @@ export default function RoomElec({ buildingId, roomId, roomCode }: { buildingId:
             {row.water_amount != null ? <> · nước {vnd(row.water_amount)} ({row.occupants} người)</> : null}
           </p>
           {canEdit ? (
-            <button type="button" className="btn" disabled={busy || !changed || e == null} onClick={save}>{busy ? "Đang lưu…" : e == null ? "Nhập số cuối kỳ để lưu" : changed ? "Lưu số điện" : "Đã lưu"}</button>
+            <button type="button" className="btn" disabled={busy || !photo || e == null} onClick={save}>{busy ? "Đang xử lý…" : !photo ? "Chụp ảnh đồng hồ để lưu" : e == null ? "Nhập số cuối kỳ để lưu" : "Lưu số điện"}</button>
           ) : <p className="muted small" style={{ margin: 0 }}>Bạn chỉ xem. Sale phụ trách toà, Giám sát hoặc Quản lý mới ghi số.</p>}
         </>
       ) : null}
