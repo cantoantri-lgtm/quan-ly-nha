@@ -10,6 +10,7 @@ import FileGallery from "../components/FileGallery";
 import ContractQR from "../components/ContractQR";
 import DepositPanel from "../components/DepositPanel";
 import { ContractTerm } from "../components/ContractTerm";
+import ElecStartField, { ElecStartView, elecStartColumns, elecStartError, emptyElecStart, type ElecStart } from "../components/ElecStartField";
 import { uploadFile } from "../lib/files";
 import type { Room } from "./BuildingDetail";
 import VehiclesPanel from "../components/VehiclesPanel";
@@ -21,6 +22,7 @@ type Contract = {
   rent_amount: number; deposit_amount: number; deposit_status: "chua_thu" | "da_thu" | "da_hoan"; billing_day: number;
   status: "hieu_luc" | "da_ket_thuc" | "da_huy"; sign_method: "giay" | "dien_tu" | null; signed_on: string | null; note: string | null;
   vehicles: number;
+  elec_start: number | null; elec_start_photo_path: string | null; elec_start_photo_store: "r2" | "supabase" | null; elec_start_photo_thumb: boolean; elec_start_taken_at: string | null;
   rooms: { code: string } | null; tenants: { full_name: string } | null;
 };
 const ST: Record<Contract["status"], string> = { hieu_luc: "Hiệu lực", da_ket_thuc: "Đã kết thúc", da_huy: "Đã huỷ" };
@@ -100,6 +102,7 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
   const [tenantId, setTenantId] = useState("");
   const [code, setCode] = useState("");
   const [start, setStart] = useState(todayVN());
+  const [elecStart, setElecStart] = useState<ElecStart>(emptyElecStart);
   const [end, setEnd] = useState("");
   const [rent, setRent] = useState("");
   const [deposit, setDeposit] = useState("");
@@ -133,11 +136,12 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
     if (depN == null) { setErr("Tiền cọc chưa đúng."); return; }
     if (!start || !end) { setErr("Nhập ngày hiệu lực hợp đồng: từ ngày và đến ngày."); return; }
     if (end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
+    const eb = elecStartError(elecStart); if (eb) { setErr(eb); return; }
     setBusy(true);
     const { data, error } = await supabase.from("contracts").insert({
       room_id: roomId, tenant_id: tenantId, code: code.trim() || null, start_date: start, end_date: end || null,
       rent_amount: rentN, deposit_amount: depN, billing_day: Number(billing) || 5, vehicles: Number(vehicles) || 0,
-      sign_method: sign || null, signed_on: sign ? start : null,
+      sign_method: sign || null, signed_on: sign ? start : null, ...elecStartColumns(elecStart),
     }).select("id").single();
     setBusy(false);
     if (error) { setErr(/contracts_one_active/.test(error.message) ? "Phòng này đang có hợp đồng hiệu lực." : friendlyError(error)); return; }
@@ -161,6 +165,7 @@ function NewContract({ buildingId, onClose, onSaved }: { buildingId: string; onC
           <small className="muted">Chưa có khách? Thêm ở mục <Link to={`/toa/${buildingId}/khach`}>Khách thuê</Link> trước.</small></label>
         <label className="field"><span>Số hợp đồng</span><input id="c-code" className="input" value={code} onChange={(e) => setCode(e.target.value)} placeholder="VD: HD-339-0012" /></label>
         <ContractTerm start={start} end={end} onStart={setStart} onEnd={setEnd} />
+        <ElecStartField buildingId={buildingId} value={elecStart} onChange={setElecStart} idPrefix="c" />
         <div className="row" style={{ alignItems: "flex-start" }}>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Giá thuê / tháng *</span><input id="c-rent" className="input num" inputMode="decimal" value={rent} onChange={(e) => setRent(e.target.value)} /></label>
           <label className="field" style={{ flex: "1 1 150px" }}><span>Tiền cọc</span><input id="c-dep" className="input num" inputMode="decimal" value={deposit} onChange={(e) => setDeposit(e.target.value)} /></label>
@@ -213,6 +218,7 @@ function ContractView({ c, canManage, canEdit, onClose, onChanged }: { c: Contra
           {canEdit ? <button type="button" className="btn ghost sm" onClick={() => setEditing(true)}>Sửa hợp đồng</button> : null}
         </div>
 
+        <ElecStartView c={c} />
         <OccupantsPanel c={c} canEdit={canEdit} />
         <VehiclesPanel contractId={c.id} active={c.status === "hieu_luc"} canEdit={canEdit} onChanged={onChanged} />
 
