@@ -527,8 +527,6 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
           <button type="button" className="btn secondary" onClick={() => { onSaved(cred.msg); nav(`/khach/${cred.tenantId}`); }}>Xong, mở hồ sơ khách</button>
         </div>
       ) : (
-      <>
-      {!isNew && room.id && (room.rent_mode ?? "thang") === "thang" ? <RoomElec buildingId={building.id} roomId={room.id} roomCode={room.code ?? ""} /> : null}
       <form className="stack" onSubmit={submit}>
         {canEdit ? (
           <>
@@ -666,9 +664,9 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
           ) : <button type="button" className="btn ghost" style={{ color: "var(--danger)" }} onClick={() => setConfirmDel(true)}>Xoá phòng</button>
         ) : null}
       </form>
-      </>
       )}
       {!isNew && !cred && room.id ? <RelatedPanel type="room" id={room.id} title={`Liên quan tới phòng ${room.code}`} bare /> : null}
+      {!isNew && !cred && room.id && (room.rent_mode ?? "thang") === "thang" ? <RoomElec buildingId={building.id} roomId={room.id} roomCode={room.code ?? ""} /> : null}
     </Sheet>
   );
 }

@@ -218,3 +218,5 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 .hw-acts { display: flex; gap: 4px; align-items: center; flex: none; }
 .hw-acts .ico-btn:disabled { opacity: .35; }
 .tile.tile-late[aria-pressed="true"] b, .tile.tile-near[aria-pressed="true"] b { color: var(--brand-ink); }
+.re-photo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+.re-photo img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2, var(--line)); }
