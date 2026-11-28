@@ -70,7 +70,7 @@ export default function ProjectForm() {
     if (end < start) { setErr("Ngày kết thúc phải sau ngày bắt đầu."); return; }
     if (budget && amt == null) { setErr("Ngân sách chưa đúng định dạng."); return; }
     setBusy(true); setErr(null);
-    const row = { name: name.trim(), description: desc.trim() || null, pic_id: pic, start_date: start, end_date: end, budget: amt ?? 0,
+    const row: Record<string, unknown> = { name: name.trim(), description: desc.trim() || null, pic_id: pic, start_date: start, end_date: end, budget: amt ?? 0,
       loa_id: loaId || null, building_id: building || null, ...(editing ? { status } : { created_by: profile!.id }) };
     const res = editing
       ? await supabase.from("projects").update(row).eq("id", id!).select("id").single()

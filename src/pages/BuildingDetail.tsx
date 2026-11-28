@@ -431,12 +431,14 @@ function RoomSheet({ room, building, canManage, canEdit, types, onClose, onSaved
     setBusy(true);
     // Khi cần lập hợp đồng: lưu phòng trước với trạng thái cũ, hợp đồng sẽ tự chuyển phòng sang "Đang cho thuê"
     const saveStatus = needTenant ? (room.status === "dang_o" ? "dang_o" : (room.status ?? "trong")) : status;
-    const row = canEdit
+    const row0 = canEdit
       ? { building_id: building.id, code: code.trim().toUpperCase(), floor: floor ? Number(floor) : guessFloor(code),
           room_type_id: typeId || null, room_type: curType?.name ?? (room.room_type_id ? null : room.room_type ?? null),
           rent_mode: mode, list_price: p, max_occupants: maxOcc ? Number(maxOcc) : null, status: saveStatus, note: note.trim() || null,
           furniture: furn.trim() || null }
       : { status, note: note.trim() || null };
+    // Kiểu dữ liệu là hợp của 2 dạng (sửa đủ hoặc chỉ trạng thái); thư viện Supabase mới cần một kiểu bản ghi chung
+    const row: Record<string, unknown> = row0;
     const { error } = isNew ? await supabase.from("rooms").insert(row) : await supabase.from("rooms").update(row).eq("id", room.id!);
     if (error) { setBusy(false); setErr(/duplicate/i.test(error.message) ? `Phòng ${code} đã có trong toà này.` : friendlyError(error)); return; }
     if (needTenant) {

@@ -97,7 +97,7 @@ export default function DnttView({ requestId, refreshKey, canAddLink, canDeleteL
               <ul className="dn-list">
                 {links.map((k) => (
                   <li key={k.id}>
-                    <a href={k.url} target="_blank" rel="noopener noreferrer">{k.title || k.url}</a>
+                    {/^https?:\/\//i.test(k.url) ? <a href={k.url} target="_blank" rel="noopener noreferrer">{k.title || k.url}</a> : <span>{k.title || k.url}</span>}
                     {canDeleteLink ? <button type="button" className="btn ghost" onClick={() => delLink(k.id)}>Xoá</button> : null}
                   </li>
                 ))}
