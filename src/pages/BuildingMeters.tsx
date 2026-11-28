@@ -5,6 +5,7 @@ import { useSession } from "../lib/session";
 import { todayVN } from "../lib/dates";
 import { Empty, Sheet, TopBar } from "../components/ui";
 import { fileUrls, uploadMeterPhoto, type MeterPhoto, type StoredFile } from "../lib/files";
+import ElecCompare from "../components/ElecCompare";
 import "../feedback.css";
 
 type Row = {
@@ -25,6 +26,7 @@ export default function BuildingMeters() {
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [sheet, setSheet] = useState<"dien" | "nuoc" | null>(null);
+  const [tick, setTick] = useState(0);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("building_meter_readings")
@@ -59,6 +61,7 @@ export default function BuildingMeters() {
             );
           })}
         </section>
+        <ElecCompare buildingId={building.id} refresh={tick} />
         {loading ? <div className="loading">Đang tải…</div> : null}
         {!loading && !rows.length ? <Empty title="Chưa có số nào">Bấm "Ghi số điện" hoặc "Ghi số nước" ở trên.</Empty> : null}
         {periods.map((p) => (
@@ -83,7 +86,7 @@ export default function BuildingMeters() {
         ))}
       </main>
       <MeterSheet open={!!sheet} kind={sheet ?? "dien"} buildingId={building.id} last={sheet ? rows.find((r) => r.kind === sheet && r.period < thisMonth)?.reading ?? null : null}
-        onClose={() => setSheet(null)} onDone={() => { setSheet(null); load(); }} />
+        onClose={() => setSheet(null)} onDone={() => { setSheet(null); load(); setTick((t) => t + 1); }} />
     </>
   );
 }

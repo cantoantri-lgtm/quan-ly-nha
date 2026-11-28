@@ -222,3 +222,9 @@ table.dt tfoot td { padding: 10px 12px; font-weight: 700; background: var(--surf
 .re-photo img { width: 96px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2, var(--line)); }
 .meter-shot { display: flex; align-items: center; gap: 8px; }
 .meter-shot img { width: 52px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); display: block; }
+.ec-grid { display: grid; gap: 0; font-size: 14px; }
+.ec-row { display: grid; grid-template-columns: 52px 1fr 1fr 1.15fr; gap: 6px; padding: 8px 0; border-top: 1px solid var(--line); align-items: start; }
+.ec-row > span { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+.ec-row small { display: block; font-size: 12px; }
+.ec-head { border-top: 0; font-size: 12px; color: var(--muted); font-weight: 600; padding-top: 0; }
+.ec-head > span:first-child { text-align: left; align-items: flex-start; }
