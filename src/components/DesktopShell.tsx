@@ -148,7 +148,7 @@ export function StatusBar() {
   return (
     <footer className="statusbar">
       <span>{profile.full_name} · {ROLE_LABEL[profile.role as Role] ?? ""}</span>
-      <span>Hôm nay {ddmmyyyy(todayVN())} · Next Living</span>
+      <span>Hôm nay {ddmmyyyy(todayVN())} · Next Vision</span>
     </footer>
   );
 }

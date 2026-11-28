@@ -259,8 +259,8 @@ export function AppHeader() {
 
   return (
     <header className="apphead">
-      <Link to={isCustomer ? "/thong-tin" : isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Next Living"><img src="/logo-next-living-ngang.svg" alt="Next Living" /></Link>
-      <div className="ah-co"><b>NEXT LIVING</b><small>Thuộc Next Vision</small></div>
+      <Link to={isCustomer ? "/thong-tin" : isCollaborator ? "/ban-do" : "/"} className="ah-logo" aria-label="Về trang chủ Next Vision"><img src="/logo-next-vision-ngang.svg" alt="Next Vision" /></Link>
+      <div className="ah-co"><b>NEXT VISION</b><small>Giao việc & quản lý nhà cho thuê</small></div>
       <nav className="ah-menu" aria-label="Menu chức năng">
         {groups.filter((g) => g.items.length).map((g) => {
           const on = menu === g.menu;

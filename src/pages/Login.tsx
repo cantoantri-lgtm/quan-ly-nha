@@ -26,7 +26,7 @@ export default function Login() {
     <div className="auth-wrap">
       <form className="auth-card" onSubmit={submit}>
         <div className="brand-logo">
-          <img src="/logo-next-living.svg" alt="Next Living – thuộc Next Vision" />
+          <img src="/logo-next-vision.svg" alt="Next Vision" />
           <div className="bs">Giao việc & quản lý nhà cho thuê</div>
         </div>
         <label className="field">
